@@ -110,8 +110,10 @@ suite('History panel manager', () => {
 		assert.strictEqual(fakePanel.getRevealCount(), 1);
 		assert.ok(fakePanel.panel.webview.html.includes('Session History'));
 		assert.ok(fakePanel.panel.webview.html.includes('copyAssistantButton-'));
+		assert.ok(fakePanel.panel.webview.html.includes('codicon-history'));
 		assert.ok(fakePanel.panel.webview.html.includes('codicon-comment'));
 		assert.ok(fakePanel.panel.webview.html.includes('codicon-copilot'));
+		assert.ok(!fakePanel.panel.webview.html.includes('featuresTab'));
 		manager.dispose();
 	});
 

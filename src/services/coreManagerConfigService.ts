@@ -4,17 +4,7 @@ import path from 'path';
 import * as vscode from 'vscode';
 import { messages } from '../i18n';
 import { listTrustedDirectories } from './coreDiagnosticsService';
-import { stabilizeManagedConfigToml } from './configTomlOrganizerService';
 import { resolveCopilotPaths } from './workspaceStatus';
-
-export type FeatureFlagRecord = {
-	key: string;
-	enabled: boolean;
-	configuredValue?: boolean;
-	defaultEnabled: boolean;
-	maturity: 'Stable' | 'Experimental' | 'Deprecated';
-	description: string;
-};
 
 export type HookEventName =
 	| 'SessionStart'
@@ -60,13 +50,6 @@ export type HookDiagnosticsSnapshot = {
 	warnings: string[];
 };
 
-type FeatureFlagDefinition = {
-	key: string;
-	defaultEnabled: boolean;
-	maturity: FeatureFlagRecord['maturity'];
-	getDescription: () => string;
-};
-
 type ParsedHookGroup = {
 	event: HookEventName;
 	matcher?: string;
@@ -78,87 +61,6 @@ type ParsedHookGroup = {
 	}>;
 };
 
-const FEATURE_DEFINITIONS: FeatureFlagDefinition[] = [
-	{
-		key: 'apps',
-		defaultEnabled: false,
-		maturity: 'Experimental',
-		getDescription: () => messages.featureFlagDescriptionApps,
-	},
-	{
-		key: 'codex_hooks',
-		defaultEnabled: true,
-		maturity: 'Stable',
-		getDescription: () => messages.featureFlagDescriptionCodexHooks,
-	},
-	{
-		key: 'fast_mode',
-		defaultEnabled: true,
-		maturity: 'Stable',
-		getDescription: () => messages.featureFlagDescriptionFastMode,
-	},
-	{
-		key: 'memories',
-		defaultEnabled: false,
-		maturity: 'Stable',
-		getDescription: () => messages.featureFlagDescriptionMemories,
-	},
-	{
-		key: 'multi_agent',
-		defaultEnabled: true,
-		maturity: 'Stable',
-		getDescription: () => messages.featureFlagDescriptionMultiAgent,
-	},
-	{
-		key: 'personality',
-		defaultEnabled: true,
-		maturity: 'Stable',
-		getDescription: () => messages.featureFlagDescriptionPersonality,
-	},
-	{
-		key: 'shell_snapshot',
-		defaultEnabled: true,
-		maturity: 'Stable',
-		getDescription: () => messages.featureFlagDescriptionShellSnapshot,
-	},
-	{
-		key: 'shell_tool',
-		defaultEnabled: true,
-		maturity: 'Stable',
-		getDescription: () => messages.featureFlagDescriptionShellTool,
-	},
-	{
-		key: 'unified_exec',
-		defaultEnabled: process.platform !== 'win32',
-		maturity: 'Stable',
-		getDescription: () => messages.featureFlagDescriptionUnifiedExec,
-	},
-	{
-		key: 'undo',
-		defaultEnabled: false,
-		maturity: 'Stable',
-		getDescription: () => messages.featureFlagDescriptionUndo,
-	},
-	{
-		key: 'web_search',
-		defaultEnabled: true,
-		maturity: 'Deprecated',
-		getDescription: () => messages.featureFlagDescriptionWebSearch,
-	},
-	{
-		key: 'web_search_cached',
-		defaultEnabled: false,
-		maturity: 'Deprecated',
-		getDescription: () => messages.featureFlagDescriptionWebSearchCached,
-	},
-	{
-		key: 'web_search_request',
-		defaultEnabled: false,
-		maturity: 'Deprecated',
-		getDescription: () => messages.featureFlagDescriptionWebSearchRequest,
-	},
-];
-
 const HOOK_EVENTS: HookEventName[] = [
 	'SessionStart',
 	'PreToolUse',
@@ -168,91 +70,8 @@ const HOOK_EVENTS: HookEventName[] = [
 	'Stop',
 ];
 
-const FEATURES_HEADER_PATTERN = /^\s*\[features\]\s*$/;
-const BOOLEAN_FEATURE_PATTERN = /^\s*([A-Za-z0-9_]+)\s*=\s*(true|false)(\s*#.*)?$/i;
-
 function getWorkspaceRoot(): string | undefined {
 	return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-}
-
-export function listFeatureFlagRecords(
-	configPath: string = resolveCopilotPaths().configPath,
-): FeatureFlagRecord[] {
-	const configured = readConfiguredFeatureFlags(configPath);
-	return FEATURE_DEFINITIONS.map((definition) => {
-		const configuredValue = configured.get(definition.key);
-		return {
-			key: definition.key,
-			enabled: configuredValue ?? definition.defaultEnabled,
-			configuredValue,
-			defaultEnabled: definition.defaultEnabled,
-			maturity: definition.maturity,
-			description: definition.getDescription(),
-		};
-	});
-}
-
-export function setFeatureFlag(
-	configPath: string,
-	featureKey: string,
-	enabled: boolean,
-): void {
-	const contents = fs.existsSync(configPath)
-		? fs.readFileSync(configPath, 'utf8')
-		: '';
-	const lines = contents.split(/\r?\n/);
-	let featuresHeaderIndex: number | undefined;
-	let insertIndex = lines.length;
-
-	for (let index = 0; index < lines.length; index += 1) {
-		const line = lines[index];
-		if (FEATURES_HEADER_PATTERN.test(line)) {
-			featuresHeaderIndex = index;
-			insertIndex = lines.length;
-			let lastFeatureLineIndex = index;
-			for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
-				if (/^\s*\[/.test(lines[cursor])) {
-					insertIndex =
-						lastFeatureLineIndex > index ? lastFeatureLineIndex + 1 : cursor;
-					break;
-				}
-				const match = lines[cursor].match(BOOLEAN_FEATURE_PATTERN);
-				if (match) {
-					lastFeatureLineIndex = cursor;
-				}
-				if (match?.[1] === featureKey) {
-					lines[cursor] = `${featureKey} = ${enabled ? 'true' : 'false'}${match[3] ?? ''}`;
-					fs.writeFileSync(
-						configPath,
-						stabilizeManagedConfigToml(lines.join('\n')),
-						'utf8',
-					);
-					return;
-				}
-			}
-			if (insertIndex === lines.length && lastFeatureLineIndex > index) {
-				insertIndex = lastFeatureLineIndex + 1;
-			}
-			break;
-		}
-	}
-
-	if (featuresHeaderIndex === undefined) {
-		const nextContents = `${contents.trimEnd()}${contents.trim().length > 0 ? '\n\n' : ''}[features]\n${featureKey} = ${enabled ? 'true' : 'false'}\n`;
-		fs.writeFileSync(
-			configPath,
-			stabilizeManagedConfigToml(nextContents),
-			'utf8',
-		);
-		return;
-	}
-
-	lines.splice(insertIndex, 0, `${featureKey} = ${enabled ? 'true' : 'false'}`);
-	fs.writeFileSync(
-		configPath,
-		stabilizeManagedConfigToml(lines.join('\n')),
-		'utf8',
-	);
 }
 
 export function listHookDiagnostics(
@@ -260,8 +79,7 @@ export function listHookDiagnostics(
 	homeDir: string = os.homedir(),
 	workspaceRoot: string | undefined = getWorkspaceRoot(),
 ): HookDiagnosticsSnapshot {
-	const featureFlags = listFeatureFlagRecords(configPath);
-	const hooksEnabled = featureFlags.find((record) => record.key === 'codex_hooks')?.enabled ?? true;
+	const hooksEnabled = readHooksEnabled(configPath);
 	const trustedDirectories = listTrustedDirectories(configPath);
 	const projectTrusted = workspaceRoot
 		? trustedDirectories.some(
@@ -360,31 +178,19 @@ export function createHooksJsonFile(targetPath: string): void {
 	}
 }
 
-function readConfiguredFeatureFlags(configPath: string): Map<string, boolean> {
+function readHooksEnabled(configPath: string): boolean {
 	if (!fs.existsSync(configPath)) {
-		return new Map<string, boolean>();
+		return true;
 	}
-	const contents = fs.readFileSync(configPath, 'utf8');
-	const lines = contents.split(/\r?\n/);
-	const configured = new Map<string, boolean>();
-	let inFeatures = false;
-
-	for (const line of lines) {
-		if (/^\s*\[/.test(line)) {
-			inFeatures = FEATURES_HEADER_PATTERN.test(line);
-			continue;
-		}
-		if (!inFeatures) {
-			continue;
-		}
-		const match = line.match(BOOLEAN_FEATURE_PATTERN);
-		if (!match) {
-			continue;
-		}
-		configured.set(match[1], match[2].toLowerCase() === 'true');
+	try {
+		const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
+			features?: Record<string, unknown>;
+		};
+		const enabled = parsed.features?.codex_hooks;
+		return typeof enabled === 'boolean' ? enabled : true;
+	} catch {
+		return true;
 	}
-
-	return configured;
 }
 
 function countHookHandlers(groups: ParsedHookGroup[]): number {

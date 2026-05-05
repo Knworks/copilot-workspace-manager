@@ -133,10 +133,6 @@ export const messages = {
 		'message.coreViewConversationHistoryTab',
 		'Session History',
 	),
-	coreViewFeatureFlagsTab: localize(
-		'message.coreViewFeatureFlagsTab',
-		'Feature Flags',
-	),
 	coreViewHooksTab: localize(
 		'message.coreViewHooksTab',
 		'Hooks',
@@ -444,74 +440,6 @@ export const messages = {
 	coreViewTrustedDirectoriesTab: localize(
 		'message.coreViewTrustedDirectoriesTab',
 		'Trusted Directory',
-	),
-	featureFlagSourceDefault: localize(
-		'message.featureFlagSourceDefault',
-		'Default',
-	),
-	featureFlagSourceConfig: localize(
-		'message.featureFlagSourceConfig',
-		'Configured',
-	),
-	featureFlagDefaultLabel: localize(
-		'message.featureFlagDefaultLabel',
-		'Default',
-	),
-	featureFlagEffectiveLabel: localize(
-		'message.featureFlagEffectiveLabel',
-		'Effective',
-	),
-	featureFlagDescriptionApps: localize(
-		'message.featureFlagDescriptionApps',
-		'Enable ChatGPT Apps and connectors support.',
-	),
-	featureFlagDescriptionCodexHooks: localize(
-		'message.featureFlagDescriptionCodexHooks',
-		'Enable lifecycle hooks from hooks.json or inline [hooks].',
-	),
-	featureFlagDescriptionFastMode: localize(
-		'message.featureFlagDescriptionFastMode',
-		'Enable Fast mode selection and the service_tier = "fast" path.',
-	),
-	featureFlagDescriptionMemories: localize(
-		'message.featureFlagDescriptionMemories',
-		'Enable Memories.',
-	),
-	featureFlagDescriptionMultiAgent: localize(
-		'message.featureFlagDescriptionMultiAgent',
-		'Enable subagent collaboration tools.',
-	),
-	featureFlagDescriptionPersonality: localize(
-		'message.featureFlagDescriptionPersonality',
-		'Enable personality selection controls.',
-	),
-	featureFlagDescriptionShellSnapshot: localize(
-		'message.featureFlagDescriptionShellSnapshot',
-		'Snapshot the shell environment to speed up repeated commands.',
-	),
-	featureFlagDescriptionShellTool: localize(
-		'message.featureFlagDescriptionShellTool',
-		'Enable the default shell tool.',
-	),
-	featureFlagDescriptionUnifiedExec: localize(
-		'message.featureFlagDescriptionUnifiedExec',
-		'Use the unified PTY-backed exec tool.',
-	),
-	featureFlagDescriptionUndo: localize(
-		'message.featureFlagDescriptionUndo',
-		'Enable undo via per-turn git ghost snapshots.',
-	),
-	featureFlagDescriptionWebSearch: localize(
-		'message.featureFlagDescriptionWebSearch',
-		'Legacy toggle. Prefer the top-level web_search setting.',
-	),
-	featureFlagDescriptionWebSearchCached: localize(
-		'message.featureFlagDescriptionWebSearchCached',
-		'Legacy toggle that maps to web_search = "cached".',
-	),
-	featureFlagDescriptionWebSearchRequest: localize(
-		'message.featureFlagDescriptionWebSearchRequest',
-		'Legacy toggle that maps to web_search = "live".',
 	),
 	hooksEnableFeature: localize(
 		'message.hooksEnableFeature',

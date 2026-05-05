@@ -17,9 +17,7 @@ import {
 } from './coreDiagnosticsService';
 import {
 	createHooksJsonFile,
-	listFeatureFlagRecords,
 	listHookDiagnostics,
-	setFeatureFlag,
 } from './coreManagerConfigService';
 import { getCoreWorkspaceStatus, resolveCopilotPaths } from './workspaceStatus';
 import { CODICON_RESOURCE_ROOTS, getCodiconCssHref, getCodiconIconPath } from './webviewAssets';
@@ -36,12 +34,11 @@ type HistoryPanelInboundMessage =
 	| { type: 'refreshTab'; tab: CoreViewTab }
 	| { type: 'addTrustedDirectory' }
 	| { type: 'removeTrustedDirectory'; targetPath: string }
-	| { type: 'setFeatureFlag'; featureKey: string; enabled: boolean }
 	| { type: 'openPath'; targetPath: string }
 	| { type: 'createHooksFile'; targetPath: string }
 	| { type: 'createEmptyFile'; targetPath: string };
 
-type CoreViewTab = 'history' | 'chain' | 'trusted' | 'features' | 'hooks';
+type CoreViewTab = 'history' | 'chain' | 'trusted' | 'hooks';
 
 type HistoryTurnSummary = {
 	turnId: string;
@@ -203,7 +200,6 @@ function isCoreViewTab(value: unknown): value is CoreViewTab {
 		value === 'history' ||
 		value === 'chain' ||
 		value === 'trusted' ||
-		value === 'features' ||
 		value === 'hooks'
 	);
 }
@@ -316,23 +312,6 @@ function buildTrustedDirectoriesHtml(): string {
 	<div class="trusted-list">${rows || `<p class="muted">${messages.historyNoResult}</p>`}</div>`;
 }
 
-function buildFeatureFlagsHtml(): string {
-	const rows = listFeatureFlagRecords(resolveCopilotPaths().configPath)
-		.map((flag) => `<article class="setting-card">
-			<div>
-				<div><strong>${escapeHtml(flag.key)}</strong></div>
-				<div class="muted">${escapeHtml(flag.description)}</div>
-			</div>
-			<label class="setting-toggle">
-				<input type="checkbox" data-feature-toggle="${escapeHtml(flag.key)}" ${flag.enabled ? 'checked' : ''} />
-				<span>${flag.enabled ? 'true' : 'false'}</span>
-			</label>
-		</article>`)
-		.join('');
-	return `<div class="tab-toolbar">${buildRefreshButtonHtml('features')}</div>
-	<div class="settings-list">${rows || `<p class="muted">${messages.historyNoResult}</p>`}</div>`;
-}
-
 function buildHooksHtml(): string {
 	const diagnostics = listHookDiagnostics();
 	const warnings = diagnostics.warnings
@@ -422,7 +401,7 @@ function buildHistoryWebviewHtml(
 		body { margin: 0; font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); }
 		.root { display: grid; grid-template-rows: auto 1fr; height: 100vh; }
 		.tabs { display: flex; gap: 4px; padding: 8px 12px 0; border-bottom: 1px solid var(--vscode-panel-border); }
-		.tab { border: 1px solid var(--vscode-panel-border); border-bottom: 0; padding: 6px 10px; border-radius: 4px 4px 0 0; background: var(--vscode-tab-inactiveBackground); color: var(--vscode-tab-inactiveForeground); }
+		.tab { border: 1px solid var(--vscode-panel-border); border-bottom: 0; padding: 6px 10px; border-radius: 4px 4px 0 0; background: var(--vscode-tab-inactiveBackground); color: var(--vscode-tab-inactiveForeground); display: inline-flex; gap: 6px; align-items: center; }
 		.tab.active { background: var(--vscode-tab-activeBackground); color: var(--vscode-tab-activeForeground); }
 		.diag-tab { display: none; min-height: 0; }
 		.diag-tab.active { display: grid; grid-template-rows: auto 1fr; }
@@ -445,7 +424,7 @@ function buildHistoryWebviewHtml(
 		.answer-block, .chain-list, .chain-detail, .trusted-list, .settings-list, .history-list, .history-section { display: grid; gap: 6px; }
 		.history-section.compact { gap: 3px; }
 		.history-section.compact .section-title { margin-bottom: 4px; }
-		.frame-header, .setting-card, .trusted-row, .chain-card { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+		.frame-header, .setting-card, .trusted-row { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
 		.message-frame { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; }
 		.message-main { display: grid; gap: 4px; min-width: 0; }
 		.copy-button { border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); padding: 4px 6px; cursor: pointer; }
@@ -465,15 +444,33 @@ function buildHistoryWebviewHtml(
 		.raw-events summary { margin-bottom: 6px; }
 		.answer-block > section, .answer-block > details { margin: 0; }
 		.answer-block ul { margin: 0; padding-left: 20px; }
+		.chain-toolbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+		.chain-toolbar-main { display: grid; gap: 4px; min-width: 0; }
+		.chain-summary-line { color: var(--vscode-descriptionForeground); font-size: 12px; }
+		.chain-group { display: grid; gap: 6px; }
+		.chain-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; width: 100%; padding: 8px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); color: var(--vscode-foreground); text-align: left; cursor: pointer; }
+		.chain-row.active { border-color: var(--vscode-focusBorder); background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
+		.chain-main { display: grid; gap: 4px; min-width: 0; }
+		.chain-title { font-weight: 600; word-break: break-word; }
+		.chain-subtitle, .chain-status-meta, .chain-path { color: var(--vscode-descriptionForeground); font-size: 12px; }
+		.chain-status-badge { display: inline-flex; align-items: center; gap: 6px; color: var(--vscode-descriptionForeground); font-size: 12px; white-space: nowrap; }
+		.chain-detail-card { display: grid; gap: 10px; padding: 8px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); }
+		.required-switch { display: inline-flex; align-items: center; cursor: pointer; user-select: none; gap: 8px; }
+		.required-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+		.required-switch span.switch-track { display: inline-block; width: 34px; height: 18px; border-radius: 999px; background: var(--vscode-checkbox-background, var(--vscode-input-background)); border: 1px solid var(--vscode-checkbox-border, var(--vscode-panel-border)); position: relative; vertical-align: middle; box-sizing: border-box; transition: background 0.15s ease, border-color 0.15s ease; }
+		.required-switch span.switch-track::after { content: ""; position: absolute; top: 50%; left: 1px; width: 14px; height: 14px; border-radius: 50%; background: var(--vscode-button-secondaryForeground); transform: translateY(-50%); transition: transform 0.15s ease; }
+		.required-switch input:checked + span.switch-track { background: var(--vscode-button-background); border-color: var(--vscode-button-background); }
+		.required-switch input:checked + span.switch-track::after { transform: translate(16px, -50%); background: var(--vscode-button-foreground); }
+		.required-switch input:focus-visible + span.switch-track { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
+		.chain-toggle-label { color: var(--vscode-descriptionForeground); font-size: 12px; }
 	</style>
 </head>
 <body>
 	<div class="root">
 		<nav class="tabs" aria-label="${escapeHtml(messages.coreViewTabsAriaLabel)}">
-			<button class="tab active" data-tab="history" type="button">${messages.coreViewConversationHistoryTab}</button>
-			<button class="tab" data-tab="chain" type="button">${messages.coreViewAgentsChainTab}</button>
+			<button class="tab active" data-tab="history" type="button"><span class="codicon codicon-history" aria-hidden="true"></span><span>${messages.coreViewConversationHistoryTab}</span></button>
+			<button class="tab" data-tab="chain" type="button"><span class="codicon codicon-copilot" aria-hidden="true"></span><span>${messages.coreViewAgentsChainTab}</span></button>
 			<button class="tab" data-tab="trusted" type="button">${messages.coreViewTrustedDirectoriesTab}</button>
-			<button class="tab" data-tab="features" type="button">${messages.coreViewFeatureFlagsTab}</button>
 			<button class="tab" data-tab="hooks" type="button">${messages.coreViewHooksTab}</button>
 		</nav>
 		<section id="historyTab" class="diag-tab active">
@@ -491,12 +488,20 @@ function buildHistoryWebviewHtml(
 		</section>
 		<section id="chainTab" class="diag-tab">
 			<div class="tab-toolbar">
-				<div>
-					<div id="chainContext" class="muted"></div>
-					<div id="chainSummary" class="muted"></div>
+				<div class="chain-toolbar">
+					<div class="chain-toolbar-main">
+						<div id="chainContext" class="muted"></div>
+						<div id="chainSummary" class="chain-summary-line"></div>
+					</div>
+					<div class="toolbar">
+						<label class="required-switch" title="${escapeHtml(messages.chainToggleDetails)}">
+							<input id="chainDetailsToggle" type="checkbox" />
+							<span class="switch-track"></span>
+							<span class="chain-toggle-label">${messages.chainToggleDetails}</span>
+						</label>
+						${buildRefreshButtonHtml('chain')}
+					</div>
 				</div>
-				<label><input id="chainDetailsToggle" type="checkbox" /> ${messages.chainToggleDetails}</label>
-				${buildRefreshButtonHtml('chain')}
 			</div>
 			<section class="bottom-pane">
 				<aside id="chainList" class="left-pane"></aside>
@@ -504,7 +509,6 @@ function buildHistoryWebviewHtml(
 			</section>
 		</section>
 		<section id="trustedTab" class="diag-tab"><div id="trustedContent"></div></section>
-		<section id="featuresTab" class="diag-tab"><div id="featuresContent"></div></section>
 		<section id="hooksTab" class="diag-tab"><div id="hooksContent"></div></section>
 	</div>
 	<script nonce="${nonce}">
@@ -589,14 +593,6 @@ function buildHistoryWebviewHtml(
 
 		document.addEventListener('change', (event) => {
 			const target = event.target instanceof HTMLInputElement ? event.target : null;
-			if (target?.dataset?.featureToggle) {
-				vscode.postMessage({
-					type: 'setFeatureFlag',
-					featureKey: target.dataset.featureToggle,
-					enabled: target.checked,
-				});
-				return;
-			}
 			if (target === chainDetailsToggle) {
 				showDetailedChainCandidates = Boolean(chainDetailsToggle.checked);
 				renderChain();
@@ -663,19 +659,20 @@ function buildHistoryWebviewHtml(
 					continue;
 				}
 				const section = document.createElement('section');
+				section.className = 'chain-group';
 				section.innerHTML = '<h3 class="chain-section-title">' + escapeHtml(sectionLabel) + '</h3>';
 				for (const entry of sectionEntries) {
 					const card = document.createElement('button');
 					card.type = 'button';
-					card.className = 'turn-card chain-card' + (entry.id === selectedChainId ? ' active' : '');
-					card.innerHTML = '<span><span class="turn-title">' + escapeHtml(entry.title) + '</span><div class="muted">' + escapeHtml(entry.summary) + '</div></span><span>' + escapeHtml(entry.statusLabel) + '</span>';
+					card.className = 'chain-row' + (entry.id === selectedChainId ? ' active' : '');
+					card.innerHTML = '<span class="codicon codicon-file row-icon" aria-hidden="true"></span><div class="chain-main"><div class="chain-title">' + escapeHtml(entry.title) + '</div><div class="chain-subtitle">' + escapeHtml(entry.summary) + '</div></div><div class="chain-status-badge">' + escapeHtml(entry.statusLabel) + '</div>';
 					card.addEventListener('click', () => { selectedChainId = entry.id; renderChain(); });
 					section.appendChild(card);
 				}
 				chainList.appendChild(section);
 			}
 			const selected = visibleEntries.find((entry) => entry.id === selectedChainId) || visibleEntries[0];
-			chainPreview.innerHTML = '<section class="chain-detail"><h2 class="section-title">' + escapeHtml(selected.title) + '</h2><div class="chain-detail-grid"><div class="chain-detail-label">' + escapeHtml(labels.chainDetailStatus) + '</div><div>' + escapeHtml(selected.statusLabel) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailClassification) + '</div><div>' + escapeHtml(selected.subtitle) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailPath) + '</div><div class="muted">' + escapeHtml(selected.path) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailExplanation) + '</div><div>' + escapeHtml(selected.explanation) + '</div></div>' + (selected.contentPreview ? '<pre>' + escapeHtml(selected.contentPreview) + '</pre>' : '') + '</section>';
+			chainPreview.innerHTML = '<section class="chain-detail-card"><div class="chain-main"><div class="chain-title">' + escapeHtml(selected.title) + '</div><div class="chain-status-meta">' + escapeHtml(selected.statusLabel) + ' / ' + escapeHtml(selected.subtitle) + '</div></div><div class="chain-detail-grid"><div class="chain-detail-label">' + escapeHtml(labels.chainDetailStatus) + '</div><div>' + escapeHtml(selected.statusLabel) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailClassification) + '</div><div>' + escapeHtml(selected.subtitle) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailPath) + '</div><div class="chain-path">' + escapeHtml(selected.path) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailExplanation) + '</div><div>' + escapeHtml(selected.explanation) + '</div></div>' + (selected.contentPreview ? '<pre>' + escapeHtml(selected.contentPreview) + '</pre>' : '') + '</section>';
 		};
 
 		const render = () => {
@@ -703,10 +700,6 @@ function buildHistoryWebviewHtml(
 				if (message.tab === 'trusted') {
 					loadedTabs.add('trusted');
 					document.getElementById('trustedContent').innerHTML = message.html;
-				}
-				if (message.tab === 'features') {
-					loadedTabs.add('features');
-					document.getElementById('featuresContent').innerHTML = message.html;
 				}
 				if (message.tab === 'hooks') {
 					loadedTabs.add('hooks');
@@ -742,7 +735,7 @@ export function createHistoryWebviewPanel(): vscode.WebviewPanel {
 		{ viewColumn: vscode.ViewColumn.Active, preserveFocus: false },
 		panelOptions,
 	);
-	panel.iconPath = getCodiconIconPath('terminal');
+	panel.iconPath = getCodiconIconPath('copilot');
 	return panel;
 }
 
@@ -839,14 +832,6 @@ export class HistoryPanelManager implements vscode.Disposable {
 			void this.removeTrustedDirectory(incoming.targetPath);
 			return;
 		}
-		if (
-			incoming.type === 'setFeatureFlag' &&
-			typeof incoming.featureKey === 'string' &&
-			typeof incoming.enabled === 'boolean'
-		) {
-			void this.setFeatureFlag(incoming.featureKey, incoming.enabled);
-			return;
-		}
 		if (incoming.type === 'openPath' && typeof incoming.targetPath === 'string') {
 			void this.openPath(incoming.targetPath);
 			return;
@@ -895,15 +880,6 @@ export class HistoryPanelManager implements vscode.Disposable {
 		this.refreshTab('trusted');
 	}
 
-	private async setFeatureFlag(featureKey: string, enabled: boolean): Promise<void> {
-		setFeatureFlag(resolveCopilotPaths().configPath, featureKey, enabled);
-		vscode.window.showInformationMessage(messages.mcpToggleUpdated);
-		this.refreshTab('features');
-		if (featureKey === 'codex_hooks') {
-			this.refreshTab('hooks');
-		}
-	}
-
 	private async openPath(targetPath: string): Promise<void> {
 		await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(targetPath));
 	}
@@ -940,14 +916,6 @@ export class HistoryPanelManager implements vscode.Disposable {
 				type: 'tabContent',
 				tab,
 				html: buildTrustedDirectoriesHtml(),
-			});
-			return;
-		}
-		if (tab === 'features') {
-			void this.panel.webview.postMessage({
-				type: 'tabContent',
-				tab,
-				html: buildFeatureFlagsHtml(),
 			});
 			return;
 		}
