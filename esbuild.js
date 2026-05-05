@@ -9,7 +9,7 @@ const codiconSourceDir = path.resolve(__dirname, 'node_modules', '@vscode', 'cod
 const codiconIconSourceDir = path.resolve(__dirname, 'node_modules', '@vscode', 'codicons', 'src', 'icons');
 const codiconDistDir = path.resolve(__dirname, 'dist', 'webview', 'codicons');
 const codiconAssetNames = ['codicon.css', 'codicon.ttf'];
-const codiconIconNames = ['agent', 'history', 'hubot', 'mcp', 'server', 'sparkle', 'terminal'];
+const codiconIconNames = ['agent', 'copilot', 'history', 'hubot', 'mcp', 'server', 'sparkle', 'terminal'];
 
 async function copyWebviewAssets() {
 	await fs.mkdir(codiconDistDir, { recursive: true });

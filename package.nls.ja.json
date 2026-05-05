@@ -57,7 +57,6 @@
   "message.historyPanelTitle": "Session History",
   "message.coreViewPanelTitle": "Copilot Manager",
   "message.coreViewConversationHistoryTab": "Session History",
-  "message.coreViewFeatureFlagsTab": "Feature Flags",
   "message.coreViewHooksTab": "Hooks",
   "message.skillManagerTitle": "Skill Manager",
   "message.skillManagerSearchPlaceholder": "Skillを検索",

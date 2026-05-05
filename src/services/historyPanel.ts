@@ -530,7 +530,76 @@ function buildHistoryWebviewHtml(
 		const chainDetailsToggle = document.getElementById('chainDetailsToggle');
 		const escapeHtml = (value) => String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll(\"'\", '&#39;');
 		const escapeRegExp = (value) => value.replace(/[.*+?^$()|[\\]{}\\\\]/g, '\\\\$&');
-		const renderMarkdown = (markdown) => escapeHtml(markdown || '').split(/\\n{2,}/).map((chunk) => '<p>' + chunk.replaceAll('\\n', '<br />') + '</p>').join('');
+		const renderInlineMarkdown = (text) => escapeHtml(text || '')
+			.replace(new RegExp('\\u0060([^\\u0060]+)\\u0060', 'g'), '<code>$1</code>')
+			.replace(new RegExp('\\\\*\\\\*([^*]+)\\\\*\\\\*', 'g'), '<strong>$1</strong>')
+			.replace(new RegExp('\\\\*([^*]+)\\\\*', 'g'), '<em>$1</em>');
+		const renderMarkdown = (markdown) => {
+			const source = String(markdown || '').replace(/\\r\\n/g, '\\n');
+			if (!source.trim()) {
+				return '';
+			}
+			const lines = source.split('\\n');
+			const html = [];
+			let inCodeBlock = false;
+			let codeLines = [];
+			let inList = false;
+			const flushList = () => {
+				if (!inList) {
+					return;
+				}
+				html.push('</ul>');
+				inList = false;
+			};
+			const flushCodeBlock = () => {
+				if (!inCodeBlock) {
+					return;
+				}
+				html.push('<pre><code>' + escapeHtml(codeLines.join('\\n')) + '</code></pre>');
+				inCodeBlock = false;
+				codeLines = [];
+			};
+			for (const line of lines) {
+				if (line.trim().startsWith('\u0060\u0060\u0060')) {
+					if (inCodeBlock) {
+						flushCodeBlock();
+					} else {
+						flushList();
+						inCodeBlock = true;
+					}
+					continue;
+				}
+				if (inCodeBlock) {
+					codeLines.push(line);
+					continue;
+				}
+				if (!line.trim()) {
+					flushList();
+					continue;
+				}
+				const headingMatch = line.match(/^(#{1,6})\\s+(.*)$/);
+				if (headingMatch) {
+					flushList();
+					const level = headingMatch[1].length;
+					html.push('<h' + level + '>' + renderInlineMarkdown(headingMatch[2]) + '</h' + level + '>');
+					continue;
+				}
+				const listMatch = line.match(/^\\s*[-*+]\\s+(.*)$/);
+				if (listMatch) {
+					if (!inList) {
+						html.push('<ul>');
+						inList = true;
+					}
+					html.push('<li>' + renderInlineMarkdown(listMatch[1]) + '</li>');
+					continue;
+				}
+				flushList();
+				html.push('<p>' + renderInlineMarkdown(line).replace(/  /g, '&nbsp; ') + '</p>');
+			}
+			flushList();
+			flushCodeBlock();
+			return html.join('');
+		};
 		const highlightTitle = (text, query) => {
 			const escaped = escapeHtml(text);
 			if (!query) {
@@ -672,7 +741,7 @@ function buildHistoryWebviewHtml(
 				chainList.appendChild(section);
 			}
 			const selected = visibleEntries.find((entry) => entry.id === selectedChainId) || visibleEntries[0];
-			chainPreview.innerHTML = '<section class="chain-detail-card"><div class="chain-main"><div class="chain-title">' + escapeHtml(selected.title) + '</div><div class="chain-status-meta">' + escapeHtml(selected.statusLabel) + ' / ' + escapeHtml(selected.subtitle) + '</div></div><div class="chain-detail-grid"><div class="chain-detail-label">' + escapeHtml(labels.chainDetailStatus) + '</div><div>' + escapeHtml(selected.statusLabel) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailClassification) + '</div><div>' + escapeHtml(selected.subtitle) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailPath) + '</div><div class="chain-path">' + escapeHtml(selected.path) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailExplanation) + '</div><div>' + escapeHtml(selected.explanation) + '</div></div>' + (selected.contentPreview ? '<pre>' + escapeHtml(selected.contentPreview) + '</pre>' : '') + '</section>';
+			chainPreview.innerHTML = '<section class="chain-detail-card"><div class="chain-main"><div class="chain-title">' + escapeHtml(selected.title) + '</div><div class="chain-status-meta">' + escapeHtml(selected.statusLabel) + ' / ' + escapeHtml(selected.subtitle) + '</div></div><div class="chain-detail-grid"><div class="chain-detail-label">' + escapeHtml(labels.chainDetailStatus) + '</div><div>' + escapeHtml(selected.statusLabel) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailClassification) + '</div><div>' + escapeHtml(selected.subtitle) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailPath) + '</div><div class="chain-path">' + escapeHtml(selected.path) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailExplanation) + '</div><div>' + escapeHtml(selected.explanation) + '</div></div>' + (selected.contentPreview ? '<div class="markdown-content">' + renderMarkdown(selected.contentPreview) + '</div>' : '') + '</section>';
 		};
 
 		const render = () => {
