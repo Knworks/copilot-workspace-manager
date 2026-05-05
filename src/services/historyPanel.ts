@@ -431,7 +431,8 @@ function buildHistoryWebviewHtml(
 		.icon-button { width: 24px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--vscode-panel-border); border-radius: 4px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; }
 		.meta-grid, .chain-detail-grid { display: grid; grid-template-columns: 140px 1fr; gap: 8px 12px; }
 		.meta-label, .chain-detail-label { color: var(--vscode-descriptionForeground); font-size: 12px; font-weight: 600; }
-		.section-title, .chain-section-title { margin: 0 0 6px; font-size: 12px; color: var(--vscode-descriptionForeground); }
+		.section-title { margin: 0 0 6px; font-size: 12px; color: var(--vscode-descriptionForeground); }
+		.chain-section-title { margin: 0 0 2px; font-size: 12px; color: var(--vscode-descriptionForeground); }
 		.markdown-content p { margin: 0 0 12px 0; line-height: 1.6; }
 		.markdown-content pre, .raw-events pre { background: var(--vscode-textCodeBlock-background); padding: 8px; border-radius: 4px; overflow: auto; }
 		mark.search-highlight { background: var(--vscode-editor-findMatchHighlightBackground); }
@@ -447,14 +448,21 @@ function buildHistoryWebviewHtml(
 		.chain-toolbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
 		.chain-toolbar-main { display: grid; gap: 4px; min-width: 0; }
 		.chain-summary-line { color: var(--vscode-descriptionForeground); font-size: 12px; }
-		.chain-group { display: grid; gap: 6px; }
-		.chain-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; width: 100%; padding: 8px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); color: var(--vscode-foreground); text-align: left; cursor: pointer; }
+		.chain-group { display: grid; gap: 2px; }
+		.chain-group-details { margin-top: 2px; }
+		.chain-row { position: relative; display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; width: 100%; padding: 8px 10px 8px 8px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); color: var(--vscode-foreground); text-align: left; cursor: pointer; }
 		.chain-row.active { border-color: var(--vscode-focusBorder); background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
-		.chain-main { display: grid; gap: 4px; min-width: 0; }
+		.chain-main { display: grid; gap: 4px; min-width: 0; padding-right: 90px; }
 		.chain-title { font-weight: 600; word-break: break-word; }
 		.chain-subtitle, .chain-status-meta, .chain-path { color: var(--vscode-descriptionForeground); font-size: 12px; }
-		.chain-status-badge { display: inline-flex; align-items: center; gap: 6px; color: var(--vscode-descriptionForeground); font-size: 12px; white-space: nowrap; }
-		.chain-detail-card { display: grid; gap: 10px; padding: 8px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); }
+		.chain-status-badge { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border: 1px solid color-mix(in srgb, currentColor 24%, var(--vscode-panel-border)); border-radius: 999px; background: color-mix(in srgb, currentColor 16%, var(--vscode-editorWidget-background)); color: var(--vscode-descriptionForeground); box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 8%, transparent); font-size: 11px; line-height: 1; white-space: nowrap; }
+		.chain-status-badge .codicon { font-size: 12px; }
+		.chain-status-current { color: var(--vscode-testing-iconPassed); }
+		.chain-status-ignored { color: var(--vscode-descriptionForeground); }
+		.chain-status-problems { color: var(--vscode-editorWarning-foreground); }
+		.chain-status-details { color: #f8afcf; }
+		.chain-detail-card { position: relative; display: grid; gap: 8px; padding: 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); }
+		.chain-preview-block { padding: 4px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editor-background); }
 		.required-switch { display: inline-flex; align-items: center; cursor: pointer; user-select: none; gap: 8px; }
 		.required-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
 		.required-switch span.switch-track { display: inline-block; width: 34px; height: 18px; border-radius: 999px; background: var(--vscode-checkbox-background, var(--vscode-input-background)); border: 1px solid var(--vscode-checkbox-border, var(--vscode-panel-border)); position: relative; vertical-align: middle; box-sizing: border-box; transition: background 0.15s ease, border-color 0.15s ease; }
@@ -608,6 +616,19 @@ function buildHistoryWebviewHtml(
 			return escaped.replace(new RegExp(escapeRegExp(query), 'gi'), (match) => '<mark class="search-highlight">' + match + '</mark>');
 		};
 		const chainSections = [['current', labels.chainCurrentSection], ['ignored', labels.chainIgnoredSection], ['problems', labels.chainProblemsSection], ['details', labels.chainDetailsSection]];
+		const getChainStatusIcon = (entry) => {
+			switch (entry.section) {
+				case 'current':
+					return 'check';
+				case 'ignored':
+					return 'circle-slash';
+				case 'problems':
+					return 'warning';
+				default:
+					return 'search';
+			}
+		};
+		const renderChainStatusBadge = (entry) => '<div class="chain-status-badge chain-status-' + entry.section + '" title="' + escapeHtml(entry.statusLabel) + '"><span class="codicon codicon-' + getChainStatusIcon(entry) + '" aria-hidden="true"></span><span>' + escapeHtml(entry.statusLabel) + '</span></div>';
 
 		searchInput.placeholder = labels.searchPlaceholder;
 		clearButton.title = labels.clear;
@@ -728,20 +749,20 @@ function buildHistoryWebviewHtml(
 					continue;
 				}
 				const section = document.createElement('section');
-				section.className = 'chain-group';
+				section.className = 'chain-group' + (sectionId === 'details' ? ' chain-group-details' : '');
 				section.innerHTML = '<h3 class="chain-section-title">' + escapeHtml(sectionLabel) + '</h3>';
 				for (const entry of sectionEntries) {
 					const card = document.createElement('button');
 					card.type = 'button';
 					card.className = 'chain-row' + (entry.id === selectedChainId ? ' active' : '');
-					card.innerHTML = '<span class="codicon codicon-file row-icon" aria-hidden="true"></span><div class="chain-main"><div class="chain-title">' + escapeHtml(entry.title) + '</div><div class="chain-subtitle">' + escapeHtml(entry.summary) + '</div></div><div class="chain-status-badge">' + escapeHtml(entry.statusLabel) + '</div>';
+					card.innerHTML = '<span class="codicon codicon-file row-icon" aria-hidden="true"></span><div class="chain-main"><div class="chain-title">' + escapeHtml(entry.title) + '</div><div class="chain-subtitle">' + escapeHtml(entry.summary) + '</div></div>' + renderChainStatusBadge(entry);
 					card.addEventListener('click', () => { selectedChainId = entry.id; renderChain(); });
 					section.appendChild(card);
 				}
 				chainList.appendChild(section);
 			}
 			const selected = visibleEntries.find((entry) => entry.id === selectedChainId) || visibleEntries[0];
-			chainPreview.innerHTML = '<section class="chain-detail-card"><div class="chain-main"><div class="chain-title">' + escapeHtml(selected.title) + '</div><div class="chain-status-meta">' + escapeHtml(selected.statusLabel) + ' / ' + escapeHtml(selected.subtitle) + '</div></div><div class="chain-detail-grid"><div class="chain-detail-label">' + escapeHtml(labels.chainDetailStatus) + '</div><div>' + escapeHtml(selected.statusLabel) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailClassification) + '</div><div>' + escapeHtml(selected.subtitle) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailPath) + '</div><div class="chain-path">' + escapeHtml(selected.path) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailExplanation) + '</div><div>' + escapeHtml(selected.explanation) + '</div></div>' + (selected.contentPreview ? '<div class="markdown-content">' + renderMarkdown(selected.contentPreview) + '</div>' : '') + '</section>';
+			chainPreview.innerHTML = '<section class="chain-detail-card">' + renderChainStatusBadge(selected) + '<div class="chain-main"><div class="chain-title">' + escapeHtml(selected.title) + '</div><div class="chain-status-meta">' + escapeHtml(selected.subtitle) + '</div></div><div class="chain-detail-grid"><div class="chain-detail-label">' + escapeHtml(labels.chainDetailClassification) + '</div><div>' + escapeHtml(selected.subtitle) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailPath) + '</div><div class="chain-path">' + escapeHtml(selected.path) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailExplanation) + '</div><div>' + escapeHtml(selected.explanation) + '</div></div>' + (selected.contentPreview ? '<div class="chain-preview-block"><div class="markdown-content">' + renderMarkdown(selected.contentPreview) + '</div></div>' : '') + '</section>';
 		};
 
 		const render = () => {
