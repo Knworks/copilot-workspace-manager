@@ -1,7 +1,6 @@
 import * as assert from 'assert';
 import {
-	getConfiguredMaxHistoryCount,
-	getIncludeReasoningMessage,
+	getMaxSessionHistoryCount,
 	getSyncSettings,
 } from '../services/settings';
 
@@ -65,43 +64,27 @@ suite('Sync settings', () => {
 		});
 	});
 
-	test('returns configured max history count when explicitly set', () => {
-		const config = createConfig({ maxHistoryCount: 42 });
+	test('returns configured max session history count when explicitly set', () => {
+		const config = createConfig({ maxSessionHistoryCount: 42 });
 
-		const maxHistoryCount = getConfiguredMaxHistoryCount(config);
+		const maxHistoryCount = getMaxSessionHistoryCount(config);
 
 		assert.strictEqual(maxHistoryCount, 42);
 	});
 
-	test('returns undefined max history count when not configured', () => {
+	test('returns default max session history count when not configured', () => {
 		const config = createConfig({});
 
-		const maxHistoryCount = getConfiguredMaxHistoryCount(config);
+		const maxHistoryCount = getMaxSessionHistoryCount(config);
 
-		assert.strictEqual(maxHistoryCount, undefined);
+		assert.strictEqual(maxHistoryCount, 100);
 	});
 
-	test('returns undefined max history count for non-positive values', () => {
-		const config = createConfig({ maxHistoryCount: 0 });
+	test('returns default max session history count for non-positive values', () => {
+		const config = createConfig({ maxSessionHistoryCount: 0 });
 
-		const maxHistoryCount = getConfiguredMaxHistoryCount(config);
+		const maxHistoryCount = getMaxSessionHistoryCount(config);
 
-		assert.strictEqual(maxHistoryCount, undefined);
-	});
-
-	test('returns false for include reasoning message when not configured', () => {
-		const config = createConfig({});
-
-		const includeReasoningMessage = getIncludeReasoningMessage(config);
-
-		assert.strictEqual(includeReasoningMessage, false);
-	});
-
-	test('returns configured include reasoning message flag', () => {
-		const config = createConfig({ incrudeReasoningMessage: true });
-
-		const includeReasoningMessage = getIncludeReasoningMessage(config);
-
-		assert.strictEqual(includeReasoningMessage, true);
+		assert.strictEqual(maxHistoryCount, 100);
 	});
 });

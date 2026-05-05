@@ -274,18 +274,12 @@
           "default": "",
           "description": "%configuration.agentFolder.description%"
         },
-        "copilot-workspace-manager.maxHistoryCount": {
+        "copilot-workspace-manager.maxSessionHistoryCount": {
           "type": "number",
           "default": 100,
           "minimum": 1,
           "order": 5,
-          "description": "%configuration.maxHistoryCount.description%"
-        },
-        "copilot-workspace-manager.incrudeReasoningMessage": {
-          "type": "boolean",
-          "default": false,
-          "order": 6,
-          "description": "%configuration.incrudeReasoningMessage.description%"
+          "description": "%configuration.maxSessionHistoryCount.description%"
         }
       }
     },

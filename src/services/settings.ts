@@ -21,9 +21,6 @@ type ConfigurationReader = Pick<vscode.WorkspaceConfiguration, 'get' | 'inspect'
 const readStringSetting = (value: unknown): string =>
 	typeof value === 'string' ? value : '';
 
-const readBooleanSetting = (value: unknown): boolean =>
-	typeof value === 'boolean' ? value : false;
-
 const readPositiveIntegerSetting = (value: unknown): number | undefined => {
 	if (typeof value !== 'number' || !Number.isFinite(value)) {
 		return undefined;
@@ -53,33 +50,16 @@ export function getSyncSettings(
 }
 
 /**
- * Reads history list limit from VS Code configuration.
+ * Reads the maximum number of session history items from VS Code configuration.
  *
- * Note:
- * - Returns a positive integer only when the user explicitly set maxHistoryCount.
- * - Returns undefined when not configured, so callers can treat it as "show all".
+ * Returns the configured positive integer, or the default value `100`.
  */
-export function getConfiguredMaxHistoryCount(
+export function getMaxSessionHistoryCount(
 	configuration: ConfigurationReader = vscode.workspace.getConfiguration(
 		SETTINGS_SECTION,
 	),
-): number | undefined {
-	const inspected = configuration.inspect<number>('maxHistoryCount');
-	if (!inspected) {
-		return undefined;
-	}
-	const explicitValue =
-		inspected.workspaceFolderValue ?? inspected.workspaceValue ?? inspected.globalValue;
-	return readPositiveIntegerSetting(explicitValue);
-}
-
-/**
- * Reads whether reasoning messages should be included in history preview.
- */
-export function getIncludeReasoningMessage(
-	configuration: ConfigurationReader = vscode.workspace.getConfiguration(
-		SETTINGS_SECTION,
-	),
-): boolean {
-	return readBooleanSetting(configuration.get('incrudeReasoningMessage'));
+): number {
+	return (
+		readPositiveIntegerSetting(configuration.get('maxSessionHistoryCount')) ?? 100
+	);
 }

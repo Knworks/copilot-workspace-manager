@@ -123,15 +123,15 @@ export const messages = {
 		),
 	historyPanelTitle: localize(
 		'message.historyPanelTitle',
-		'Copilot History',
+		'Session History',
 	),
 	coreViewPanelTitle: localize(
 		'message.coreViewPanelTitle',
-		'Copilot Core',
+		'Copilot Manager',
 	),
 	coreViewConversationHistoryTab: localize(
 		'message.coreViewConversationHistoryTab',
-		'History',
+		'Session History',
 	),
 	coreViewFeatureFlagsTab: localize(
 		'message.coreViewFeatureFlagsTab',
@@ -368,7 +368,7 @@ export const messages = {
 	),
 	coreViewTabsAriaLabel: localize(
 		'message.coreViewTabsAriaLabel',
-		'Copilot Core tabs',
+		'Copilot Manager tabs',
 	),
 	chainNoWorkspace: localize(
 		'message.chainNoWorkspace',
@@ -610,6 +610,42 @@ export const messages = {
 	historyAssistantLabel: localize(
 		'message.historyAssistantLabel',
 		'Assistant',
+	),
+	historySessionIdLabel: localize(
+		'message.historySessionIdLabel',
+		'Session',
+	),
+	historyEventsFileLabel: localize(
+		'message.historyEventsFileLabel',
+		'Events File',
+	),
+	historyAgentResponsesLabel: localize(
+		'message.historyAgentResponsesLabel',
+		'Agent Responses',
+	),
+	historyNoAgentResponses: localize(
+		'message.historyNoAgentResponses',
+		'No agent responses were extracted.',
+	),
+	historyToolUsageLabel: localize(
+		'message.historyToolUsageLabel',
+		'Tool Usage',
+	),
+	historyNoToolUsage: localize(
+		'message.historyNoToolUsage',
+		'No tool usage was extracted.',
+	),
+	historyIssuesLabel: localize(
+		'message.historyIssuesLabel',
+		'Issues',
+	),
+	historyRawEventsLabel: localize(
+		'message.historyRawEventsLabel',
+		'Raw Events',
+	),
+	historyRawEventsHelp: localize(
+		'message.historyRawEventsHelp',
+		'Shown only as fallback details when parsing was incomplete.',
 	),
 	helloWorld: localize(
 		'message.helloWorld',

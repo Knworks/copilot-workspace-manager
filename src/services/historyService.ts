@@ -1,22 +1,31 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import * as vscode from 'vscode';
 
 type RecordLike = Record<string, unknown>;
 
-export type HistoryAiTimelineItem = {
-	kind: 'assistant' | 'reasoning';
+export type HistoryAssistantMessage = {
 	message: string;
 	localTime: string;
-	sortTimestampMs: number;
-	sequence: number;
+};
+
+export type HistoryToolUsage = {
+	label: string;
+	status: string;
+	localTime: string;
+	detail?: string;
+};
+
+export type HistoryIssue = {
+	severity: 'warning' | 'error';
+	message: string;
 };
 
 export type HistoryTurnRecord = {
 	turnId: string;
 	sessionId: string;
 	filePath: string;
-	taskTurnId?: string;
 	year: string;
 	month: string;
 	day: string;
@@ -24,30 +33,25 @@ export type HistoryTurnRecord = {
 	localTime: string;
 	sortTimestampMs: number;
 	userMessage: string;
-	userMessageLocalTime?: string;
-	agentMessages: string[];
-	agentMessageLocalTimes?: string[];
-	agentMessageTimestampMs?: number[];
-	reasoningMessages: string[];
-	reasoningMessageLocalTimes?: string[];
-	reasoningMessageTimestampMs?: number[];
-	aiTimeline?: HistoryAiTimelineItem[];
-};
-
-export type HistoryDayNode = {
-	dateKey: string;
-	year: string;
-	month: string;
-	day: string;
-	turns: HistoryTurnRecord[];
+	userMessageLocalTime: string;
+	listLabel: string;
+	assistantMessages: HistoryAssistantMessage[];
+	toolUsages: HistoryToolUsage[];
+	issues: HistoryIssue[];
+	rawEvents: string[];
 };
 
 export type HistoryIndex = {
-	days: HistoryDayNode[];
 	turns: HistoryTurnRecord[];
 };
 
-const ROLLOUT_FILE_PATTERN = /^rollout-.*\.jsonl$/;
+type SessionEvent = {
+	type: string;
+	id?: string;
+	parentId?: string | null;
+	timestamp?: string;
+	data?: RecordLike;
+};
 
 function isRecordLike(value: unknown): value is RecordLike {
 	return typeof value === 'object' && value !== null;
@@ -64,8 +68,51 @@ function toTimestampMs(input: unknown): number | undefined {
 	return Number.isNaN(parsed) ? undefined : parsed;
 }
 
-function compareLabelDesc(a: string, b: string): number {
-	return b.localeCompare(a, undefined, { numeric: true });
+function extractText(value: unknown): string | undefined {
+	if (typeof value === 'string') {
+		const trimmed = value.trim();
+		return trimmed ? trimmed : undefined;
+	}
+	if (typeof value === 'number' || typeof value === 'boolean') {
+		return String(value);
+	}
+	if (Array.isArray(value)) {
+		const parts = value
+			.map((entry) => extractText(entry))
+			.filter((entry): entry is string => Boolean(entry));
+		return parts.length > 0 ? parts.join('\n') : undefined;
+	}
+	if (!isRecordLike(value)) {
+		return undefined;
+	}
+	return (
+		extractText(value.text) ??
+		extractText(value.content) ??
+		extractText(value.message) ??
+		extractText(value.output) ??
+		extractText(value.result) ??
+		extractText(value.summary) ??
+		extractText(value.value) ??
+		extractText(value.parts)
+	);
+}
+
+function formatDateParts(timestampMs: number): {
+	year: string;
+	month: string;
+	day: string;
+	dateKey: string;
+} {
+	const date = new Date(timestampMs);
+	const year = String(date.getFullYear());
+	const month = String(date.getMonth() + 1).padStart(2, '0');
+	const day = String(date.getDate()).padStart(2, '0');
+	return {
+		year,
+		month,
+		day,
+		dateKey: `${year}/${month}/${day}`,
+	};
 }
 
 function compareTurnDesc(left: HistoryTurnRecord, right: HistoryTurnRecord): number {
@@ -75,362 +122,258 @@ function compareTurnDesc(left: HistoryTurnRecord, right: HistoryTurnRecord): num
 	return right.turnId.localeCompare(left.turnId);
 }
 
-function collectRolloutFileEntries(
-	sessionsRoot: string,
-): Array<{ filePath: string; year: string; month: string; day: string }> {
-	if (!fs.existsSync(sessionsRoot)) {
-		return [];
-	}
-
-	const entries: Array<{ filePath: string; year: string; month: string; day: string }> = [];
-
-	const walk = (currentDir: string): void => {
-		for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
-			const fullPath = path.join(currentDir, entry.name);
-			if (entry.isDirectory()) {
-				walk(fullPath);
-				continue;
-			}
-			if (!entry.isFile() || !ROLLOUT_FILE_PATTERN.test(entry.name)) {
-				continue;
-			}
-			const relative = path.relative(sessionsRoot, fullPath);
-			const segments = relative.split(path.sep);
-			if (segments.length !== 4) {
-				continue;
-			}
-			const [year, month, day] = segments;
-			if (!/^\d{4}$/.test(year) || !/^\d{2}$/.test(month) || !/^\d{2}$/.test(day)) {
-				continue;
-			}
-			entries.push({ filePath: fullPath, year, month, day });
-		}
-	};
-
-	walk(sessionsRoot);
-	return entries;
-}
-
-function readRolloutEvents(filePath: string): Array<RecordLike> {
-	const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
-	const events: Array<RecordLike> = [];
+function readSessionEvents(eventsFilePath: string): {
+	events: SessionEvent[];
+	parseErrors: string[];
+} {
+	const lines = fs.readFileSync(eventsFilePath, 'utf8').split(/\r?\n/);
+	const events: SessionEvent[] = [];
+	const parseErrors: string[] = [];
 	for (const line of lines) {
 		if (!line.trim()) {
 			continue;
 		}
 		try {
 			const parsed = JSON.parse(line) as unknown;
-			if (isRecordLike(parsed)) {
-				events.push(parsed);
+			if (!isRecordLike(parsed) || typeof parsed.type !== 'string') {
+				continue;
 			}
+			events.push({
+				type: parsed.type,
+				id: typeof parsed.id === 'string' ? parsed.id : undefined,
+				parentId: typeof parsed.parentId === 'string' ? parsed.parentId : null,
+				timestamp: typeof parsed.timestamp === 'string' ? parsed.timestamp : undefined,
+				data: isRecordLike(parsed.data) ? parsed.data : undefined,
+			});
 		} catch {
-			// ignore malformed lines
+			parseErrors.push(line);
 		}
 	}
-	return events;
+	return { events, parseErrors };
 }
 
-function resolveSessionId(filePath: string): string {
-	const baseName = path.basename(filePath, '.jsonl');
-	return baseName.startsWith('rollout-')
-		? baseName.slice('rollout-'.length)
-		: baseName;
+function isAssistantEvent(eventType: string): boolean {
+	const normalized = eventType.toLowerCase();
+	if (!normalized.startsWith('assistant.')) {
+		return false;
+	}
+	return !normalized.endsWith('turn_start');
 }
 
-function extractText(value: unknown): string | undefined {
-	if (typeof value === 'string') {
-		return value;
-	}
-	if (Array.isArray(value)) {
-		const texts = value
-			.map((entry) => extractText(entry))
-			.filter((text): text is string => Boolean(text && text.length > 0));
-		return texts.length > 0 ? texts.join('\n') : undefined;
-	}
-	if (!isRecordLike(value)) {
+function isToolEvent(eventType: string): boolean {
+	const normalized = eventType.toLowerCase();
+	return normalized.includes('tool');
+}
+
+function extractUserMessage(event: SessionEvent): string | undefined {
+	if (event.type !== 'user.message') {
 		return undefined;
 	}
-	if (typeof value.text === 'string') {
-		return value.text;
-	}
-	if (typeof value.message === 'string') {
-		return value.message;
-	}
-	if (typeof value.content === 'string') {
-		return value.content;
-	}
-	if (Array.isArray(value.content)) {
-		return extractText(value.content);
-	}
-	if (Array.isArray(value.parts)) {
-		return extractText(value.parts);
-	}
-	return undefined;
-}
-
-function parseUserMessage(payload: RecordLike): string | undefined {
-	return extractText(payload.message);
-}
-
-function parseAgentMessage(payload: RecordLike): string | undefined {
-	return extractText(payload.message) ?? extractText(payload.content);
-}
-
-function parseReasoningMessage(payload: RecordLike): string | undefined {
 	return (
-		extractText(payload.summary) ??
-		extractText(payload.content) ??
-		extractText(payload.message)
+		extractText(event.data?.content) ??
+		extractText(event.data?.transformedContent) ??
+		extractText(event.data?.message)
 	);
 }
 
-type TaskAccumulator = {
-	taskTurnId: string;
-	startTimestampMs: number;
-	userMessage?: string;
-	userMessageLocalTime?: string;
-	agentMessages: string[];
-	agentMessageLocalTimes: string[];
-	agentMessageTimestampMs: number[];
-	reasoningMessages: string[];
-	reasoningMessageLocalTimes: string[];
-	reasoningMessageTimestampMs: number[];
-	aiTimeline: HistoryAiTimelineItem[];
-	nextTimelineSequence: number;
-};
-
-function extractTurnId(event: RecordLike, payload: RecordLike | undefined): string | undefined {
-	const fromEvent = event.turn_id;
-	if (typeof fromEvent === 'string' && fromEvent.trim()) {
-		return fromEvent;
+function isDisplayableUserMessage(message: string): boolean {
+	const trimmed = message.trim();
+	if (!trimmed) {
+		return false;
 	}
-	if (payload) {
-		const fromPayload = payload.turn_id;
-		if (typeof fromPayload === 'string' && fromPayload.trim()) {
-			return fromPayload;
-		}
-	}
-	return undefined;
+	return !/^\/[A-Za-z0-9-]+$/.test(trimmed);
 }
 
-function parseRolloutTurns(
-	filePath: string,
-	year: string,
-	month: string,
-	day: string,
-): HistoryTurnRecord[] {
-	const events = readRolloutEvents(filePath);
-	const sessionId = resolveSessionId(filePath);
-	const turns: HistoryTurnRecord[] = [];
-	const activeTasks = new Map<string, TaskAccumulator>();
-	const fileStat = fs.statSync(filePath);
-	let latestTurnContextId: string | undefined;
+function extractAssistantMessage(event: SessionEvent): string | undefined {
+	if (!isAssistantEvent(event.type)) {
+		return undefined;
+	}
+	return (
+		extractText(event.data?.content) ??
+		extractText(event.data?.message) ??
+		extractText(event.data?.response) ??
+		extractText(event.data?.output) ??
+		extractText(event.data?.result)
+	);
+}
 
-	const finalizeTask = (task: TaskAccumulator): void => {
-		if (!task.userMessage) {
+function extractToolUsage(event: SessionEvent): HistoryToolUsage | undefined {
+	if (!isToolEvent(event.type)) {
+		return undefined;
+	}
+	const label =
+		extractText(event.data?.toolName) ??
+		extractText(event.data?.name) ??
+		extractText(event.data?.title) ??
+		extractText(event.data?.command) ??
+		event.type;
+	const status =
+		extractText(event.data?.status) ??
+		event.type.replace(/^.*?\./, '').replaceAll('.', ' ');
+	const detail =
+		extractText(event.data?.arguments) ??
+		extractText(event.data?.args) ??
+		extractText(event.data?.input) ??
+		extractText(event.data?.result) ??
+		extractText(event.data?.error);
+	return {
+		label,
+		status,
+		localTime: formatLocalTime(event.timestamp ?? Date.now()),
+		detail,
+	};
+}
+
+function parseSessionDirectory(sessionDirPath: string): HistoryTurnRecord[] {
+	const sessionId = path.basename(sessionDirPath);
+	const eventsFilePath = path.join(sessionDirPath, 'events.jsonl');
+	if (!fs.existsSync(eventsFilePath)) {
+		return [];
+	}
+
+	const { events, parseErrors } = readSessionEvents(eventsFilePath);
+	const turns: HistoryTurnRecord[] = [];
+	let currentTurn: HistoryTurnRecord | undefined;
+	let currentIndex = 0;
+	const pendingIssues: HistoryIssue[] = [];
+	const pendingRawEvents: string[] = [];
+
+	const finalizeCurrentTurn = (): void => {
+		if (!currentTurn) {
 			return;
 		}
-		const sortedAiTimeline = [...task.aiTimeline].sort((left, right) => {
-			if (left.sortTimestampMs !== right.sortTimestampMs) {
-				return left.sortTimestampMs - right.sortTimestampMs;
-			}
-			return left.sequence - right.sequence;
-		});
-		const nextTurn: HistoryTurnRecord = {
-			turnId: `${sessionId}:${task.taskTurnId}`,
-			sessionId,
-			filePath,
-			taskTurnId: task.taskTurnId,
-			year,
-			month,
-			day,
-			dateKey: `${year}/${month}/${day}`,
-			localTime: formatLocalTime(task.startTimestampMs),
-			sortTimestampMs: task.startTimestampMs,
-			userMessage: task.userMessage,
-			userMessageLocalTime: task.userMessageLocalTime,
-			agentMessages: task.agentMessages,
-			agentMessageLocalTimes: task.agentMessageLocalTimes,
-			agentMessageTimestampMs: task.agentMessageTimestampMs,
-			reasoningMessages: task.reasoningMessages,
-			reasoningMessageLocalTimes: task.reasoningMessageLocalTimes,
-			reasoningMessageTimestampMs: task.reasoningMessageTimestampMs,
-			aiTimeline: sortedAiTimeline,
-		};
-		turns.push(nextTurn);
+		if (!currentTurn.listLabel) {
+			currentTurn.listLabel = currentTurn.userMessage;
+		}
+		turns.push(currentTurn);
+		currentTurn = undefined;
 	};
 
-	const resolveTaskTurnId = (eventTurnId: string | undefined): string | undefined => {
-		if (eventTurnId) {
-			return eventTurnId;
-		}
-		if (latestTurnContextId && activeTasks.has(latestTurnContextId)) {
-			return latestTurnContextId;
-		}
-		if (activeTasks.size === 1) {
-			const onlyTask = activeTasks.values().next().value as TaskAccumulator | undefined;
-			return onlyTask?.taskTurnId;
-		}
-		return undefined;
-	};
+	for (const parseErrorLine of parseErrors) {
+		pendingIssues.push({
+			severity: 'warning',
+			message: 'One or more JSON lines could not be parsed and were skipped.',
+		});
+		pendingRawEvents.push(parseErrorLine);
+	}
 
 	for (const event of events) {
-		const payload = isRecordLike(event.payload) ? event.payload : undefined;
-		const payloadType = typeof payload?.type === 'string' ? payload.type : undefined;
-		const eventTurnId = extractTurnId(event, payload);
-
-		if (event.type === 'turn_context' && eventTurnId) {
-			latestTurnContextId = eventTurnId;
+		const userMessage = extractUserMessage(event);
+		if (userMessage && isDisplayableUserMessage(userMessage)) {
+			finalizeCurrentTurn();
+			const timestampMs = toTimestampMs(event.timestamp) ?? Date.now();
+			const date = formatDateParts(timestampMs);
+			currentTurn = {
+				turnId: `${sessionId}:${String(currentIndex)}`,
+				sessionId,
+				filePath: eventsFilePath,
+				year: date.year,
+				month: date.month,
+				day: date.day,
+				dateKey: date.dateKey,
+				localTime: formatLocalTime(timestampMs),
+				sortTimestampMs: timestampMs,
+				userMessage,
+				userMessageLocalTime: formatLocalTime(timestampMs),
+				listLabel: userMessage,
+				assistantMessages: [],
+				toolUsages: [],
+				issues: pendingIssues.splice(0),
+				rawEvents: pendingRawEvents.splice(0),
+			};
+			currentIndex += 1;
 			continue;
 		}
 
-		if (event.type === 'event_msg' && payloadType === 'task_started' && eventTurnId) {
-			const timestampMs = toTimestampMs(event.timestamp) ?? fileStat.mtimeMs;
-			activeTasks.set(eventTurnId, {
-				taskTurnId: eventTurnId,
-				startTimestampMs: timestampMs,
-				userMessage: undefined,
-				userMessageLocalTime: undefined,
-				agentMessages: [],
-				agentMessageLocalTimes: [],
-				agentMessageTimestampMs: [],
-				reasoningMessages: [],
-				reasoningMessageLocalTimes: [],
-				reasoningMessageTimestampMs: [],
-				aiTimeline: [],
-				nextTimelineSequence: 0,
+		if (!currentTurn) {
+			continue;
+		}
+
+		const assistantMessage = extractAssistantMessage(event);
+		if (assistantMessage) {
+			currentTurn.assistantMessages.push({
+				message: assistantMessage,
+				localTime: formatLocalTime(event.timestamp ?? currentTurn.sortTimestampMs),
 			});
-			latestTurnContextId = eventTurnId;
 			continue;
 		}
 
-		const taskTurnId = resolveTaskTurnId(eventTurnId);
-
-		if (payloadType === 'task_complete' && taskTurnId) {
-			const task = activeTasks.get(taskTurnId);
-			if (task) {
-				finalizeTask(task);
-				activeTasks.delete(taskTurnId);
-			}
+		const toolUsage = extractToolUsage(event);
+		if (toolUsage) {
+			currentTurn.toolUsages.push(toolUsage);
 			continue;
 		}
 
-		if (!taskTurnId) {
-			continue;
-		}
-		const task = activeTasks.get(taskTurnId);
-		if (!task) {
-			continue;
-		}
-
-		if (event.type === 'event_msg' && payloadType === 'user_message') {
-			const userMessage = parseUserMessage(payload!);
-			if (userMessage && !task.userMessage) {
-				task.userMessage = userMessage;
-				const userTimestampMs = toTimestampMs(event.timestamp) ?? task.startTimestampMs;
-				task.userMessageLocalTime = formatLocalTime(userTimestampMs);
-			}
-			continue;
-		}
-
-		if (event.type === 'event_msg' && payloadType === 'agent_message') {
-			const agentMessage = parseAgentMessage(payload!);
-			if (agentMessage) {
-				task.agentMessages.push(agentMessage);
-				const agentTimestampMs = toTimestampMs(event.timestamp) ?? task.startTimestampMs;
-				task.agentMessageLocalTimes.push(formatLocalTime(agentTimestampMs));
-				task.agentMessageTimestampMs.push(agentTimestampMs);
-				task.aiTimeline.push({
-					kind: 'assistant',
-					message: agentMessage,
-					localTime: formatLocalTime(agentTimestampMs),
-					sortTimestampMs: agentTimestampMs,
-					sequence: task.nextTimelineSequence,
-				});
-				task.nextTimelineSequence += 1;
-			}
-			continue;
-		}
-
-		if (event.type === 'response_item' && payloadType === 'reasoning') {
-			const reasoningMessage = parseReasoningMessage(payload!);
-			if (reasoningMessage) {
-				task.reasoningMessages.push(reasoningMessage);
-				const reasoningTimestampMs = toTimestampMs(event.timestamp) ?? task.startTimestampMs;
-				task.reasoningMessageLocalTimes.push(formatLocalTime(reasoningTimestampMs));
-				task.reasoningMessageTimestampMs.push(reasoningTimestampMs);
-				task.aiTimeline.push({
-					kind: 'reasoning',
-					message: reasoningMessage,
-					localTime: formatLocalTime(reasoningTimestampMs),
-					sortTimestampMs: reasoningTimestampMs,
-					sequence: task.nextTimelineSequence,
-				});
-				task.nextTimelineSequence += 1;
-			}
+		if (event.type === 'abort') {
+			currentTurn.issues.push({
+				severity: 'warning',
+				message:
+					extractText(event.data?.reason) ??
+					'This session turn was aborted before completion.',
+			});
 		}
 	}
 
-	for (const task of activeTasks.values()) {
-		finalizeTask(task);
+	finalizeCurrentTurn();
+
+	if (turns.length === 0) {
+		return [];
 	}
 
-	return turns.sort(compareTurnDesc);
+	if (pendingIssues.length > 0) {
+		turns[turns.length - 1].issues.push(...pendingIssues);
+	}
+
+	return turns;
 }
 
-function toDays(turns: HistoryTurnRecord[]): HistoryDayNode[] {
-	const grouped = new Map<string, HistoryTurnRecord[]>();
-	for (const turn of turns) {
-		const dayTurns = grouped.get(turn.dateKey) ?? [];
-		dayTurns.push(turn);
-		grouped.set(turn.dateKey, dayTurns);
+export function resolveCopilotHomeDir(
+	homeDir: string = os.homedir(),
+	copilotHome: string | undefined = process.env.COPILOT_HOME,
+): string {
+	if (typeof copilotHome === 'string' && copilotHome.trim()) {
+		return copilotHome;
 	}
-
-	return [...grouped.entries()]
-		.sort(([left], [right]) => compareLabelDesc(left, right))
-		.map(([dateKey, dayTurns]) => ({
-			dateKey,
-			year: dayTurns[0].year,
-			month: dayTurns[0].month,
-			day: dayTurns[0].day,
-			turns: [...dayTurns].sort(compareTurnDesc),
-		}));
+	return path.join(homeDir, '.copilot');
 }
 
-export function resolveCodexHomeDir(homeDir: string = os.homedir()): string {
-	const codexHome = process.env.CODEX_HOME;
-	if (typeof codexHome === 'string' && codexHome.trim()) {
-		return codexHome;
-	}
-	return path.join(homeDir, '.codex');
-}
-
-export function resolveSessionsRoot(codexHomeDir?: string): string {
-	const baseDir = codexHomeDir ?? resolveCodexHomeDir();
-	return path.join(baseDir, 'sessions');
+export function resolveSessionsRoot(copilotHomeDir?: string): string {
+	const baseDir = copilotHomeDir ?? resolveCopilotHomeDir();
+	return path.join(baseDir, 'session-state');
 }
 
 export function formatLocalTime(input: string | number | Date): string {
 	const date = new Date(input);
 	if (Number.isNaN(date.getTime())) {
-		return '[0:00:00]';
+		return '';
 	}
-	const hours = date.getHours();
-	const minutes = String(date.getMinutes()).padStart(2, '0');
-	const seconds = String(date.getSeconds()).padStart(2, '0');
-	return `[${hours}:${minutes}:${seconds}]`;
+	const locale = (vscode.env.language ?? 'en').toLowerCase();
+	if (locale.startsWith('ja')) {
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, '0');
+		const day = String(date.getDate()).padStart(2, '0');
+		const hours = String(date.getHours()).padStart(2, '0');
+		const minutes = String(date.getMinutes()).padStart(2, '0');
+		const seconds = String(date.getSeconds()).padStart(2, '0');
+		return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+	}
+	return new Intl.DateTimeFormat(vscode.env.language ?? 'en', {
+		dateStyle: 'medium',
+		timeStyle: 'medium',
+	}).format(date);
 }
 
-export function buildHistoryIndex(codexHomeDir?: string): HistoryIndex {
-	const fileEntries = collectRolloutFileEntries(resolveSessionsRoot(codexHomeDir));
-	const turns = fileEntries
-		.flatMap((entry) =>
-			parseRolloutTurns(entry.filePath, entry.year, entry.month, entry.day),
-		)
+export function buildHistoryIndex(copilotHomeDir?: string): HistoryIndex {
+	const sessionsRoot = resolveSessionsRoot(copilotHomeDir);
+	if (!fs.existsSync(sessionsRoot)) {
+		return { turns: [] };
+	}
+
+	const turns = fs
+		.readdirSync(sessionsRoot, { withFileTypes: true })
+		.filter((entry) => entry.isDirectory() && entry.name !== 'logs')
+		.flatMap((entry) => parseSessionDirectory(path.join(sessionsRoot, entry.name)))
 		.sort(compareTurnDesc);
 
-	return {
-		days: toDays(turns),
-		turns,
-	};
+	return { turns };
 }
