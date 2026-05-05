@@ -29,6 +29,7 @@ import { AgentManagerPanelManager } from './services/agentManagerPanel';
 import { McpManagerPanelManager } from './services/mcpManagerPanel';
 import {
 	syncCoreInstructionsBidirectional,
+	syncCoreFilesBidirectional,
 	syncDirectoryBidirectional,
 } from './services/syncService';
 
@@ -187,6 +188,11 @@ export function activate(context: vscode.ExtensionContext) {
 				if (!getCoreWorkspaceStatus().isAvailable) {
 					return;
 				}
+				const selection = coreView.selection[0];
+				if (selection?.fsPath) {
+					await revealFolder(path.dirname(selection.fsPath));
+					return;
+				}
 				const { copilotDir } = resolveCopilotPaths();
 				await revealFolder(copilotDir);
 			}),
@@ -325,20 +331,14 @@ export function activate(context: vscode.ExtensionContext) {
 				if (!(await confirmSync(copilotFolder))) {
 					return;
 				}
-				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-				if (!workspaceRoot) {
-					vscode.window.showInformationMessage(messages.chainNoWorkspace);
-					return;
-				}
 				const { copilotDir } = resolveCopilotPaths();
-				const result = syncCoreInstructionsBidirectional(workspaceRoot, copilotDir);
+				const result = syncCoreFilesBidirectional(copilotDir, copilotFolder);
 				if (result.skipped.length > 0) {
 					vscode.window.showWarningMessage(
 						messages.syncSkipped(result.skipped.length),
 					);
 				}
 				coreProvider.refresh();
-				mcpProvider.refresh();
 			}),
 	);
 

@@ -120,7 +120,7 @@ suite('View title menus', () => {
 			const when = entry.when ?? '';
 			const targetViewIds =
 				command === 'copilot-workspace-manager.refreshAll'
-					? [...viewIds, 'copilot-workspace-manager.mcp', 'copilot-workspace-manager.agents']
+					? ['copilot-workspace-manager.core', ...viewIds, 'copilot-workspace-manager.mcp', 'copilot-workspace-manager.agents']
 					: viewIds;
 			const excludedForCommand =
 				command === 'copilot-workspace-manager.refreshAll'

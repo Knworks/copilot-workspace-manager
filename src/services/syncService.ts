@@ -336,3 +336,46 @@ export function syncCoreInstructionsBidirectional(
 		userEntries,
 	);
 }
+
+export function syncCoreFilesBidirectional(
+	copilotDir: string,
+	targetDir: string,
+): SyncResult {
+	const fileNames = [
+		'config.json',
+		'settings.json',
+		'mcp-config.json',
+		'copilot-instructions.md',
+	];
+	const sourceEntries = new Map<string, FileEntry>();
+	const targetEntries = new Map<string, FileEntry>();
+
+	for (const fileName of fileNames) {
+		const sourcePath = path.join(copilotDir, fileName);
+		if (fs.existsSync(sourcePath)) {
+			const stat = fs.statSync(sourcePath);
+			sourceEntries.set(fileName, {
+				fullPath: sourcePath,
+				mtimeMs: stat.mtimeMs,
+			});
+		}
+
+		const mirroredPath = path.join(targetDir, fileName);
+		if (fs.existsSync(mirroredPath)) {
+			const stat = fs.statSync(mirroredPath);
+			targetEntries.set(fileName, {
+				fullPath: mirroredPath,
+				mtimeMs: stat.mtimeMs,
+			});
+		}
+	}
+
+	return syncEntries(
+		'core-files',
+		copilotDir,
+		copilotDir,
+		targetDir,
+		sourceEntries,
+		targetEntries,
+	);
+}

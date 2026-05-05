@@ -11,22 +11,52 @@ const contextStub = {
 } as vscode.ExtensionContext;
 
 suite('Core explorer provider', () => {
-	test('returns only existing core files when available', () => {
+	test('returns core files in fixed order and omits missing entries', () => {
 		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'core-view-'));
 		const originalCopilotHome = process.env.COPILOT_HOME;
+		const originalWorkspaceFolders = vscode.workspace.workspaceFolders;
 		try {
-			process.env.COPILOT_HOME = path.join(tempDir, '.copilot');
-			fs.mkdirSync(process.env.COPILOT_HOME, { recursive: true });
-			fs.writeFileSync(path.join(process.env.COPILOT_HOME, 'config.json'), '{}', 'utf8');
-			fs.writeFileSync(path.join(process.env.COPILOT_HOME, 'mcp-config.json'), '{}', 'utf8');
+			const copilotHome = path.join(tempDir, '.copilot');
+			const workspaceRoot = path.join(tempDir, 'workspace');
+			process.env.COPILOT_HOME = copilotHome;
+			fs.mkdirSync(path.join(workspaceRoot, '.github', 'copilot'), { recursive: true });
+			fs.mkdirSync(copilotHome, { recursive: true });
+			fs.writeFileSync(path.join(copilotHome, 'config.json'), '{}', 'utf8');
+			fs.writeFileSync(path.join(copilotHome, 'settings.json'), '{}', 'utf8');
+			fs.writeFileSync(path.join(workspaceRoot, '.github', 'copilot', 'settings.local.json'), '{}', 'utf8');
+			fs.writeFileSync(path.join(copilotHome, 'mcp-config.json'), '{}', 'utf8');
+			fs.writeFileSync(path.join(copilotHome, 'copilot-instructions.md'), 'user', 'utf8');
+			fs.writeFileSync(path.join(workspaceRoot, 'AGENTS.md'), 'primary', 'utf8');
+			fs.mkdirSync(path.join(workspaceRoot, 'docs'), { recursive: true });
+			fs.writeFileSync(path.join(workspaceRoot, 'docs', 'AGENTS.md'), 'additional', 'utf8');
+			Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+				configurable: true,
+				value: [{ uri: vscode.Uri.file(workspaceRoot) }],
+			});
+
 			const provider = new CoreExplorerProvider(
 				contextStub,
 				() => ({ isAvailable: true }),
 				() => ({ isAvailable: true }),
 			);
 			const items = provider.getChildren() as vscode.TreeItem[];
-			assert.deepStrictEqual(items.map((item) => item.label), ['config.json', 'mcp-config.json']);
+			assert.deepStrictEqual(
+				items.map((item) => `${item.label}:${item.description ?? ''}`),
+				[
+					'config.json:Internal Config',
+					'settings.json:User Settings',
+					'settings.local.json:Workspace Local Settings',
+					'mcp-config.json:',
+					'copilot-instructions.md:User Instructions',
+					'AGENTS.md:Primary Instructions',
+					'AGENTS.md:Additional Instructions',
+				],
+			);
 		} finally {
+			Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+				configurable: true,
+				value: originalWorkspaceFolders,
+			});
 			if (originalCopilotHome === undefined) {
 				delete process.env.COPILOT_HOME;
 			} else {

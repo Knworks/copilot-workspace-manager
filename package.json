@@ -323,7 +323,7 @@
         },
         {
           "command": "copilot-workspace-manager.refreshAll",
-          "when": "view == 'copilot-workspace-manager.prompts' || view == 'copilot-workspace-manager.skills' || view == 'copilot-workspace-manager.templates' || view == 'copilot-workspace-manager.mcp' || view == 'copilot-workspace-manager.agents'",
+          "when": "view == 'copilot-workspace-manager.core' || view == 'copilot-workspace-manager.prompts' || view == 'copilot-workspace-manager.skills' || view == 'copilot-workspace-manager.templates' || view == 'copilot-workspace-manager.mcp' || view == 'copilot-workspace-manager.agents'",
           "group": "navigation@5"
         },
         {
