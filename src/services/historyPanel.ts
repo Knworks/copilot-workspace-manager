@@ -469,7 +469,7 @@ function buildHistoryWebviewHtml(
 		.chain-status-problems { color: var(--vscode-editorWarning-foreground); }
 		.chain-status-details { color: #f8afcf; }
 		.chain-detail-card { position: relative; display: grid; gap: 8px; padding: 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); }
-		.chain-preview-block { padding: 8px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editor-background); }
+		.chain-preview-block { padding: 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editor-background); }
 		.required-switch { display: inline-flex; align-items: center; cursor: pointer; user-select: none; gap: 8px; }
 		.required-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
 		.required-switch span.switch-track { display: inline-block; width: 34px; height: 18px; border-radius: 999px; background: var(--vscode-checkbox-background, var(--vscode-input-background)); border: 1px solid var(--vscode-checkbox-border, var(--vscode-panel-border)); position: relative; vertical-align: middle; box-sizing: border-box; transition: background 0.15s ease, border-color 0.15s ease; }
