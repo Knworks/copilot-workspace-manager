@@ -4,7 +4,7 @@ import path from 'path';
 import * as vscode from 'vscode';
 import { resolveCopilotPaths } from './workspaceStatus';
 
-export type SkillLocationKind = 'project' | 'compatible' | 'user' | 'plugin';
+export type SkillLocationKind = 'project' | 'user' | 'plugin';
 
 export type SkillLocation = {
 	kind: SkillLocationKind;
@@ -25,47 +25,51 @@ export function getSkillLocations(
 	homeDir: string = os.homedir(),
 	projectRoot: string | undefined = getProjectRoot(),
 ): SkillLocation[] {
+	const { copilotDir } = resolveCopilotPaths(homeDir);
 	const locations: SkillLocation[] = [];
 	if (projectRoot) {
-		const preferredProjectRoot = path.join(projectRoot, '.github', 'skills');
-		locations.push({
-			kind: 'project',
-			label: 'Workspace Skills',
-			rootPath: preferredProjectRoot,
-			createPath: preferredProjectRoot,
-			priority: 1,
-		});
-		for (const compatibleRoot of [
+		for (const rootPath of [
+			path.join(projectRoot, '.github', 'skills'),
 			path.join(projectRoot, '.agents', 'skills'),
 			path.join(projectRoot, '.claude', 'skills'),
 		]) {
-			if (fs.existsSync(compatibleRoot)) {
-				locations.push({
-					kind: 'compatible',
-					label: 'Workspace Compatible Skills',
-					rootPath: compatibleRoot,
-					createPath: compatibleRoot,
-					priority: 2,
-				});
-			}
+			locations.push({
+				kind: 'project',
+				label: 'Workspace Skills',
+				rootPath,
+				createPath: rootPath,
+				priority: 1,
+			});
 		}
 	}
-	locations.push(
-		{
+	for (const rootPath of [
+		path.join(copilotDir, 'skills'),
+		path.join(homeDir, '.agents', 'skills'),
+		path.join(homeDir, '.claude', 'skills'),
+	]) {
+		locations.push({
 			kind: 'user',
 			label: 'User Skills',
-			rootPath: path.join(resolveCopilotPaths(homeDir).copilotDir, 'skills'),
-			createPath: path.join(resolveCopilotPaths(homeDir).copilotDir, 'skills'),
-			priority: 3,
-		},
-		{
+			rootPath,
+			createPath: rootPath,
+			priority: 2,
+		});
+	}
+	for (const rootPath of collectPluginRoots(path.join(copilotDir, 'installed-plugins'), 'skills')) {
+		locations.push({
 			kind: 'plugin',
 			label: 'Plugin Skills',
-			rootPath: path.join(resolveCopilotPaths(homeDir).copilotDir, 'installed-plugins'),
-			priority: 4,
-		},
+			rootPath,
+			priority: 3,
+		});
+	}
+	return locations.sort((left, right) =>
+		left.priority - right.priority ||
+		left.rootPath.localeCompare(right.rootPath, undefined, {
+			numeric: true,
+			sensitivity: 'base',
+		}),
 	);
-	return locations;
 }
 
 export function findSkillLocationForPath(
@@ -80,4 +84,26 @@ export function findSkillLocationForPath(
 			resolvedTarget.startsWith(`${resolvedRoot}${path.sep}`)
 		);
 	});
+}
+
+function collectPluginRoots(pluginsRoot: string, targetDirName: string): string[] {
+	if (!fs.existsSync(pluginsRoot)) {
+		return [];
+	}
+	const results: string[] = [];
+	const visit = (currentPath: string): void => {
+		for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
+			if (!entry.isDirectory()) {
+				continue;
+			}
+			const fullPath = path.join(currentPath, entry.name);
+			if (entry.name === targetDirName) {
+				results.push(fullPath);
+				continue;
+			}
+			visit(fullPath);
+		}
+	};
+	visit(pluginsRoot);
+	return results;
 }

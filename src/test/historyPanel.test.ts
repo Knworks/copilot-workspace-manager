@@ -298,7 +298,7 @@ suite('History panel manager', () => {
 		assert.strictEqual(chainMessage.payload.workspaceRoot, undefined);
 		assert.strictEqual(
 			chainMessage.payload.emptyStateMessage,
-			'Open a workspace folder to view the AGENTS loading chain.',
+			'Open a workspace folder to view the instructions chain.',
 		);
 		assert.strictEqual(loadCount, 0);
 

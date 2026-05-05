@@ -10,7 +10,7 @@ const contextStub = {
 } as vscode.ExtensionContext;
 
 suite('File explorer provider', () => {
-	test('returns root children when available', () => {
+	test('returns file children when available', () => {
 		const provider = new FileExplorerProvider(
 			'prompts',
 			contextStub,
@@ -18,20 +18,16 @@ suite('File explorer provider', () => {
 			'root',
 			() => [
 				{
-					name: 'docs',
-					fullPath: path.join('root', 'docs'),
-					isDirectory: true,
-					isFile: false,
+					name: 'review.md',
+					fullPath: path.join('root', 'review.md'),
+					isDirectory: false,
+					isFile: true,
 				},
 			],
 		);
 		const items = provider.getChildren() as vscode.TreeItem[];
 		assert.strictEqual(items.length, 1);
-		assert.strictEqual(items[0].label, 'docs');
-		assert.strictEqual(
-			items[0].collapsibleState,
-			vscode.TreeItemCollapsibleState.Collapsed,
-		);
+		assert.strictEqual(items[0].label, 'review.md');
 	});
 
 	test('returns unavailable item when not available', () => {
@@ -46,7 +42,7 @@ suite('File explorer provider', () => {
 		assert.strictEqual(items[0].label, getUnavailableLabel('missing'));
 	});
 
-	test('file items include open command', () => {
+	test('prompt files use terminal icon', () => {
 		const provider = new FileExplorerProvider(
 			'prompts',
 			contextStub,
@@ -62,194 +58,13 @@ suite('File explorer provider', () => {
 			],
 		);
 		const children = provider.getChildren() as vscode.TreeItem[];
-		assert.strictEqual(children.length, 1);
-		const fileItem = children[0];
-		assert.strictEqual(fileItem.command?.command, 'copilot-workspace-manager.openFile');
+		assert.ok(children[0].iconPath instanceof vscode.ThemeIcon);
+		assert.strictEqual((children[0].iconPath as vscode.ThemeIcon).id, 'terminal');
 	});
 
-	test('Given file types When listing children Then icons match', () => {
-		// Arrange
+	test('templates ignore folders and hidden entries', () => {
 		const provider = new FileExplorerProvider(
 			'templates',
-			contextStub,
-			() => ({ isAvailable: true }),
-			'root',
-			() => [
-				{
-					name: 'docs',
-					fullPath: path.join('root', 'docs'),
-					isDirectory: true,
-					isFile: false,
-				},
-				{
-					name: 'note.md',
-					fullPath: path.join('root', 'note.md'),
-					isDirectory: false,
-					isFile: true,
-				},
-				{
-					name: 'script.py',
-					fullPath: path.join('root', 'script.py'),
-					isDirectory: false,
-					isFile: true,
-				},
-				{
-					name: 'plain.txt',
-					fullPath: path.join('root', 'plain.txt'),
-					isDirectory: false,
-					isFile: true,
-				},
-				{
-					name: 'config.yml',
-					fullPath: path.join('root', 'config.yml'),
-					isDirectory: false,
-					isFile: true,
-				},
-				{
-					name: 'document.docx',
-					fullPath: path.join('root', 'document.docx'),
-					isDirectory: false,
-					isFile: true,
-				},
-				{
-					name: 'favicon.ico',
-					fullPath: path.join('root', 'favicon.ico'),
-					isDirectory: false,
-					isFile: true,
-				},
-			],
-		);
-
-		// Act
-		const children = provider.getChildren() as vscode.TreeItem[];
-		const byLabel = (label: string): vscode.TreeItem =>
-			children.find((item) => item.label === label) as vscode.TreeItem;
-		const folderItem = byLabel('docs');
-		const markdownItem = byLabel('note.md');
-		const pythonItem = byLabel('script.py');
-		const defaultItem = byLabel('plain.txt');
-		const settingsItem = byLabel('config.yml');
-		const wordItem = byLabel('document.docx');
-		const iconItem = byLabel('favicon.ico');
-		const expectedIconPath = (fileName: string): string =>
-			vscode.Uri.file(
-				contextStub.asAbsolutePath(path.join('images', fileName)),
-			).fsPath;
-
-		// Assert
-		const folderIconPath = folderItem.iconPath as { light: vscode.Uri; dark: vscode.Uri };
-		assert.strictEqual(
-			folderIconPath.light.fsPath,
-			expectedIconPath('folder32.png'),
-		);
-		assert.strictEqual(
-			folderIconPath.dark.fsPath,
-			expectedIconPath('folder32.png'),
-		);
-
-		const markdownIconPath = markdownItem.iconPath as {
-			light: vscode.Uri;
-			dark: vscode.Uri;
-		};
-		assert.strictEqual(
-			markdownIconPath.light.fsPath,
-			expectedIconPath('markdown32.png'),
-		);
-		assert.strictEqual(
-			markdownIconPath.dark.fsPath,
-			expectedIconPath('markdown32.png'),
-		);
-
-		const pythonIconPath = pythonItem.iconPath as { light: vscode.Uri; dark: vscode.Uri };
-		assert.strictEqual(
-			pythonIconPath.light.fsPath,
-			expectedIconPath('python32.png'),
-		);
-		assert.strictEqual(
-			pythonIconPath.dark.fsPath,
-			expectedIconPath('python32.png'),
-		);
-
-		const defaultIconPath = defaultItem.iconPath as {
-			light: vscode.Uri;
-			dark: vscode.Uri;
-		};
-		assert.strictEqual(
-			defaultIconPath.light.fsPath,
-			expectedIconPath('text32.png'),
-		);
-		assert.strictEqual(
-			defaultIconPath.dark.fsPath,
-			expectedIconPath('text32.png'),
-		);
-
-		const settingsIconPath = settingsItem.iconPath as {
-			light: vscode.Uri;
-			dark: vscode.Uri;
-		};
-		assert.strictEqual(
-			settingsIconPath.light.fsPath,
-			expectedIconPath('settingsfile32.png'),
-		);
-		assert.strictEqual(
-			settingsIconPath.dark.fsPath,
-			expectedIconPath('settingsfile32.png'),
-		);
-
-		const wordIconPath = wordItem.iconPath as { light: vscode.Uri; dark: vscode.Uri };
-		assert.strictEqual(
-			wordIconPath.light.fsPath,
-			expectedIconPath('office_word32.png'),
-		);
-		assert.strictEqual(
-			wordIconPath.dark.fsPath,
-			expectedIconPath('office_word32.png'),
-		);
-
-		const iconIconPath = iconItem.iconPath as { light: vscode.Uri; dark: vscode.Uri };
-		assert.strictEqual(
-			iconIconPath.light.fsPath,
-			expectedIconPath('image32.png'),
-		);
-		assert.strictEqual(
-			iconIconPath.dark.fsPath,
-			expectedIconPath('image32.png'),
-		);
-	});
-
-	test('Given prompt files When listing children Then terminal codicon is used', () => {
-		const provider = new FileExplorerProvider(
-			'prompts',
-			contextStub,
-			() => ({ isAvailable: true }),
-			'root',
-			() => [
-				{
-					name: 'note.md',
-					fullPath: path.join('root', 'note.md'),
-					isDirectory: false,
-					isFile: true,
-				},
-				{
-					name: 'script.py',
-					fullPath: path.join('root', 'script.py'),
-					isDirectory: false,
-					isFile: true,
-				},
-			],
-		);
-
-		const children = provider.getChildren() as vscode.TreeItem[];
-		for (const child of children) {
-			assert.ok(child.iconPath instanceof vscode.ThemeIcon);
-			assert.strictEqual((child.iconPath as vscode.ThemeIcon).id, 'terminal');
-		}
-	});
-
-	test('Given hidden entries When listing children Then they are excluded', () => {
-		// Arrange
-		const provider = new FileExplorerProvider(
-			'prompts',
 			contextStub,
 			() => ({ isAvailable: true }),
 			'root',
@@ -261,32 +76,21 @@ suite('File explorer provider', () => {
 					isFile: true,
 				},
 				{
+					name: 'folder',
+					fullPath: path.join('root', 'folder'),
+					isDirectory: true,
+					isFile: false,
+				},
+				{
 					name: 'visible.md',
 					fullPath: path.join('root', 'visible.md'),
 					isDirectory: false,
 					isFile: true,
 				},
-				{
-					name: '.secret',
-					fullPath: path.join('root', '.secret'),
-					isDirectory: true,
-					isFile: false,
-				},
-				{
-					name: 'public',
-					fullPath: path.join('root', 'public'),
-					isDirectory: true,
-					isFile: false,
-				},
 			],
 		);
-
-		// Act
 		const children = provider.getChildren() as vscode.TreeItem[];
-		const labels = children.map((item) => item.label as string);
-
-		// Assert
-		assert.deepStrictEqual(labels, ['public', 'visible.md']);
+		assert.deepStrictEqual(children.map((item) => item.label), ['visible.md']);
 	});
 
 	test('skills explorer combines multiple skill locations with location metadata', () => {
@@ -320,7 +124,6 @@ suite('File explorer provider', () => {
 	test('skills explorer shows status icons only for skill root folders and SKILL.md', () => {
 		const workspaceSkillsRoot = path.join(process.env.HOME ?? '', '.copilot', 'skills');
 		const enabledSkillRoot = path.join(workspaceSkillsRoot, 'enabled-skill');
-		const disabledSkillRoot = path.join(workspaceSkillsRoot, 'disabled-skill');
 		const entriesByRoot = new Map<string, Array<{
 			name: string;
 			fullPath: string;
@@ -336,18 +139,6 @@ suite('File explorer provider', () => {
 						isDirectory: true,
 						isFile: false,
 					},
-					{
-						name: 'disabled-skill',
-						fullPath: disabledSkillRoot,
-						isDirectory: true,
-						isFile: false,
-					},
-					{
-						name: 'notes',
-						fullPath: path.join(workspaceSkillsRoot, 'notes'),
-						isDirectory: true,
-						isFile: false,
-					},
 				],
 			],
 			[
@@ -359,34 +150,7 @@ suite('File explorer provider', () => {
 						isDirectory: false,
 						isFile: true,
 					},
-					{
-						name: 'guide.md',
-						fullPath: path.join(enabledSkillRoot, 'guide.md'),
-						isDirectory: false,
-						isFile: true,
-					},
-					{
-						name: 'examples',
-						fullPath: path.join(enabledSkillRoot, 'examples'),
-						isDirectory: true,
-						isFile: false,
-					},
 				],
-			],
-			[
-				disabledSkillRoot,
-				[
-					{
-						name: 'SKILL.md',
-						fullPath: path.join(disabledSkillRoot, 'SKILL.md'),
-						isDirectory: false,
-						isFile: true,
-					},
-				],
-			],
-			[
-				path.join(workspaceSkillsRoot, 'notes'),
-				[],
 			],
 		]);
 		const provider = new FileExplorerProvider(
@@ -398,43 +162,12 @@ suite('File explorer provider', () => {
 		);
 
 		const rootChildren = provider.getChildren() as vscode.TreeItem[];
-		const byLabel = (items: vscode.TreeItem[], label: string): vscode.TreeItem =>
-			items.find((item) => item.label === label) as vscode.TreeItem;
+		const root = rootChildren[0] as WorkspaceTreeItem;
+		assert.ok(root.iconPath instanceof vscode.ThemeIcon);
+		assert.strictEqual((root.iconPath as vscode.ThemeIcon).id, 'folder-library');
 
-		const enabledRoot = byLabel(rootChildren, 'enabled-skill');
-		assert.ok(enabledRoot.iconPath instanceof vscode.ThemeIcon);
-		assert.strictEqual((enabledRoot.iconPath as vscode.ThemeIcon).id, 'folder-library');
-
-		const disabledRoot = byLabel(rootChildren, 'disabled-skill');
-		assert.ok(disabledRoot.iconPath instanceof vscode.ThemeIcon);
-		assert.strictEqual((disabledRoot.iconPath as vscode.ThemeIcon).id, 'folder-library');
-
-		const normalRoot = byLabel(rootChildren, 'notes');
-		assert.ok(normalRoot.iconPath instanceof vscode.ThemeIcon);
-		assert.strictEqual((normalRoot.iconPath as vscode.ThemeIcon).id, 'folder-library');
-
-		const enabledChildren = provider.getChildren(enabledRoot as WorkspaceTreeItem) as vscode.TreeItem[];
-		const skillFile = byLabel(enabledChildren, 'SKILL.md');
-		assert.ok(skillFile.iconPath instanceof vscode.ThemeIcon);
-		assert.strictEqual((skillFile.iconPath as vscode.ThemeIcon).id, 'agent');
-
-		const guideFile = byLabel(enabledChildren, 'guide.md');
-		const guideIcon = guideFile.iconPath as { light: vscode.Uri; dark: vscode.Uri };
-		assert.strictEqual(
-			guideIcon.light.fsPath,
-			vscode.Uri.file(contextStub.asAbsolutePath(path.join('images', 'markdown32.png'))).fsPath,
-		);
-
-		const examplesFolder = byLabel(enabledChildren, 'examples');
-		const examplesIcon = examplesFolder.iconPath as { light: vscode.Uri; dark: vscode.Uri };
-		assert.strictEqual(
-			examplesIcon.light.fsPath,
-			vscode.Uri.file(contextStub.asAbsolutePath(path.join('images', 'folder32.png'))).fsPath,
-		);
-
-		const disabledChildren = provider.getChildren(disabledRoot as WorkspaceTreeItem) as vscode.TreeItem[];
-		const disabledSkillFile = byLabel(disabledChildren, 'SKILL.md');
-		assert.ok(disabledSkillFile.iconPath instanceof vscode.ThemeIcon);
-		assert.strictEqual((disabledSkillFile.iconPath as vscode.ThemeIcon).id, 'agent');
+		const skillChildren = provider.getChildren(root) as vscode.TreeItem[];
+		assert.ok(skillChildren[0].iconPath instanceof vscode.ThemeIcon);
+		assert.strictEqual((skillChildren[0].iconPath as vscode.ThemeIcon).id, 'agent');
 	});
 });

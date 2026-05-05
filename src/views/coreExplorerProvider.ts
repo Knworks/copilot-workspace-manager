@@ -26,128 +26,79 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 	protected getAvailableChildren(): vscode.ProviderResult<WorkspaceTreeItem[]> {
 		const paths = resolveCopilotPaths();
 		const configStatus = this.configStatusProvider();
-		const configItem = new WorkspaceTreeItem(
-			'file',
-			'core',
-			'config.json',
-			vscode.TreeItemCollapsibleState.None,
-			paths.configPath,
-		);
-		configItem.command = {
-			command: 'copilot-workspace-manager.openFile',
-			title: 'Open config.json',
-			arguments: [configItem],
-		};
-		if (!configStatus.isAvailable && configStatus.reason) {
-			configItem.tooltip = configStatus.reason;
-			configItem.iconPath = new vscode.ThemeIcon('warning');
-		} else {
-			configItem.iconPath = this.getIcon('settingsfile32.png');
+		const items: WorkspaceTreeItem[] = [];
+
+		if (fs.existsSync(paths.configPath)) {
+			const configItem = this.toFileItem('config.json', paths.configPath, 'settingsfile32.png');
+			if (!configStatus.isAvailable && configStatus.reason) {
+				configItem.tooltip = configStatus.reason;
+				configItem.iconPath = new vscode.ThemeIcon('warning');
+			}
+			items.push(configItem);
 		}
 
-		const mcpItem = new WorkspaceTreeItem(
-			'file',
-			'core',
-			'mcp-config.json',
-			vscode.TreeItemCollapsibleState.None,
-			path.join(paths.copilotDir, 'mcp-config.json'),
-		);
-		mcpItem.command = {
-			command: 'copilot-workspace-manager.openFile',
-			title: 'Open mcp-config.json',
-			arguments: [mcpItem],
-		};
-		mcpItem.iconPath = this.getIcon('settingsfile32.png');
+		if (fs.existsSync(paths.mcpConfigPath)) {
+			items.push(this.toFileItem('mcp-config.json', paths.mcpConfigPath, 'settingsfile32.png'));
+		}
 
-		const permissionsItem = new WorkspaceTreeItem(
-			'file',
-			'core',
-			'permissions-config.json',
-			vscode.TreeItemCollapsibleState.None,
-			path.join(paths.copilotDir, 'permissions-config.json'),
-		);
-		permissionsItem.command = {
-			command: 'copilot-workspace-manager.openFile',
-			title: 'Open permissions-config.json',
-			arguments: [permissionsItem],
-		};
-		permissionsItem.iconPath = this.getIcon('settingsfile32.png');
+		const userInstructionsPath = path.join(paths.copilotDir, 'copilot-instructions.md');
+		if (fs.existsSync(userInstructionsPath)) {
+			const item = this.toFileItem(
+				'copilot-instructions.md',
+				userInstructionsPath,
+				'markdown32.png',
+			);
+			item.description = 'User Instructions';
+			items.push(item);
+		}
 
-		const userInstructionsItem = new WorkspaceTreeItem(
-			'file',
-			'core',
-			'copilot-instructions.md',
-			vscode.TreeItemCollapsibleState.None,
-			path.join(paths.copilotDir, 'copilot-instructions.md'),
-		);
-		userInstructionsItem.command = {
-			command: 'copilot-workspace-manager.openFile',
-			title: 'Open copilot-instructions.md',
-			arguments: [userInstructionsItem],
-		};
-		userInstructionsItem.iconPath = this.getIcon('markdown32.png');
-
-		const folderItems = ['agents', 'skills', 'logs', 'session-state', 'installed-plugins']
-			.filter((folderName) => fs.existsSync(path.join(paths.copilotDir, folderName)))
-			.map(
-			(folderName) => {
-				const folderItem = new WorkspaceTreeItem(
-					'folder',
-					'core',
-					folderName,
-					vscode.TreeItemCollapsibleState.None,
-					path.join(paths.copilotDir, folderName),
-				);
-				folderItem.command = {
-					command: 'copilot-workspace-manager.openFile',
-					title: `Open ${folderName}`,
-					arguments: [folderItem],
-				};
-				folderItem.iconPath = this.getIcon('folder32.png');
-				return folderItem;
-			},
-		);
-
-		const items = [
-			configItem,
-			mcpItem,
-			permissionsItem,
-			userInstructionsItem,
-			...folderItems,
-		];
 		const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 		if (workspaceRoot) {
-			const repositoryInstructionsPath = path.join(
+			const workspaceInstructionsPath = path.join(
 				workspaceRoot,
 				'.github',
 				'copilot-instructions.md',
 			);
-			const repositoryInstructionsItem = new WorkspaceTreeItem(
-				'file',
-				'core',
-				'Repository copilot-instructions.md',
-				vscode.TreeItemCollapsibleState.None,
-				repositoryInstructionsPath,
-			);
-			repositoryInstructionsItem.command = {
-				command: 'copilot-workspace-manager.openFile',
-				title: 'Open repository copilot-instructions.md',
-				arguments: [repositoryInstructionsItem],
-			};
-			repositoryInstructionsItem.iconPath = this.getIcon('markdown32.png');
-			items.push(repositoryInstructionsItem);
+			if (fs.existsSync(workspaceInstructionsPath)) {
+				const item = this.toFileItem(
+					'copilot-instructions.md',
+					workspaceInstructionsPath,
+					'markdown32.png',
+				);
+				item.description = 'Workspace Instructions';
+				items.push(item);
+			}
 		}
 
 		return items;
+	}
+
+	private toFileItem(
+		label: string,
+		fsPath: string,
+		iconFileName: string,
+	): WorkspaceTreeItem {
+		const item = new WorkspaceTreeItem(
+			'file',
+			'core',
+			label,
+			vscode.TreeItemCollapsibleState.None,
+			fsPath,
+		);
+		item.command = {
+			command: 'copilot-workspace-manager.openFile',
+			title: `Open ${label}`,
+			arguments: [item],
+		};
+		item.iconPath = this.getIcon(iconFileName);
+		return item;
 	}
 
 	private getIcon(
 		lightFileName: string,
 		darkFileName?: string,
 	): { light: vscode.Uri; dark: vscode.Uri } {
-		const lightPath = this.context.asAbsolutePath(
-			path.join('images', lightFileName),
-		);
+		const lightPath = this.context.asAbsolutePath(path.join('images', lightFileName));
 		const darkPath = this.context.asAbsolutePath(
 			path.join('images', darkFileName ?? lightFileName),
 		);

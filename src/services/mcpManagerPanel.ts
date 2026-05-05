@@ -518,7 +518,7 @@ export class McpManagerPanelManager implements vscode.Disposable {
 	}
 
 	private async handleMessage(message: InboundMessage): Promise<void> {
-		const { configPath } = resolveCopilotPaths();
+		const { mcpConfigPath } = resolveCopilotPaths();
 		if (message.type === 'ready') {
 			return;
 		}
@@ -536,7 +536,7 @@ export class McpManagerPanelManager implements vscode.Disposable {
 			this.refresh();
 			return;
 		} else if (message.type === 'toggle') {
-			toggleMcpServer(configPath, message.id);
+			toggleMcpServer(mcpConfigPath, message.id);
 			this.onDidChangeMcp();
 			this.refresh();
 			return;
@@ -547,13 +547,13 @@ export class McpManagerPanelManager implements vscode.Disposable {
 				messages.dialogOk,
 			);
 			if (choice === messages.dialogOk) {
-				deleteMcpServer(configPath, message.id);
+				deleteMcpServer(mcpConfigPath, message.id);
 				this.onDidChangeMcp();
 				this.refresh();
 			}
 			return;
 		} else if (message.type === 'save') {
-			const result = saveMcpServer(configPath, message.model, message.previousId);
+			const result = saveMcpServer(mcpConfigPath, message.model, message.previousId);
 			if (!result.ok) {
 				vscode.window.showErrorMessage(localizeValidationErrors(result.errors).join('\n'));
 			} else {
@@ -580,7 +580,7 @@ export class McpManagerPanelManager implements vscode.Disposable {
 	}
 
 	private readModels(): McpFormModel[] {
-		return listMcpFormModels(resolveCopilotPaths().configPath);
+		return listMcpFormModels(resolveCopilotPaths().mcpConfigPath);
 	}
 }
 

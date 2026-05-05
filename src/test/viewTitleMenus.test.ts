@@ -31,10 +31,6 @@ suite('View title menus', () => {
 
 		const perViewCommands = [
 			{
-				command: 'copilot-workspace-manager.addPromptsFolder',
-				viewId: 'copilot-workspace-manager.prompts',
-			},
-			{
 				command: 'copilot-workspace-manager.addPromptsFile',
 				viewId: 'copilot-workspace-manager.prompts',
 			},
@@ -45,10 +41,6 @@ suite('View title menus', () => {
 			{
 				command: 'copilot-workspace-manager.addSkillsFile',
 				viewId: 'copilot-workspace-manager.skills',
-			},
-			{
-				command: 'copilot-workspace-manager.addTemplatesFolder',
-				viewId: 'copilot-workspace-manager.templates',
 			},
 			{
 				command: 'copilot-workspace-manager.addTemplatesFile',

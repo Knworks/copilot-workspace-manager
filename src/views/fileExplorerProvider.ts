@@ -63,88 +63,46 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 	getRootPath(): string {
 		if (this.kind === 'skills') {
 			return (
-				this.getRootOptions().find((location) => location.kind === 'project')
-					?.rootPath ?? this.getRootOptions()[0].rootPath
+				this.getRootOptions().find((location) => location.kind === 'project')?.rootPath ??
+				this.getRootOptions()[0].rootPath
 			);
 		}
 		if (this.rootPathOverride) {
 			return this.rootPathOverride;
 		}
 		if (this.kind === 'templates') {
-			const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-			return workspaceRoot
-				? path.join(workspaceRoot, '.copilot', TEMPLATE_FOLDER_NAME)
-				: path.join(resolveCopilotPaths().copilotDir, TEMPLATE_FOLDER_NAME);
+			return path.join(resolveCopilotPaths().managerDir, TEMPLATE_FOLDER_NAME);
 		}
 		if (this.kind === 'prompts') {
 			const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-			return workspaceRoot
-				? path.join(workspaceRoot, '.github', 'prompts')
-				: path.join(resolveCopilotPaths().copilotDir, 'prompts', 'ide');
+			return workspaceRoot ? path.join(workspaceRoot, '.claude', 'commands') : '';
 		}
 		return path.join(resolveCopilotPaths().copilotDir, this.kind);
 	}
 
 	getRootOptions(): SkillLocation[] {
 		const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-		const copilotDir = resolveCopilotPaths().copilotDir;
 		if (this.kind === 'prompts') {
-			const workspaceLocations: SkillLocation[] = workspaceRoot
+			return workspaceRoot
 				? [
-						{
-							kind: 'project',
-							label: 'Workspace CLI Commands',
-							rootPath: path.join(workspaceRoot, '.claude', 'commands'),
-							createPath: path.join(workspaceRoot, '.claude', 'commands'),
-							priority: 1,
-						},
-						{
-							kind: 'project',
-							label: 'Workspace IDE Prompts',
-							rootPath: path.join(workspaceRoot, '.github', 'prompts'),
-							createPath: path.join(workspaceRoot, '.github', 'prompts'),
-							priority: 2,
-						},
-					]
+					{
+						kind: 'project',
+						label: 'Workspace Commands',
+						rootPath: path.join(workspaceRoot, '.claude', 'commands'),
+						createPath: path.join(workspaceRoot, '.claude', 'commands'),
+						priority: 1,
+					},
+				]
 				: [];
-			return [
-				...workspaceLocations,
-				{
-					kind: 'user',
-					label: 'Command Library',
-					rootPath: path.join(copilotDir, 'prompts', 'commands'),
-					createPath: path.join(copilotDir, 'prompts', 'commands'),
-					priority: 3,
-				},
-				{
-					kind: 'user',
-					label: 'Prompt Library',
-					rootPath: path.join(copilotDir, 'prompts', 'ide'),
-					createPath: path.join(copilotDir, 'prompts', 'ide'),
-					priority: 4,
-				},
-			];
 		}
 		if (this.kind === 'templates') {
-			const workspaceLocations: SkillLocation[] = workspaceRoot
-				? [
-						{
-							kind: 'project',
-							label: 'Workspace Templates',
-							rootPath: path.join(workspaceRoot, '.copilot', TEMPLATE_FOLDER_NAME),
-							createPath: path.join(workspaceRoot, '.copilot', TEMPLATE_FOLDER_NAME),
-							priority: 1,
-						},
-					]
-				: [];
 			return [
-				...workspaceLocations,
 				{
 					kind: 'user',
-					label: 'User Templates',
-					rootPath: path.join(copilotDir, TEMPLATE_FOLDER_NAME),
-					createPath: path.join(copilotDir, TEMPLATE_FOLDER_NAME),
-					priority: 2,
+					label: 'Templates',
+					rootPath: path.join(resolveCopilotPaths().managerDir, TEMPLATE_FOLDER_NAME),
+					createPath: path.join(resolveCopilotPaths().managerDir, TEMPLATE_FOLDER_NAME),
+					priority: 1,
 				},
 			];
 		}
@@ -173,9 +131,6 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 			if (this.kind === 'skills') {
 				return this.readSkillRoots();
 			}
-			if (!this.rootPathOverride && (this.kind === 'prompts' || this.kind === 'templates')) {
-				return this.readRootItems();
-			}
 			return this.readDirectory(this.getRootPath());
 		}
 
@@ -188,16 +143,11 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 
 	private getSingleRootPath(): string {
 		if (this.kind === 'templates') {
-			const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-			return workspaceRoot
-				? path.join(workspaceRoot, '.copilot', TEMPLATE_FOLDER_NAME)
-				: path.join(resolveCopilotPaths().copilotDir, TEMPLATE_FOLDER_NAME);
+			return path.join(resolveCopilotPaths().managerDir, TEMPLATE_FOLDER_NAME);
 		}
 		if (this.kind === 'prompts') {
 			const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-			return workspaceRoot
-				? path.join(workspaceRoot, '.github', 'prompts')
-				: path.join(resolveCopilotPaths().copilotDir, 'prompts', 'ide');
+			return workspaceRoot ? path.join(workspaceRoot, '.claude', 'commands') : '';
 		}
 		return path.join(resolveCopilotPaths().copilotDir, this.kind);
 	}
@@ -242,41 +192,17 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 		);
 	}
 
-	private readRootItems(): WorkspaceTreeItem[] {
-		return this.getRootOptions().map((location) => {
-			const item = new WorkspaceTreeItem(
-				'root',
-				this.kind,
-				location.label,
-				vscode.TreeItemCollapsibleState.Collapsed,
-				location.rootPath,
-			);
-			item.id = `${this.kind}:${location.rootPath}`;
-			item.contextValue = 'workspace-root';
-			item.description = location.rootPath;
-			item.tooltip = location.rootPath;
-			item.iconPath = this.getFolderIcon(location.rootPath);
-			return item;
-		});
-	}
-
-	private readDirectory(
-		targetPath: string,
-		location?: SkillLocation,
-	): WorkspaceTreeItem[] {
+	private readDirectory(targetPath: string, location?: SkillLocation): WorkspaceTreeItem[] {
 		const entries = this.listEntries(targetPath)
 			.filter((entry) => !this.isHiddenName(entry.name))
-			.sort((left, right) => {
-				if (left.isDirectory !== right.isDirectory) {
-					return left.isDirectory ? -1 : 1;
-				}
-				return left.name.localeCompare(right.name, undefined, {
+			.filter((entry) => this.kind === 'skills' || !entry.isDirectory)
+			.sort((left, right) =>
+				left.name.localeCompare(right.name, undefined, {
 					numeric: true,
 					sensitivity: 'base',
-				});
-			});
-		const resolvedLocation =
-			location ?? this.getLocationForPath(targetPath);
+				}),
+			);
+		const resolvedLocation = location ?? this.getLocationForPath(targetPath);
 		return entries.map((entry) => {
 			if (entry.isDirectory) {
 				const folderItem = new WorkspaceTreeItem(
@@ -307,10 +233,7 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 				title: 'Open file',
 				arguments: [fileItem],
 			};
-			fileItem.iconPath = this.getFileIcon(
-				entry.name,
-				entry.fullPath,
-			);
+			fileItem.iconPath = this.getFileIcon(entry.name, entry.fullPath);
 			this.applyLocationMetadata(fileItem, resolvedLocation, entry.fullPath);
 			return fileItem;
 		});
@@ -334,14 +257,9 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 
 	private getFolderIcon(
 		folderPath?: string,
-	):
-		| vscode.ThemeIcon
-		| { light: vscode.Uri; dark: vscode.Uri }
-		| undefined {
-		if (this.kind === 'skills' && folderPath) {
-			if (this.isSkillRootFolder(folderPath)) {
-				return new vscode.ThemeIcon('folder-library');
-			}
+	): vscode.ThemeIcon | { light: vscode.Uri; dark: vscode.Uri } | undefined {
+		if (this.kind === 'skills' && folderPath && this.isSkillRootFolder(folderPath)) {
+			return new vscode.ThemeIcon('folder-library');
 		}
 
 		const iconPath = this.context.asAbsolutePath(path.join('images', 'folder32.png'));
@@ -352,10 +270,7 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 	private getFileIcon(
 		fileName: string,
 		filePath?: string,
-	):
-		| vscode.ThemeIcon
-		| { light: vscode.Uri; dark: vscode.Uri }
-		| undefined {
+	): vscode.ThemeIcon | { light: vscode.Uri; dark: vscode.Uri } | undefined {
 		if (this.kind === 'prompts') {
 			return new vscode.ThemeIcon('terminal');
 		}
@@ -372,11 +287,7 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 	}
 
 	private isSkillRootFolder(folderPath: string): boolean {
-		if (
-			this.getRootOptions().some(
-				(location) => path.dirname(folderPath) === location.rootPath,
-			)
-		) {
+		if (this.getRootOptions().some((location) => path.dirname(folderPath) === location.rootPath)) {
 			return true;
 		}
 

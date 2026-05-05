@@ -12,8 +12,11 @@ export type WorkspaceStatus = {
 export type WorkspacePaths = {
 	copilotDir: string;
 	configPath: string;
+	managerDir: string;
+	mcpConfigPath: string;
 };
 
+export const WORKSPACE_MANAGER_FOLDER_NAME = '.copilot-workspace-manager';
 export const TEMPLATE_FOLDER_NAME = 'templates';
 
 export const UNAVAILABLE_REASONS = {
@@ -39,6 +42,8 @@ export function resolveCopilotPaths(
 	return {
 		copilotDir,
 		configPath: path.join(copilotDir, 'config.json'),
+		managerDir: path.join(copilotDir, WORKSPACE_MANAGER_FOLDER_NAME),
+		mcpConfigPath: path.join(copilotDir, 'mcp-config.json'),
 	};
 }
 

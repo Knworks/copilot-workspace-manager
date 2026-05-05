@@ -198,11 +198,9 @@ async function deleteAgent(
 async function pickAgentLocationRoot(
 	agentProvider: AgentExplorerProvider,
 ): Promise<string | null> {
-	const locations = agentProvider.getRootOptions();
-	const projectFirst = [
-		...locations.filter((location) => location.kind === 'project'),
-		...locations.filter((location) => location.kind !== 'project'),
-	];
+	const projectFirst = agentProvider
+		.getRootOptions()
+		.filter((location) => location.kind !== 'plugin');
 	const selected = await vscode.window.showQuickPick(
 		projectFirst.map((location) => ({
 			label: location.label,

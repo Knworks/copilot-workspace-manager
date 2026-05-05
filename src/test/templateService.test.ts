@@ -25,9 +25,12 @@ suite('Template service', () => {
 		}
 	});
 
-	test('uses .copilot/templates as template root path', () => {
+	test('uses manager templates root path', () => {
 		const homeDir = path.join('home', 'tester');
 		const rootPath = getTemplateRootPath(homeDir);
-		assert.strictEqual(rootPath, path.join(homeDir, '.copilot', 'templates'));
+		assert.strictEqual(
+			rootPath,
+			path.join(homeDir, '.copilot', '.copilot-workspace-manager', 'templates'),
+		);
 	});
 });

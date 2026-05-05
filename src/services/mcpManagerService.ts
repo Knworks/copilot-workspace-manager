@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { stabilizeManagedConfigToml } from './configTomlOrganizerService';
+import path from 'path';
 
 export type McpTransport = 'stdio' | 'http';
 
@@ -28,31 +28,17 @@ export type McpValidationResult = {
 	errors: string[];
 };
 
-type McpBlock = {
-	id: string;
-	startLine: number;
-	endLine: number;
-	lines: string[];
+type McpConfigShape = {
+	mcpServers?: Record<string, Record<string, unknown>>;
+	servers?: Record<string, Record<string, unknown>>;
 };
 
-const MCP_HEADER_PATTERN =
-	/^\s*\[mcp_servers\.(?:"((?:[^"\\]|\\.)*)"|([A-Za-z0-9_.-]+))\]\s*$/;
 const MCP_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 export function listMcpFormModels(configPath: string): McpFormModel[] {
-	if (!fs.existsSync(configPath)) {
-		return [];
-	}
-	const contents = fs.readFileSync(configPath, 'utf8');
-	const blocks = parseMcpBlocks(contents);
-	const envBlocks = new Map(
-		blocks
-			.filter((block) => block.id.endsWith('.env'))
-			.map((block) => [block.id.slice(0, -4), block] as const),
-	);
-	return blocks
-		.filter((block) => !block.id.endsWith('.env'))
-		.map((block) => blockToModel(block, envBlocks.get(block.id)));
+	const parsed = readConfig(configPath);
+	const servers = parsed.mcpServers ?? parsed.servers ?? {};
+	return Object.entries(servers).map(([id, value]) => toModel(id, value));
 }
 
 export function validateMcpModel(
@@ -66,9 +52,6 @@ export function validateMcpModel(
 	}
 	if (existingIds.includes(model.id) && model.id !== previousId) {
 		errors.push('serverNameDuplicate');
-	}
-	if (model.transport !== 'stdio' && model.transport !== 'http') {
-		errors.push('transportRequired');
 	}
 	if (model.transport === 'stdio' && !model.command.trim()) {
 		errors.push('commandRequired');
@@ -113,303 +96,114 @@ export function saveMcpServer(
 	model: McpFormModel,
 	previousId?: string,
 ): McpValidationResult {
-	const contents = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf8') : '';
-	const blocks = parseMcpBlocks(contents);
-	const validation = validateMcpModel(
-		model,
-		blocks.map((block) => block.id),
-		previousId,
-	);
+	const parsed = readConfig(configPath);
+	const servers = { ...(parsed.mcpServers ?? parsed.servers ?? {}) };
+	const validation = validateMcpModel(model, Object.keys(servers), previousId);
 	if (!validation.ok) {
 		return validation;
 	}
-	const target = previousId
-		? blocks.find((block) => block.id === previousId)
-		: undefined;
-	const targetEnv = previousId
-		? blocks.find((block) => block.id === `${previousId}.env`)
-		: undefined;
-	const newBlock = buildMcpBlock(model, target).split('\n');
-	const newEnvBlock = buildMcpEnvBlock(model).split('\n');
-	if (!target) {
-		const separator = contents.trim().length > 0 ? '\n\n' : '';
-		const envSection =
-			model.env.length > 0 ? `\n\n${newEnvBlock.join('\n')}` : '';
-		fs.writeFileSync(
-			configPath,
-			stabilizeManagedConfigToml(
-				`${contents}${separator}${newBlock.join('\n')}${envSection}\n`,
-			),
-			'utf8',
-		);
-		return validation;
+	if (previousId && previousId !== model.id) {
+		delete servers[previousId];
 	}
-	const lines = contents.split(/\r?\n/);
-	const replacements = [
-		{ target, nextLines: newBlock },
-		...(targetEnv
-			? [{ target: targetEnv, nextLines: model.env.length > 0 ? newEnvBlock : [] }]
-			: []),
-	].sort((left, right) => right.target.startLine - left.target.startLine);
-	for (const replacement of replacements) {
-		lines.splice(
-			replacement.target.startLine,
-			replacement.target.endLine - replacement.target.startLine + 1,
-			...replacement.nextLines,
-		);
-	}
-	if (!targetEnv && model.env.length > 0) {
-		lines.push('', ...newEnvBlock);
-	}
-	fs.writeFileSync(
-		configPath,
-		stabilizeManagedConfigToml(normalizeLines(lines)),
-		'utf8',
-	);
+	servers[model.id] = fromModel(model);
+	parsed.mcpServers = servers;
+	delete parsed.servers;
+	writeConfig(configPath, parsed);
 	return validation;
 }
 
 export function deleteMcpServer(configPath: string, serverId: string): boolean {
-	const contents = fs.readFileSync(configPath, 'utf8');
-	const blocks = parseMcpBlocks(contents);
-	const targetIds = new Set([serverId, `${serverId}.env`]);
-	const targets = blocks.filter((block) => targetIds.has(block.id));
-	if (targets.length === 0) {
+	const parsed = readConfig(configPath);
+	const servers = { ...(parsed.mcpServers ?? parsed.servers ?? {}) };
+	if (!(serverId in servers)) {
 		return false;
 	}
-	const lines = contents.split(/\r?\n/);
-	for (const target of [...targets].sort((left, right) => right.startLine - left.startLine)) {
-		lines.splice(target.startLine, target.endLine - target.startLine + 1);
-	}
-	fs.writeFileSync(
-		configPath,
-		stabilizeManagedConfigToml(normalizeLines(lines)),
-		'utf8',
-	);
+	delete servers[serverId];
+	parsed.mcpServers = servers;
+	delete parsed.servers;
+	writeConfig(configPath, parsed);
 	return true;
 }
 
-function parseMcpBlocks(contents: string): McpBlock[] {
-	const lines = contents.split(/\r?\n/);
-	const blocks: McpBlock[] = [];
-	let current: McpBlock | undefined;
-	for (let index = 0; index < lines.length; index += 1) {
-		const header = lines[index].match(/^\s*\[[^\]]+\]\s*$/);
-		if (header) {
-			if (current) {
-				current.endLine = index - 1;
-				current.lines = lines.slice(current.startLine, current.endLine + 1);
-				current = undefined;
-			}
-			const mcpHeader = lines[index].match(MCP_HEADER_PATTERN);
-			if (mcpHeader) {
-				const id = unescapeTomlString(mcpHeader[1] ?? mcpHeader[2] ?? '');
-				current = {
-					id,
-					startLine: index,
-					endLine: lines.length - 1,
-					lines: [],
-				};
-				blocks.push(current);
-			}
-		}
-	}
-	if (current) {
-		current.lines = lines.slice(current.startLine, current.endLine + 1);
-	}
-	return blocks;
-}
-
-function blockToModel(block: McpBlock, envBlock?: McpBlock): McpFormModel {
-	const values = readBlockValues(block.lines);
-	const hasUrl = typeof values.url === 'string';
-	const args = Array.isArray(values.args) ? values.args : [];
-	const enabledTools = Array.isArray(values.enabled_tools) ? values.enabled_tools : [];
-	const disabledTools = Array.isArray(values.disabled_tools) ? values.disabled_tools : [];
+function toModel(id: string, value: Record<string, unknown>): McpFormModel {
+	const url = typeof value.url === 'string' ? value.url : '';
+	const command = typeof value.command === 'string' ? value.command : '';
+	const type = typeof value.type === 'string' ? value.type : '';
 	return {
-		id: block.id,
-		transport: hasUrl ? 'http' : 'stdio',
-		command: typeof values.command === 'string' ? values.command : '',
-		args,
-		url: typeof values.url === 'string' ? values.url : '',
-		env: envBlock ? readEnvBlockEntries(envBlock.lines) : toEnvEntries(values.env),
-		required: typeof values.required === 'boolean' ? values.required : undefined,
-		startupTimeoutSec:
-			typeof values.startup_timeout_sec === 'number'
-				? values.startup_timeout_sec
-				: undefined,
-		toolTimeoutSec:
-			typeof values.tool_timeout_sec === 'number'
-				? values.tool_timeout_sec
-				: undefined,
-		enabledTools,
-		disabledTools,
-		enabled: typeof values.enabled === 'boolean' ? values.enabled : true,
+		id,
+		transport: url || type === 'http' || type === 'sse' ? 'http' : 'stdio',
+		command,
+		args: Array.isArray(value.args) ? value.args.filter((item): item is string => typeof item === 'string') : [],
+		url,
+		env: Object.entries(
+			value.env && typeof value.env === 'object' && !Array.isArray(value.env)
+				? value.env as Record<string, unknown>
+				: {},
+		)
+			.filter(([, envValue]) => typeof envValue === 'string')
+			.map(([key, envValue]) => ({ key, value: envValue as string })),
+		required: typeof value.required === 'boolean' ? value.required : undefined,
+		startupTimeoutSec: typeof value.startupTimeoutSec === 'number' ? value.startupTimeoutSec : undefined,
+		toolTimeoutSec: typeof value.toolTimeoutSec === 'number' ? value.toolTimeoutSec : undefined,
+		enabledTools: Array.isArray(value.enabledTools)
+			? value.enabledTools.filter((item): item is string => typeof item === 'string')
+			: [],
+		disabledTools: Array.isArray(value.disabledTools)
+			? value.disabledTools.filter((item): item is string => typeof item === 'string')
+			: [],
+		enabled: value.disabled !== true,
 	};
 }
 
-function readBlockValues(lines: string[]): Record<string, unknown> {
-	const values: Record<string, unknown> = {};
-	for (const line of lines.slice(1)) {
-		const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*(?:#.*)?$/);
-		if (!match) {
-			continue;
-		}
-		values[match[1]] = parseTomlScalarOrArray(match[2]);
-	}
-	return values;
-}
-
-function parseTomlScalarOrArray(value: string): unknown {
-	const trimmed = value.trim();
-	if (trimmed === 'true') {
-		return true;
-	}
-	if (trimmed === 'false') {
-		return false;
-	}
-	if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
-		return Number(trimmed);
-	}
-	const stringMatch = trimmed.match(/^"((?:[^"\\]|\\.)*)"$/);
-	if (stringMatch) {
-		return stringMatch[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-	}
-	const literalStringMatch = trimmed.match(/^'([^']*)'$/);
-	if (literalStringMatch) {
-		return literalStringMatch[1];
-	}
-	if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-		return [...trimmed.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((match) =>
-			match[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\'),
-		);
-	}
-	if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-		return parseTomlInlineTable(trimmed);
-	}
-	return trimmed;
-}
-
-function parseTomlInlineTable(value: string): Record<string, string> {
-	const result: Record<string, string> = {};
-	for (const match of value.matchAll(
-		/([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g,
-	)) {
-		result[match[1]] = match[2]
-			.replace(/\\"/g, '"')
-			.replace(/\\\\/g, '\\');
-	}
-	return result;
-}
-
-function toEnvEntries(value: unknown): McpEnvEntry[] {
-	if (!value || typeof value !== 'object' || Array.isArray(value)) {
-		return [];
-	}
-	return Object.entries(value as Record<string, unknown>)
-		.filter(([, entryValue]) => typeof entryValue === 'string')
-		.map(([key, entryValue]) => ({ key, value: entryValue as string }));
-}
-
-function readEnvBlockEntries(lines: string[]): McpEnvEntry[] {
-	return Object.entries(readBlockValues(lines))
-		.filter(([, entryValue]) => typeof entryValue === 'string')
-		.map(([key, value]) => ({ key, value: value as string }));
-}
-
-function buildMcpBlock(model: McpFormModel, previous?: McpBlock): string {
-	const preserved = new Map<string, string>();
-	if (previous) {
-		for (const line of previous.lines.slice(1)) {
-			const key = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=/)?.[1];
-			if (key) {
-				preserved.set(key, line);
-			}
-		}
-	}
-	const controlled = new Set([
-		'enabled',
-		'command',
-		'args',
-		'env',
-		'url',
-		'required',
-		'startup_timeout_sec',
-		'tool_timeout_sec',
-		'enabled_tools',
-		'disabled_tools',
-	]);
-	const lines = [`[mcp_servers.${formatHeaderKey(model.id)}]`];
-	if (!model.enabled) {
-		lines.push('enabled = false');
-	}
+function fromModel(model: McpFormModel): Record<string, unknown> {
+	const next: Record<string, unknown> = {
+		disabled: !model.enabled,
+	};
 	if (model.transport === 'stdio') {
-		lines.push(`command = "${escapeTomlString(model.command)}"`);
+		next.type = 'stdio';
+		next.command = model.command;
 		if (model.args.length > 0) {
-			lines.push(`args = ${formatStringArray(model.args)}`);
+			next.args = model.args;
 		}
 	} else {
-		lines.push(`url = "${escapeTomlString(model.url)}"`);
+		next.type = 'http';
+		next.url = model.url;
+	}
+	if (model.env.length > 0) {
+		next.env = Object.fromEntries(
+			model.env.filter((entry) => entry.key.trim()).map((entry) => [entry.key.trim(), entry.value]),
+		);
 	}
 	if (model.required !== undefined) {
-		lines.push(`required = ${model.required ? 'true' : 'false'}`);
+		next.required = model.required;
 	}
 	if (model.startupTimeoutSec !== undefined) {
-		lines.push(`startup_timeout_sec = ${model.startupTimeoutSec}`);
+		next.startupTimeoutSec = model.startupTimeoutSec;
 	}
 	if (model.toolTimeoutSec !== undefined) {
-		lines.push(`tool_timeout_sec = ${model.toolTimeoutSec}`);
+		next.toolTimeoutSec = model.toolTimeoutSec;
 	}
 	if (model.enabledTools.length > 0) {
-		lines.push(`enabled_tools = ${formatStringArray(model.enabledTools)}`);
+		next.enabledTools = model.enabledTools;
 	}
 	if (model.disabledTools.length > 0) {
-		lines.push(`disabled_tools = ${formatStringArray(model.disabledTools)}`);
+		next.disabledTools = model.disabledTools;
 	}
-	for (const [key, line] of preserved) {
-		if (!controlled.has(key)) {
-			lines.push(line);
-		}
+	return next;
+}
+
+function readConfig(configPath: string): McpConfigShape {
+	if (!fs.existsSync(configPath)) {
+		return {};
 	}
-	return lines.join('\n');
-}
-
-function escapeTomlString(value: string): string {
-	return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-}
-
-function unescapeTomlString(value: string): string {
-	return value.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-}
-
-function formatHeaderKey(value: string): string {
-	return /^[A-Za-z0-9_-]+$/.test(value)
-		? value
-		: `"${escapeTomlString(value)}"`;
-}
-
-function formatStringArray(values: string[]): string {
-	return `[${values.map((value) => `"${escapeTomlString(value)}"`).join(', ')}]`;
-}
-
-function buildMcpEnvBlock(model: McpFormModel): string {
-	const envHeader = /^[A-Za-z0-9_.-]+$/.test(model.id)
-		? `[mcp_servers.${model.id}.env]`
-		: `[mcp_servers.${formatHeaderKey(`${model.id}.env`)}]`;
-	const lines = [envHeader];
-	for (const entry of model.env) {
-		if (!entry.key.trim()) {
-			continue;
-		}
-		lines.push(`${entry.key} = '${escapeTomlLiteralString(entry.value)}'`);
+	try {
+		return JSON.parse(fs.readFileSync(configPath, 'utf8')) as McpConfigShape;
+	} catch {
+		return {};
 	}
-	return lines.join('\n');
 }
 
-function escapeTomlLiteralString(value: string): string {
-	return value.replace(/'/g, "''");
-}
-
-function normalizeLines(lines: string[]): string {
-	return `${lines.join('\n').replace(/\s+$/, '')}\n`;
+function writeConfig(configPath: string, config: McpConfigShape): void {
+	fs.mkdirSync(path.dirname(configPath), { recursive: true });
+	fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
 }

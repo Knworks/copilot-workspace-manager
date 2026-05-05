@@ -88,30 +88,32 @@ suite('Core manager config service', () => {
 		withTempDir((root) => {
 			const homeDir = path.join(root, 'home');
 			const workspaceRoot = path.join(root, 'workspace');
-			const userCodexDir = path.join(homeDir, '.codex');
-			const projectCodexDir = path.join(workspaceRoot, '.codex');
-			const configPath = path.join(userCodexDir, 'config.toml');
-			fs.mkdirSync(userCodexDir, { recursive: true });
-			fs.mkdirSync(projectCodexDir, { recursive: true });
+			const userCopilotDir = path.join(homeDir, '.copilot');
+			const configPath = path.join(userCopilotDir, 'config.json');
+			fs.mkdirSync(userCopilotDir, { recursive: true });
+			fs.mkdirSync(path.join(workspaceRoot, '.github'), { recursive: true });
 			fs.writeFileSync(
 				configPath,
-				[
-					'[features]',
-					'codex_hooks = true',
-					'',
-					`[projects.'${workspaceRoot}']`,
-					'trust_level = "trusted"',
-					'',
-					'[[hooks.PreToolUse]]',
-					'matcher = "^Bash$"',
-					'[[hooks.PreToolUse.hooks]]',
-					'type = "command"',
-					'command = "echo user-inline"',
-				].join('\n'),
+				JSON.stringify(
+					{
+						features: { codex_hooks: true },
+						trusted_folders: [workspaceRoot],
+						hooks: {
+							PreToolUse: [
+								{
+									matcher: '^Bash$',
+									hooks: [{ type: 'command', command: 'echo user-inline' }],
+								},
+							],
+						},
+					},
+					null,
+					2,
+				),
 				'utf8',
 			);
 			fs.writeFileSync(
-				path.join(userCodexDir, 'hooks.json'),
+				path.join(userCopilotDir, 'hooks.json'),
 				JSON.stringify(
 					{
 						hooks: {
@@ -134,15 +136,21 @@ suite('Core manager config service', () => {
 				'utf8',
 			);
 			fs.writeFileSync(
-				path.join(projectCodexDir, 'config.toml'),
-				[
-					'[[hooks.PostToolUse]]',
-					'matcher = "^Bash$"',
-					'[[hooks.PostToolUse.hooks]]',
-					'type = "command"',
-					'command = "echo project-inline"',
-					'timeout = 30',
-				].join('\n'),
+				path.join(workspaceRoot, '.github', 'hooks.json'),
+				JSON.stringify(
+					{
+						hooks: {
+							PostToolUse: [
+								{
+									matcher: '^Bash$',
+									hooks: [{ type: 'command', command: 'echo project-inline', timeout: 30 }],
+								},
+							],
+						},
+					},
+					null,
+					2,
+				),
 				'utf8',
 			);
 
@@ -159,24 +167,26 @@ suite('Core manager config service', () => {
 		withTempDir((root) => {
 			const homeDir = path.join(root, 'home');
 			const workspaceRoot = path.join(root, 'workspace');
-			const userCodexDir = path.join(homeDir, '.codex');
-			const projectCodexDir = path.join(workspaceRoot, '.codex');
-			const configPath = path.join(userCodexDir, 'config.toml');
-			fs.mkdirSync(userCodexDir, { recursive: true });
-			fs.mkdirSync(projectCodexDir, { recursive: true });
+			const userCopilotDir = path.join(homeDir, '.copilot');
+			const configPath = path.join(userCopilotDir, 'config.json');
+			fs.mkdirSync(userCopilotDir, { recursive: true });
+			fs.mkdirSync(path.join(workspaceRoot, '.github'), { recursive: true });
 			fs.writeFileSync(
 				configPath,
-				['[features]', 'codex_hooks = true'].join('\n'),
+				JSON.stringify({ features: { codex_hooks: true } }, null, 2),
 				'utf8',
 			);
 			fs.writeFileSync(
-				path.join(projectCodexDir, 'config.toml'),
-				[
-					'[[hooks.Stop]]',
-					'[[hooks.Stop.hooks]]',
-					'type = "command"',
-					'command = "echo stop"',
-				].join('\n'),
+				path.join(workspaceRoot, '.github', 'hooks.json'),
+				JSON.stringify(
+					{
+						hooks: {
+							Stop: [{ hooks: [{ type: 'command', command: 'echo stop' }] }],
+						},
+					},
+					null,
+					2,
+				),
 				'utf8',
 			);
 

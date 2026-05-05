@@ -8,7 +8,7 @@ export type TemplateCandidate = {
 };
 
 export function getTemplateRootPath(homeDir?: string): string {
-	return path.join(resolveCopilotPaths(homeDir).copilotDir, TEMPLATE_FOLDER_NAME);
+	return path.join(resolveCopilotPaths(homeDir).managerDir, TEMPLATE_FOLDER_NAME);
 }
 
 export function listTemplateCandidates(rootPath?: string): TemplateCandidate[] {

@@ -437,7 +437,18 @@ async function resolveTargetDirectoryForAdd(
 	}
 
 	const locations = provider.getRootOptions();
-	const creatableLocations = locations.filter((location) => location.createPath);
+	const creatableLocations = locations.filter((location) => {
+		if (!location.createPath) {
+			return false;
+		}
+		if (item.kind !== 'skills') {
+			return true;
+		}
+		if (location.kind === 'plugin') {
+			return false;
+		}
+		return !location.rootPath.endsWith(`${path.sep}.agents${path.sep}skills`);
+	});
 	const currentLocation = provider.getLocationForPath(targetDir);
 	const sortedLocations = [
 		...creatableLocations.filter((location) => location.kind === currentLocation?.kind),
@@ -472,7 +483,7 @@ function createRootItem(viewKind: FileViewKind, rootPath: string): WorkspaceTree
 		rootPath,
 	);
 	rootItem.id = rootPath;
-	rootItem.contextValue = 'codex-root';
+	rootItem.contextValue = 'workspace-root';
 	return rootItem;
 }
 
@@ -488,6 +499,10 @@ async function addFileWithSelection(
 
 	const targetDir = resolveTargetDirectory(selection, provider);
 	if (!targetDir) {
+		return;
+	}
+	if (selection.kind === 'skills' && selection.nodeType === 'root') {
+		vscode.window.showInformationMessage(messages.file.skillFileFolderRequired);
 		return;
 	}
 

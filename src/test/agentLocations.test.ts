@@ -6,7 +6,7 @@ import {
 } from '../services/agentLocations';
 
 suite('Agent locations', () => {
-	test('returns Copilot project user and plugin agent locations in priority order', () => {
+	test('returns Copilot project and user agent locations in priority order', () => {
 		const homeDir = path.join('home');
 		const projectRoot = path.join('repo');
 
@@ -14,15 +14,11 @@ suite('Agent locations', () => {
 
 		assert.deepStrictEqual(
 			locations.map((location) => location.kind),
-			['project', 'user', 'plugin'],
+			['project', 'user'],
 		);
 		assert.strictEqual(locations[0].rootPath, path.join(projectRoot, '.github', 'agents'));
 		assert.strictEqual(locations[0].createPath, path.join(projectRoot, '.github', 'agents'));
 		assert.strictEqual(locations[1].rootPath, path.join(homeDir, '.copilot', 'agents'));
-		assert.strictEqual(
-			locations[2].rootPath,
-			path.join(homeDir, '.copilot', 'installed-plugins'),
-		);
 	});
 
 	test('findAgentLocationForPath resolves paths under an agent root', () => {

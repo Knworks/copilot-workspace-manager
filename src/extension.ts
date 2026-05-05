@@ -237,9 +237,7 @@ export function activate(context: vscode.ExtensionContext) {
 					return;
 				}
 				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-				if (workspaceRoot) {
-					await revealFolder(path.join(workspaceRoot, '.copilot', TEMPLATE_FOLDER_NAME));
-				}
+				await revealFolder(path.join(resolveCopilotPaths().managerDir, TEMPLATE_FOLDER_NAME));
 			}),
 	);
 
@@ -362,17 +360,11 @@ export function activate(context: vscode.ExtensionContext) {
 				const { copilotDir } = resolveCopilotPaths();
 				const commandResult = syncDirectoryBidirectional(
 					'promptCommands',
-					copilotDir,
-					path.join(copilotDir, 'prompts', 'commands'),
+					resolveCopilotPaths().managerDir,
+					path.join(workspaceRoot, '.claude', 'commands'),
 					path.join(workspaceRoot, '.claude', 'commands'),
 				);
-				const ideResult = syncDirectoryBidirectional(
-					'promptIde',
-					copilotDir,
-					path.join(copilotDir, 'prompts', 'ide'),
-					path.join(workspaceRoot, '.github', 'prompts'),
-				);
-				const skippedCount = commandResult.skipped.length + ideResult.skipped.length;
+				const skippedCount = commandResult.skipped.length;
 				if (skippedCount > 0) {
 					vscode.window.showWarningMessage(
 						messages.syncSkipped(skippedCount),
@@ -428,12 +420,12 @@ export function activate(context: vscode.ExtensionContext) {
 				if (!(await confirmSync('Copilot templates'))) {
 					return;
 				}
-				const { copilotDir } = resolveCopilotPaths();
+				const { managerDir } = resolveCopilotPaths();
 				const result = syncDirectoryBidirectional(
 					'templates',
-					copilotDir,
-					path.join(workspaceRoot, '.copilot', TEMPLATE_FOLDER_NAME),
-					path.join(copilotDir, TEMPLATE_FOLDER_NAME),
+					managerDir,
+					path.join(managerDir, TEMPLATE_FOLDER_NAME),
+					path.join(managerDir, TEMPLATE_FOLDER_NAME),
 				);
 				if (result.skipped.length > 0) {
 					vscode.window.showWarningMessage(

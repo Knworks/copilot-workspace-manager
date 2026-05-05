@@ -19,54 +19,42 @@ function withTempDir(run: (root: string) => void): void {
 }
 
 suite('Core diagnostics service', () => {
-	test('buildAgentsLoadingChain marks higher priority project override active', () => {
+	test('buildAgentsLoadingChain prefers user instructions over workspace instructions', () => {
 		withTempDir((root) => {
 			const homeDir = path.join(root, 'home');
-			const codexDir = path.join(homeDir, '.codex');
+			const copilotDir = path.join(homeDir, '.copilot');
 			const workspaceRoot = path.join(root, 'workspace');
-			fs.mkdirSync(codexDir, { recursive: true });
-			fs.mkdirSync(workspaceRoot, { recursive: true });
-			fs.writeFileSync(path.join(codexDir, 'config.toml'), 'project_doc_fallback_filenames = ["GUIDE.md"]', 'utf8');
-			fs.writeFileSync(path.join(workspaceRoot, 'AGENTS.override.md'), 'override', 'utf8');
-			fs.writeFileSync(path.join(workspaceRoot, 'AGENTS.md'), 'standard', 'utf8');
+			fs.mkdirSync(path.join(workspaceRoot, '.github'), { recursive: true });
+			fs.mkdirSync(copilotDir, { recursive: true });
+			fs.writeFileSync(path.join(copilotDir, 'copilot-instructions.md'), 'user', 'utf8');
+			fs.writeFileSync(path.join(workspaceRoot, '.github', 'copilot-instructions.md'), 'workspace', 'utf8');
 
 			const nodes = buildAgentsLoadingChain(workspaceRoot, homeDir);
 
-			const override = nodes.find((node) => node.fileName === 'AGENTS.override.md' && node.kind === 'Project');
-			const standard = nodes.find((node) => node.fileName === 'AGENTS.md' && node.kind === 'Project');
-			assert.strictEqual(override?.status, 'Active');
-			assert.strictEqual(standard?.status, 'Skipped');
-			assert.ok(nodes.length >= 2);
+			assert.strictEqual(nodes[0].status, 'Active');
+			assert.strictEqual(nodes[1].status, 'Skipped');
 		});
 	});
 
-	test('buildAgentsLoadingChain marks deleted standard project file as missing', () => {
+	test('buildAgentsLoadingChain marks missing workspace instructions', () => {
 		withTempDir((root) => {
 			const homeDir = path.join(root, 'home');
-			const codexDir = path.join(homeDir, '.codex');
+			const copilotDir = path.join(homeDir, '.copilot');
 			const workspaceRoot = path.join(root, 'workspace');
-			fs.mkdirSync(codexDir, { recursive: true });
+			fs.mkdirSync(copilotDir, { recursive: true });
 			fs.mkdirSync(workspaceRoot, { recursive: true });
-			fs.writeFileSync(path.join(codexDir, 'config.toml'), '', 'utf8');
-			const agentsPath = path.join(workspaceRoot, 'AGENTS.md');
-			fs.writeFileSync(agentsPath, 'standard', 'utf8');
+			fs.writeFileSync(path.join(copilotDir, 'copilot-instructions.md'), 'user', 'utf8');
 
-			let nodes = buildAgentsLoadingChain(workspaceRoot, homeDir);
-			let standard = nodes.find((node) => node.fileName === 'AGENTS.md' && node.kind === 'Project');
-			assert.strictEqual(standard?.status, 'Active');
-			assert.strictEqual(standard?.contentPreview, 'standard');
+			const nodes = buildAgentsLoadingChain(workspaceRoot, homeDir);
 
-			fs.rmSync(agentsPath);
-			nodes = buildAgentsLoadingChain(workspaceRoot, homeDir);
-			standard = nodes.find((node) => node.fileName === 'AGENTS.md' && node.kind === 'Project');
-			assert.strictEqual(standard?.status, 'Missing');
-			assert.strictEqual(standard?.contentPreview, undefined);
+			assert.strictEqual(nodes[0].status, 'Active');
+			assert.strictEqual(nodes[1].status, 'Missing');
 		});
 	});
 
 	test('trusted directories can be listed added and removed', () => {
 		withTempDir((root) => {
-			const configPath = path.join(root, 'config.toml');
+			const configPath = path.join(root, 'config.json');
 			const projectPath = path.join(root, 'project');
 			fs.mkdirSync(projectPath, { recursive: true });
 
@@ -82,47 +70,13 @@ suite('Core diagnostics service', () => {
 		});
 	});
 
-	test('addTrustedDirectory keeps project blocks grouped before later skills blocks', () => {
+	test('trusted directories read JSON trusted_folders', () => {
 		withTempDir((root) => {
-			const configPath = path.join(root, 'config.toml');
-			const existingProject = path.join(root, 'project-a');
-			const nextProject = path.join(root, 'project-b');
-			fs.writeFileSync(
-				configPath,
-				[
-					`[projects."${existingProject.replace(/\\/g, '\\\\')}"]`,
-					'trust_level = "trusted"',
-					'',
-					'[[skills.config]]',
-					`path = '${path.join(root, 'skills', 'alpha', 'SKILL.md')}'`,
-					'enabled = true',
-					'',
-				].join('\n'),
-				'utf8',
-			);
-
-			addTrustedDirectory(configPath, nextProject);
-
-			const contents = fs.readFileSync(configPath, 'utf8');
-			const firstProjectIndex = contents.indexOf(existingProject.replace(/\\/g, '\\\\'));
-			const secondProjectIndex = contents.indexOf(nextProject.replace(/\\/g, '\\\\'));
-			const skillsIndex = contents.indexOf('[[skills.config]]');
-			assert.ok(firstProjectIndex >= 0);
-			assert.ok(secondProjectIndex > firstProjectIndex);
-			assert.ok(skillsIndex > secondProjectIndex);
-		});
-	});
-
-	test('trusted directories support single-quoted project headers', () => {
-		withTempDir((root) => {
-			const configPath = path.join(root, 'config.toml');
+			const configPath = path.join(root, 'config.json');
 			const projectPath = '\\\\?\\Z:\\copilot-workspace-manager-test\\missing-project';
 			fs.writeFileSync(
 				configPath,
-				[
-					`[projects.'${projectPath}']`,
-					'trust_level = "trusted"',
-				].join('\n'),
+				JSON.stringify({ trusted_folders: [projectPath] }, null, 2),
 				'utf8',
 			);
 

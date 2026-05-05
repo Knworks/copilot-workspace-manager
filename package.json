@@ -292,14 +292,9 @@
     "menus": {
       "view/title": [
         {
-          "command": "copilot-workspace-manager.addPromptsFolder",
-          "when": "view == 'copilot-workspace-manager.prompts'",
-          "group": "navigation@1"
-        },
-        {
           "command": "copilot-workspace-manager.addPromptsFile",
           "when": "view == 'copilot-workspace-manager.prompts'",
-          "group": "navigation@2"
+          "group": "navigation@1"
         },
         {
           "command": "copilot-workspace-manager.addSkillsFolder",
@@ -312,14 +307,9 @@
           "group": "navigation@2"
         },
         {
-          "command": "copilot-workspace-manager.addTemplatesFolder",
-          "when": "view == 'copilot-workspace-manager.templates'",
-          "group": "navigation@1"
-        },
-        {
           "command": "copilot-workspace-manager.addTemplatesFile",
           "when": "view == 'copilot-workspace-manager.templates'",
-          "group": "navigation@2"
+          "group": "navigation@1"
         },
         {
           "command": "copilot-workspace-manager.delete",

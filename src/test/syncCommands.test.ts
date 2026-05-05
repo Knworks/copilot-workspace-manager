@@ -76,15 +76,18 @@ async function withConfirmedSync(run: () => Promise<void>): Promise<void> {
 }
 
 suite('Sync commands', () => {
-	test('syncPrompts copies command and IDE prompt files through fixed pairs', async () => {
+	test('syncPrompts keeps workspace commands in the project commands directory', async () => {
 		await withTempWorkspace(async (homeDir, workspaceRoot) => {
 			await activateExtension();
 			const copilotRoot = path.join(homeDir, '.copilot');
-			fs.mkdirSync(path.join(copilotRoot, 'prompts', 'commands'), { recursive: true });
-			fs.mkdirSync(path.join(copilotRoot, 'prompts', 'ide'), { recursive: true });
+			fs.mkdirSync(path.join(workspaceRoot, '.claude', 'commands'), { recursive: true });
+			fs.mkdirSync(copilotRoot, { recursive: true });
 			fs.writeFileSync(path.join(copilotRoot, 'config.json'), '{}', 'utf8');
-			fs.writeFileSync(path.join(copilotRoot, 'prompts', 'commands', 'review.md'), 'command', 'utf8');
-			fs.writeFileSync(path.join(copilotRoot, 'prompts', 'ide', 'review.prompt.md'), 'prompt', 'utf8');
+			fs.writeFileSync(
+				path.join(workspaceRoot, '.claude', 'commands', 'review.md'),
+				'command',
+				'utf8',
+			);
 
 			await withConfirmedSync(async () => {
 				await vscode.commands.executeCommand('copilot-workspace-manager.syncPrompts');
@@ -93,10 +96,6 @@ suite('Sync commands', () => {
 			assert.strictEqual(
 				fs.readFileSync(path.join(workspaceRoot, '.claude', 'commands', 'review.md'), 'utf8'),
 				'command',
-			);
-			assert.strictEqual(
-				fs.readFileSync(path.join(workspaceRoot, '.github', 'prompts', 'review.prompt.md'), 'utf8'),
-				'prompt',
 			);
 		});
 	});

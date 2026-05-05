@@ -90,7 +90,7 @@ export const messages = {
 	),
 	mcpToggleUpdated: localize(
 		'message.mcpToggleUpdated',
-		'Settings updated. Please restart Codex to apply changes.',
+		'Settings updated. Reload Copilot CLI or the extension to apply changes.',
 	),
 	configTomlOrganized: (backupPath: string) =>
 		localize(
@@ -156,7 +156,7 @@ export const messages = {
 	),
 	agentManagerTitle: localize(
 		'message.agentManagerTitle',
-		'AGENTS Manager',
+		'Sub Agents Manager',
 	),
 	agentManagerSearchPlaceholder: localize(
 		'message.agentManagerSearchPlaceholder',
@@ -324,7 +324,7 @@ export const messages = {
 	),
 	coreViewAgentsChainTab: localize(
 		'message.coreViewAgentsChainTab',
-		'AGENTS Loading Chain',
+		'Instructions Chain',
 	),
 	chainCurrentSection: localize(
 		'message.chainCurrentSection',
@@ -368,11 +368,11 @@ export const messages = {
 	),
 	coreViewTabsAriaLabel: localize(
 		'message.coreViewTabsAriaLabel',
-		'Codex Manager tabs',
+		'Copilot Core tabs',
 	),
 	chainNoWorkspace: localize(
 		'message.chainNoWorkspace',
-		'Open a workspace folder to view the AGENTS loading chain.',
+		'Open a workspace folder to view the instructions chain.',
 	),
 	chainPreviewEmpty: localize(
 		'message.chainPreviewEmpty',

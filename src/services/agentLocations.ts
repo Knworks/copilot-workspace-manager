@@ -1,3 +1,4 @@
+import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import * as vscode from 'vscode';
@@ -21,6 +22,7 @@ export function getAgentLocations(
 	homeDir: string = os.homedir(),
 	projectRoot: string | undefined = getProjectRoot(),
 ): AgentLocation[] {
+	const { copilotDir } = resolveCopilotPaths(homeDir);
 	const locations: AgentLocation[] = [];
 	if (projectRoot) {
 		const preferredProjectRoot = path.join(projectRoot, '.github', 'agents');
@@ -35,17 +37,25 @@ export function getAgentLocations(
 	locations.push({
 		kind: 'user',
 		label: 'User Agents',
-		rootPath: path.join(resolveCopilotPaths(homeDir).copilotDir, 'agents'),
-		createPath: path.join(resolveCopilotPaths(homeDir).copilotDir, 'agents'),
+		rootPath: path.join(copilotDir, 'agents'),
+		createPath: path.join(copilotDir, 'agents'),
 		priority: 2,
 	});
-	locations.push({
-		kind: 'plugin',
-		label: 'Plugin Agents',
-		rootPath: path.join(resolveCopilotPaths(homeDir).copilotDir, 'installed-plugins'),
-		priority: 3,
-	});
-	return locations;
+	for (const rootPath of collectPluginRoots(path.join(copilotDir, 'installed-plugins'), 'agents')) {
+		locations.push({
+			kind: 'plugin',
+			label: 'Plugin Agents',
+			rootPath,
+			priority: 3,
+		});
+	}
+	return locations.sort((left, right) =>
+		left.priority - right.priority ||
+		left.rootPath.localeCompare(right.rootPath, undefined, {
+			numeric: true,
+			sensitivity: 'base',
+		}),
+	);
 }
 
 export function findAgentLocationForPath(
@@ -60,4 +70,26 @@ export function findAgentLocationForPath(
 			resolvedTarget.startsWith(`${resolvedRoot}${path.sep}`)
 		);
 	});
+}
+
+function collectPluginRoots(pluginsRoot: string, targetDirName: string): string[] {
+	if (!fs.existsSync(pluginsRoot)) {
+		return [];
+	}
+	const results: string[] = [];
+	const visit = (currentPath: string): void => {
+		for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
+			if (!entry.isDirectory()) {
+				continue;
+			}
+			const fullPath = path.join(currentPath, entry.name);
+			if (entry.name === targetDirName) {
+				results.push(fullPath);
+				continue;
+			}
+			visit(fullPath);
+		}
+	};
+	visit(pluginsRoot);
+	return results;
 }

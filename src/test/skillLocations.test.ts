@@ -6,7 +6,7 @@ import {
 } from '../services/skillLocations';
 
 suite('Skill locations', () => {
-	test('returns Copilot project user and plugin skill locations in priority order', () => {
+	test('returns Copilot project and user skill locations in priority order', () => {
 		const homeDir = path.join('home');
 		const projectRoot = path.join('repo');
 
@@ -14,14 +14,16 @@ suite('Skill locations', () => {
 
 		assert.deepStrictEqual(
 			locations.map((location) => location.kind),
-			['project', 'user', 'plugin'],
+			['project', 'project', 'project', 'user', 'user', 'user'],
 		);
-		assert.strictEqual(locations[0].rootPath, path.join(projectRoot, '.github', 'skills'));
-		assert.strictEqual(locations[0].createPath, path.join(projectRoot, '.github', 'skills'));
-		assert.strictEqual(locations[1].rootPath, path.join(homeDir, '.copilot', 'skills'));
-		assert.strictEqual(
-			locations[2].rootPath,
-			path.join(homeDir, '.copilot', 'installed-plugins'),
+		assert.ok(
+			locations.slice(0, 3).some((location) => location.rootPath === path.join(projectRoot, '.github', 'skills')),
+		);
+		assert.ok(
+			locations.slice(3).some((location) => location.rootPath === path.join(homeDir, '.copilot', 'skills')),
+		);
+		assert.ok(
+			locations.slice(3).some((location) => location.rootPath === path.join(homeDir, '.claude', 'skills')),
 		);
 	});
 
