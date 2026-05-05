@@ -1,0 +1,9 @@
+.serena/
+.cocoindex_code/
+.github/
+node_modules/
+dist/
+coverage/
+out/
+.DS_Store
+.vscode-test

@@ -1,0 +1,589 @@
+// The module 'vscode' contains the VS Code extensibility API
+// Import the module and reference it with the alias vscode in your code below
+import * as vscode from 'vscode';
+import fs from 'fs';
+import path from 'path';
+import { ensureSelection } from './services/selectionGuard';
+import {
+	getCoreWorkspaceStatus,
+	getWorkspaceStatus,
+	resolveCodexPaths,
+	TEMPLATE_FOLDER_NAME,
+} from './services/workspaceStatus';
+import { CodexTreeItem } from './models/treeItems';
+import { registerFileCommands } from './commands/fileCommands';
+import { registerAgentCommands } from './commands/agentCommands';
+import { CoreExplorerProvider } from './views/coreExplorerProvider';
+import { FileExplorerProvider } from './views/fileExplorerProvider';
+import { McpExplorerProvider } from './views/mcpExplorerProvider';
+import { AgentExplorerProvider } from './views/agentExplorerProvider';
+import { toggleMcpServer } from './services/mcpService';
+import { messages } from './i18n';
+import { runSafely } from './services/errorHandling';
+import { SelectionContext } from './services/selectionContext';
+import { TreeExpansionState } from './services/treeExpansionState';
+import { ViewFocusState } from './services/viewFocusState';
+import { getSyncSettings } from './services/settings';
+import { HistoryPanelManager } from './services/historyPanel';
+import { SkillManagerPanelManager } from './services/skillManagerPanel';
+import { AgentManagerPanelManager } from './services/agentManagerPanel';
+import { McpManagerPanelManager } from './services/mcpManagerPanel';
+import {
+	syncCoreFilesBidirectional,
+	syncDirectoryBidirectional,
+} from './services/syncService';
+import { reconcileAgentConfigAfterSync } from './services/agentSyncCleanupService';
+import { organizeConfigToml } from './services/configTomlOrganizerService';
+
+// This method is called when your extension is activated
+// Your extension is activated the very first time the command is executed
+export function activate(context: vscode.ExtensionContext) {
+	const coreProvider = new CoreExplorerProvider(context);
+	const promptsProvider = new FileExplorerProvider('prompts', context);
+	const skillsProvider = new FileExplorerProvider('skills', context);
+	const templatesProvider = new FileExplorerProvider('templates', context);
+	const mcpProvider = new McpExplorerProvider(context);
+	const agentsProvider = new AgentExplorerProvider(context);
+	const selectionContext = new SelectionContext();
+	const expansionState = new TreeExpansionState();
+	const viewFocusState = new ViewFocusState();
+	const historyPanelManager = new HistoryPanelManager();
+	const skillManagerPanelManager = new SkillManagerPanelManager(() =>
+		skillsProvider.refresh(),
+	);
+	const agentManagerPanelManager = new AgentManagerPanelManager(() =>
+		agentsProvider.refresh(),
+	);
+	const mcpManagerPanelManager = new McpManagerPanelManager(() =>
+		mcpProvider.refresh(),
+	);
+
+	const coreView = vscode.window.createTreeView('copilot-workspace-manager.core', {
+		treeDataProvider: coreProvider,
+	});
+	const promptsView = vscode.window.createTreeView('copilot-workspace-manager.prompts', {
+		treeDataProvider: promptsProvider,
+	});
+	const skillsView = vscode.window.createTreeView('copilot-workspace-manager.skills', {
+		treeDataProvider: skillsProvider,
+	});
+	const templatesView = vscode.window.createTreeView(
+		'copilot-workspace-manager.templates',
+		{
+			treeDataProvider: templatesProvider,
+		},
+	);
+	const mcpView = vscode.window.createTreeView('copilot-workspace-manager.mcp', {
+		treeDataProvider: mcpProvider,
+	});
+	const agentsView = vscode.window.createTreeView('copilot-workspace-manager.agents', {
+		treeDataProvider: agentsProvider,
+	});
+
+	const trackExpansion = (
+		kind: 'prompts' | 'skills' | 'templates',
+		view: vscode.TreeView<CodexTreeItem>,
+	) => [
+		view.onDidExpandElement((event) =>
+			expansionState.registerExpanded(kind, event.element),
+		),
+		view.onDidCollapseElement((event) =>
+			expansionState.registerCollapsed(kind, event.element),
+		),
+	];
+
+	const trackSelection = (
+		view: vscode.TreeView<CodexTreeItem>,
+		kind?: 'prompts' | 'skills' | 'templates',
+	) =>
+		view.onDidChangeSelection((event) => {
+			selectionContext.setSelection(event.selection[0]);
+			if (kind) {
+				viewFocusState.setActive(kind, event.selection.length > 0);
+				return;
+			}
+			viewFocusState.clear();
+		});
+
+	context.subscriptions.push(
+		coreView,
+		promptsView,
+		skillsView,
+		templatesView,
+		mcpView,
+		agentsView,
+		trackSelection(coreView),
+		trackSelection(promptsView, 'prompts'),
+		trackSelection(skillsView, 'skills'),
+		trackSelection(templatesView, 'templates'),
+		trackSelection(mcpView),
+		trackSelection(agentsView),
+		...trackExpansion('prompts', promptsView),
+		...trackExpansion('skills', skillsView),
+		...trackExpansion('templates', templatesView),
+		historyPanelManager,
+		skillManagerPanelManager,
+		agentManagerPanelManager,
+		mcpManagerPanelManager,
+	);
+
+	context.subscriptions.push(
+		vscode.window.onDidChangeActiveTextEditor(() => {
+			viewFocusState.clear();
+		}),
+	);
+
+	// Use the console to output diagnostic information (console.log) and errors (console.error)
+	// This line of code will only be executed once when your extension is activated
+	console.log('Congratulations, your extension "copilot-workspace-manager" is now active!');
+
+	// The command has been defined in the package.json file
+	// Now provide the implementation of the command with registerCommand
+	// The commandId parameter must match the command field in package.json
+	const helloWorldDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.helloWorld',
+		(item?: vscode.TreeItem) =>
+			runSafely(() => {
+				if (!getWorkspaceStatus().isAvailable) {
+					return;
+				}
+				if (!ensureSelection(item)) {
+					return;
+				}
+				// The code you place here will be executed every time your command is executed
+				// Display a message box to the user
+				vscode.window.showInformationMessage(messages.helloWorld);
+			}),
+	);
+
+	const openFileDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.openFile',
+		(item?: CodexTreeItem) =>
+			runSafely(async () => {
+				const status =
+					item?.kind === 'core'
+						? getCoreWorkspaceStatus()
+						: getWorkspaceStatus();
+				if (!status.isAvailable) {
+					return;
+				}
+				if (!ensureSelection(item) || !item.fsPath) {
+					return;
+				}
+				const target = vscode.Uri.file(item.fsPath);
+				await vscode.commands.executeCommand('vscode.open', target);
+			}),
+	);
+
+	const revealFolder = async (targetDir: string): Promise<void> => {
+		if (!fs.existsSync(targetDir)) {
+			vscode.window.showErrorMessage(messages.openFolderMissing);
+			return;
+		}
+		await vscode.env.openExternal(vscode.Uri.file(targetDir));
+	};
+
+	const openCodexFolderDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.openCodexFolder',
+		() =>
+			runSafely(async () => {
+				if (!getCoreWorkspaceStatus().isAvailable) {
+					return;
+				}
+				const { codexDir } = resolveCodexPaths();
+				await revealFolder(codexDir);
+			}),
+	);
+
+	const openPromptsFolderDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.openPromptsFolder',
+		() =>
+			runSafely(async () => {
+				if (!getWorkspaceStatus().isAvailable) {
+					return;
+				}
+				const { codexDir } = resolveCodexPaths();
+				await revealFolder(path.join(codexDir, 'prompts'));
+			}),
+	);
+
+	const openSkillsFolderDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.openSkillsFolder',
+		() =>
+			runSafely(async () => {
+				if (!getWorkspaceStatus().isAvailable) {
+					return;
+				}
+				const { codexDir } = resolveCodexPaths();
+				const selection = skillsView.selection[0];
+				if (selection?.fsPath) {
+					const targetDir =
+						selection.nodeType === 'file'
+							? path.dirname(selection.fsPath)
+							: selection.fsPath;
+					await revealFolder(targetDir);
+					return;
+				}
+				await revealFolder(path.join(codexDir, 'skills'));
+			}),
+	);
+
+	const openTemplatesFolderDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.openTemplatesFolder',
+		() =>
+			runSafely(async () => {
+				if (!getWorkspaceStatus().isAvailable) {
+					return;
+				}
+				const { codexDir } = resolveCodexPaths();
+				await revealFolder(path.join(codexDir, TEMPLATE_FOLDER_NAME));
+			}),
+	);
+
+	const openAgentsFolderDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.openAgentsFolder',
+		() =>
+			runSafely(async () => {
+				if (!getWorkspaceStatus().isAvailable) {
+					return;
+				}
+				const { codexDir } = resolveCodexPaths();
+				const selection = agentsView.selection[0];
+				if (selection?.fsPath) {
+					await revealFolder(path.dirname(selection.fsPath));
+					return;
+				}
+				await revealFolder(path.join(codexDir, 'agents'));
+			}),
+	);
+
+	const openHistoryViewDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.openHistoryView',
+		() =>
+			runSafely(() => {
+				if (!getCoreWorkspaceStatus().isAvailable) {
+					return;
+				}
+				historyPanelManager.show();
+			}),
+	);
+
+	const openSkillManagerDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.openSkillManager',
+		() =>
+			runSafely(() => {
+				if (!getWorkspaceStatus().isAvailable) {
+					return;
+				}
+				skillManagerPanelManager.show();
+			}),
+	);
+
+	const openAgentManagerDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.openAgentManager',
+		() =>
+			runSafely(() => {
+				if (!getWorkspaceStatus().isAvailable) {
+					return;
+				}
+				agentManagerPanelManager.show();
+			}),
+	);
+
+	const openMcpManagerDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.openMcpManager',
+		() =>
+			runSafely(() => {
+				if (!getWorkspaceStatus().isAvailable) {
+					return;
+				}
+				mcpManagerPanelManager.show();
+			}),
+	);
+
+	const organizeConfigTomlDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.organizeConfigToml',
+		() =>
+			runSafely(async () => {
+				if (!getCoreWorkspaceStatus().isAvailable) {
+					return;
+				}
+				const configPath = resolveCodexPaths().configPath;
+				try {
+					const result = organizeConfigToml(configPath);
+					vscode.window.showInformationMessage(
+						result.changed
+							? messages.configTomlOrganized(result.backupPath)
+							: messages.configTomlAlreadyOrganized(result.backupPath),
+					);
+					coreProvider.refresh();
+					mcpProvider.refresh();
+					skillsProvider.refresh();
+					agentsProvider.refresh();
+				} catch (error) {
+					console.error(error);
+					vscode.window.showErrorMessage(
+						messages.configTomlOrganizeBackupFailed,
+					);
+				}
+			}),
+	);
+
+	const confirmSync = async (targetDir: string): Promise<boolean> => {
+		const message = messages.syncConfirm(targetDir);
+		const choice = await vscode.window.showWarningMessage(
+			message,
+			{ modal: true },
+			messages.dialogOk,
+		);
+		return choice === messages.dialogOk;
+	};
+
+	const syncCoreDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.syncCore',
+		() =>
+			runSafely(async () => {
+				if (!getCoreWorkspaceStatus().isAvailable) {
+					return;
+				}
+				const { codexFolder } = getSyncSettings();
+				if (!codexFolder) {
+					return;
+				}
+				if (!(await confirmSync(codexFolder))) {
+					return;
+				}
+				const { codexDir } = resolveCodexPaths();
+				const result = syncCoreFilesBidirectional(codexDir, codexFolder);
+				if (result.skipped.length > 0) {
+					vscode.window.showWarningMessage(
+						messages.syncSkipped(result.skipped.length),
+					);
+				}
+				coreProvider.refresh();
+				mcpProvider.refresh();
+			}),
+	);
+
+	const syncPromptsDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.syncPrompts',
+		() =>
+			runSafely(async () => {
+				if (!getWorkspaceStatus().isAvailable) {
+					return;
+				}
+				const { promptsFolder } = getSyncSettings();
+				if (!promptsFolder) {
+					return;
+				}
+				if (!(await confirmSync(promptsFolder))) {
+					return;
+				}
+				const { codexDir } = resolveCodexPaths();
+				const result = syncDirectoryBidirectional(
+					'prompts',
+					codexDir,
+					path.join(codexDir, 'prompts'),
+					promptsFolder,
+				);
+				if (result.skipped.length > 0) {
+					vscode.window.showWarningMessage(
+						messages.syncSkipped(result.skipped.length),
+					);
+				}
+				promptsProvider.refresh();
+			}),
+	);
+
+	const syncSkillsDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.syncSkills',
+		() =>
+			runSafely(async () => {
+				if (!getWorkspaceStatus().isAvailable) {
+					return;
+				}
+				const { skillsFolder } = getSyncSettings();
+				if (!skillsFolder) {
+					return;
+				}
+				if (!(await confirmSync(skillsFolder))) {
+					return;
+				}
+				const { codexDir } = resolveCodexPaths();
+				const result = syncDirectoryBidirectional(
+					'skills',
+					codexDir,
+					path.join(codexDir, 'skills'),
+					skillsFolder,
+				);
+				if (result.skipped.length > 0) {
+					vscode.window.showWarningMessage(
+						messages.syncSkipped(result.skipped.length),
+					);
+				}
+				skillsProvider.refresh();
+			}),
+	);
+
+	const syncTemplatesDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.syncTemplates',
+		() =>
+			runSafely(async () => {
+				if (!getWorkspaceStatus().isAvailable) {
+					return;
+				}
+				const { templatesFolder } = getSyncSettings();
+				if (!templatesFolder) {
+					return;
+				}
+				if (!(await confirmSync(templatesFolder))) {
+					return;
+				}
+				const { codexDir } = resolveCodexPaths();
+				const result = syncDirectoryBidirectional(
+					'templates',
+					codexDir,
+					path.join(codexDir, TEMPLATE_FOLDER_NAME),
+					templatesFolder,
+				);
+				if (result.skipped.length > 0) {
+					vscode.window.showWarningMessage(
+						messages.syncSkipped(result.skipped.length),
+					);
+				}
+				templatesProvider.refresh();
+			}),
+	);
+
+	const syncAgentsDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.syncAgents',
+		() =>
+			runSafely(async () => {
+				if (!getWorkspaceStatus().isAvailable) {
+					return;
+				}
+				const { agentFolder } = getSyncSettings();
+				if (!agentFolder) {
+					return;
+				}
+				if (!(await confirmSync(agentFolder))) {
+					return;
+				}
+				const { codexDir } = resolveCodexPaths();
+				const agentsDir = path.join(codexDir, 'agents');
+				const existingAgentIdsBeforeSync = readAgentIds(agentsDir);
+				const result = syncDirectoryBidirectional(
+					'agents',
+					codexDir,
+					agentsDir,
+					agentFolder,
+				);
+				if (result.skipped.length > 0) {
+					vscode.window.showWarningMessage(
+						messages.syncSkipped(result.skipped.length),
+					);
+				}
+				reconcileAgentConfigAfterSync(
+					codexDir,
+					path.join(codexDir, 'config.toml'),
+					existingAgentIdsBeforeSync,
+				);
+				agentsProvider.refresh();
+			}),
+	);
+
+	const refreshDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.refreshAll',
+		() =>
+			runSafely(() => {
+				if (!getWorkspaceStatus().isAvailable) {
+					return;
+				}
+				coreProvider.refresh();
+				promptsProvider.refresh();
+				skillsProvider.refresh();
+				templatesProvider.refresh();
+				mcpProvider.refresh();
+				agentsProvider.refresh();
+			}),
+	);
+
+	const toggleMcpDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.mcp.toggle',
+		(serverId?: string) =>
+			runSafely(() => {
+				if (!getWorkspaceStatus().isAvailable) {
+					return;
+				}
+				if (!serverId) {
+					ensureSelection(undefined);
+					return;
+				}
+				const configPath = resolveCodexPaths().configPath;
+				if (toggleMcpServer(configPath, serverId)) {
+					vscode.window.showInformationMessage(
+						messages.mcpToggleUpdated,
+					);
+					mcpProvider.refresh();
+				}
+			}),
+	);
+
+	context.subscriptions.push(
+		helloWorldDisposable,
+		openFileDisposable,
+		openCodexFolderDisposable,
+		openHistoryViewDisposable,
+		openSkillManagerDisposable,
+		openAgentManagerDisposable,
+		openMcpManagerDisposable,
+		organizeConfigTomlDisposable,
+		openPromptsFolderDisposable,
+		openSkillsFolderDisposable,
+		openTemplatesFolderDisposable,
+		openAgentsFolderDisposable,
+		syncCoreDisposable,
+		syncPromptsDisposable,
+		syncSkillsDisposable,
+		syncTemplatesDisposable,
+		syncAgentsDisposable,
+		refreshDisposable,
+		toggleMcpDisposable,
+	);
+
+	registerFileCommands(context, {
+		getSelection: () => selectionContext.getSelection(),
+		providers: {
+			prompts: promptsProvider,
+			skills: skillsProvider,
+			templates: templatesProvider,
+		},
+		views: {
+			prompts: promptsView,
+			skills: skillsView,
+			templates: templatesView,
+		},
+		expansionState,
+		viewFocusState,
+	});
+
+	registerAgentCommands(context, {
+		getSelection: () => selectionContext.getSelection(),
+		agentProvider: agentsProvider,
+	});
+}
+
+function readAgentIds(agentsDir: string): Set<string> {
+	if (!fs.existsSync(agentsDir)) {
+		return new Set<string>();
+	}
+	return new Set(
+		fs
+			.readdirSync(agentsDir, { withFileTypes: true })
+			.filter((entry) => entry.isFile() && path.extname(entry.name).toLowerCase() === '.toml')
+			.map((entry) => path.basename(entry.name, path.extname(entry.name))),
+	);
+}
+
+// This method is called when your extension is deactivated
+export function deactivate() {}

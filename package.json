@@ -1,0 +1,471 @@
+{
+  "name": "copilot-workspace-manager",
+  "displayName": "%displayName%",
+  "description": "%description%",
+  "publisher": "Knworks",
+  "icon": "images/copilot-workspace-manager.png",
+  "repository": "https://github.com/Knworks/copilot-workspace-manager",
+  "version": "1.1.0",
+  "engines": {
+    "vscode": "^1.107.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "codex",
+    "workspace",
+    "prompts",
+    "skills",
+    "templates",
+    "mcp",
+    "agents",
+    "config",
+    "toml",
+    "explorer"
+  ],
+  "activationEvents": [
+    "onView:copilot-workspace-manager.core",
+    "onView:copilot-workspace-manager.prompts",
+    "onView:copilot-workspace-manager.skills",
+    "onView:copilot-workspace-manager.templates",
+    "onView:copilot-workspace-manager.mcp",
+    "onView:copilot-workspace-manager.agents",
+    "onCommand:copilot-workspace-manager.openHistoryView",
+    "onCommand:copilot-workspace-manager.openSkillManager",
+    "onCommand:copilot-workspace-manager.openAgentManager",
+    "onCommand:copilot-workspace-manager.openMcpManager",
+    "onCommand:copilot-workspace-manager.organizeConfigToml"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "copilot-workspace-manager",
+          "title": "%viewContainer.copilotWorkspaceManager.title%",
+          "icon": "images/sidebar.png"
+        }
+      ]
+    },
+    "views": {
+      "copilot-workspace-manager": [
+        {
+          "id": "copilot-workspace-manager.core",
+          "name": "%view.core.name%"
+        },
+        {
+          "id": "copilot-workspace-manager.agents",
+          "name": "%view.agents.name%"
+        },
+        {
+          "id": "copilot-workspace-manager.skills",
+          "name": "%view.skills.name%"
+        },
+        {
+          "id": "copilot-workspace-manager.prompts",
+          "name": "%view.prompts.name%"
+        },
+        {
+          "id": "copilot-workspace-manager.mcp",
+          "name": "%view.mcp.name%"
+        },
+        {
+          "id": "copilot-workspace-manager.templates",
+          "name": "%view.templates.name%"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "copilot-workspace-manager.helloWorld",
+        "title": "%command.helloWorld%"
+      },
+      {
+        "command": "copilot-workspace-manager.openFile",
+        "title": "%command.openFile%"
+      },
+      {
+        "command": "copilot-workspace-manager.openCodexFolder",
+        "title": "%command.openCodexFolder%",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "copilot-workspace-manager.openHistoryView",
+        "title": "%command.openHistoryView%",
+        "icon": "$(server-process)"
+      },
+      {
+        "command": "copilot-workspace-manager.openSkillManager",
+        "title": "%command.openSkillManager%",
+        "icon": "$(server-process)"
+      },
+      {
+        "command": "copilot-workspace-manager.openAgentManager",
+        "title": "%command.openAgentManager%",
+        "icon": "$(server-process)"
+      },
+      {
+        "command": "copilot-workspace-manager.openMcpManager",
+        "title": "%command.openMcpManager%",
+        "icon": "$(server-process)"
+      },
+      {
+        "command": "copilot-workspace-manager.organizeConfigToml",
+        "title": "%command.organizeConfigToml%",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "copilot-workspace-manager.openPromptsFolder",
+        "title": "%command.openFolder%",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "copilot-workspace-manager.openSkillsFolder",
+        "title": "%command.openFolder%",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "copilot-workspace-manager.openTemplatesFolder",
+        "title": "%command.openCodexFolder%",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "copilot-workspace-manager.openAgentsFolder",
+        "title": "%command.openFolder%",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "copilot-workspace-manager.syncCore",
+        "title": "%command.sync%",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "copilot-workspace-manager.syncPrompts",
+        "title": "%command.sync%",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "copilot-workspace-manager.syncSkills",
+        "title": "%command.sync%",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "copilot-workspace-manager.syncTemplates",
+        "title": "%command.sync%",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "copilot-workspace-manager.syncAgents",
+        "title": "%command.sync%",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "copilot-workspace-manager.refreshAll",
+        "title": "%command.refresh%",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "copilot-workspace-manager.addAgent",
+        "title": "%command.addAgent%",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "copilot-workspace-manager.editAgent",
+        "title": "%command.editAgent%",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "copilot-workspace-manager.deleteAgent",
+        "title": "%command.deleteAgent%",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "copilot-workspace-manager.enableAgent",
+        "title": "%command.enableAgent%",
+        "icon": {
+          "light": "images/agent_on.png",
+          "dark": "images/agent_on.png"
+        }
+      },
+      {
+        "command": "copilot-workspace-manager.disableAgent",
+        "title": "%command.disableAgent%",
+        "icon": {
+          "light": "images/agent_off.png",
+          "dark": "images/agent_off.png"
+        }
+      },
+      {
+        "command": "copilot-workspace-manager.addFile",
+        "title": "%command.addFile%",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "copilot-workspace-manager.addFolder",
+        "title": "%command.addFolder%",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "copilot-workspace-manager.addPromptsFile",
+        "title": "%command.addFile%",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "copilot-workspace-manager.addPromptsFolder",
+        "title": "%command.addFolder%",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "copilot-workspace-manager.addSkillsFile",
+        "title": "%command.addFile%",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "copilot-workspace-manager.addSkillsFolder",
+        "title": "%command.addFolder%",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "copilot-workspace-manager.addTemplatesFile",
+        "title": "%command.addFile%",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "copilot-workspace-manager.addTemplatesFolder",
+        "title": "%command.addFolder%",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "copilot-workspace-manager.rename",
+        "title": "%command.rename%",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "copilot-workspace-manager.delete",
+        "title": "%command.delete%",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "copilot-workspace-manager.mcp.toggle",
+        "title": "%command.mcp.toggle%"
+      }
+    ],
+    "configuration": {
+      "title": "%configuration.title%",
+      "properties": {
+        "copilot-workspace-manager.codexFolder": {
+          "type": "string",
+          "order": 0,
+          "default": "",
+          "description": "%configuration.codexFolder.description%"
+        },
+        "copilot-workspace-manager.promptsFolder": {
+          "type": "string",
+          "order": 1,
+          "default": "",
+          "description": "%configuration.promptsFolder.description%"
+        },
+        "copilot-workspace-manager.skillsFolder": {
+          "type": "string",
+          "order": 2,
+          "default": "",
+          "description": "%configuration.skillsFolder.description%"
+        },
+        "copilot-workspace-manager.templatesFolder": {
+          "type": "string",
+          "order": 3,
+          "default": "",
+          "description": "%configuration.templatesFolder.description%"
+        },
+        "copilot-workspace-manager.agentFolder": {
+          "type": "string",
+          "order": 4,
+          "default": "",
+          "description": "%configuration.agentFolder.description%"
+        },
+        "copilot-workspace-manager.maxHistoryCount": {
+          "type": "number",
+          "default": 100,
+          "minimum": 1,
+          "order": 5,
+          "description": "%configuration.maxHistoryCount.description%"
+        },
+        "copilot-workspace-manager.incrudeReasoningMessage": {
+          "type": "boolean",
+          "default": false,
+          "order": 6,
+          "description": "%configuration.incrudeReasoningMessage.description%"
+        }
+      }
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "copilot-workspace-manager.addPromptsFolder",
+          "when": "view == 'copilot-workspace-manager.prompts'",
+          "group": "navigation@1"
+        },
+        {
+          "command": "copilot-workspace-manager.addPromptsFile",
+          "when": "view == 'copilot-workspace-manager.prompts'",
+          "group": "navigation@2"
+        },
+        {
+          "command": "copilot-workspace-manager.addSkillsFolder",
+          "when": "view == 'copilot-workspace-manager.skills'",
+          "group": "navigation@1"
+        },
+        {
+          "command": "copilot-workspace-manager.addSkillsFile",
+          "when": "view == 'copilot-workspace-manager.skills'",
+          "group": "navigation@2"
+        },
+        {
+          "command": "copilot-workspace-manager.addTemplatesFolder",
+          "when": "view == 'copilot-workspace-manager.templates'",
+          "group": "navigation@1"
+        },
+        {
+          "command": "copilot-workspace-manager.addTemplatesFile",
+          "when": "view == 'copilot-workspace-manager.templates'",
+          "group": "navigation@2"
+        },
+        {
+          "command": "copilot-workspace-manager.delete",
+          "when": "view == 'copilot-workspace-manager.prompts' || view == 'copilot-workspace-manager.skills' || view == 'copilot-workspace-manager.templates'",
+          "group": "navigation@3"
+        },
+        {
+          "command": "copilot-workspace-manager.rename",
+          "when": "view == 'copilot-workspace-manager.prompts' || view == 'copilot-workspace-manager.skills' || view == 'copilot-workspace-manager.templates'",
+          "group": "navigation@4"
+        },
+        {
+          "command": "copilot-workspace-manager.refreshAll",
+          "when": "view == 'copilot-workspace-manager.prompts' || view == 'copilot-workspace-manager.skills' || view == 'copilot-workspace-manager.templates' || view == 'copilot-workspace-manager.mcp' || view == 'copilot-workspace-manager.agents'",
+          "group": "navigation@5"
+        },
+        {
+          "command": "copilot-workspace-manager.openMcpManager",
+          "when": "view == 'copilot-workspace-manager.mcp'",
+          "group": "navigation@6"
+        },
+        {
+          "command": "copilot-workspace-manager.openPromptsFolder",
+          "when": "view == 'copilot-workspace-manager.prompts'",
+          "group": "navigation@6"
+        },
+        {
+          "command": "copilot-workspace-manager.syncPrompts",
+          "when": "view == 'copilot-workspace-manager.prompts' && config.copilot-workspace-manager.promptsFolder",
+          "group": "navigation@7"
+        },
+        {
+          "command": "copilot-workspace-manager.openSkillsFolder",
+          "when": "view == 'copilot-workspace-manager.skills'",
+          "group": "navigation@6"
+        },
+        {
+          "command": "copilot-workspace-manager.syncSkills",
+          "when": "view == 'copilot-workspace-manager.skills' && config.copilot-workspace-manager.skillsFolder",
+          "group": "navigation@7"
+        },
+        {
+          "command": "copilot-workspace-manager.openSkillManager",
+          "when": "view == 'copilot-workspace-manager.skills'",
+          "group": "navigation@9"
+        },
+        {
+          "command": "copilot-workspace-manager.openTemplatesFolder",
+          "when": "view == 'copilot-workspace-manager.templates'",
+          "group": "navigation@6"
+        },
+        {
+          "command": "copilot-workspace-manager.openAgentsFolder",
+          "when": "view == 'copilot-workspace-manager.agents'",
+          "group": "navigation@6"
+        },
+        {
+          "command": "copilot-workspace-manager.syncTemplates",
+          "when": "view == 'copilot-workspace-manager.templates' && config.copilot-workspace-manager.templatesFolder",
+          "group": "navigation@7"
+        },
+        {
+          "command": "copilot-workspace-manager.syncAgents",
+          "when": "view == 'copilot-workspace-manager.agents' && config.copilot-workspace-manager.agentFolder",
+          "group": "navigation@7"
+        },
+        {
+          "command": "copilot-workspace-manager.openCodexFolder",
+          "when": "view == 'copilot-workspace-manager.core'",
+          "group": "navigation@6"
+        },
+        {
+          "command": "copilot-workspace-manager.openHistoryView",
+          "when": "view == 'copilot-workspace-manager.core'",
+          "group": "navigation@9"
+        },
+        {
+          "command": "copilot-workspace-manager.syncCore",
+          "when": "view == 'copilot-workspace-manager.core' && config.copilot-workspace-manager.codexFolder",
+          "group": "navigation@8"
+        },
+        {
+          "command": "copilot-workspace-manager.addAgent",
+          "when": "view == 'copilot-workspace-manager.agents'",
+          "group": "navigation@1"
+        },
+        {
+          "command": "copilot-workspace-manager.editAgent",
+          "when": "view == 'copilot-workspace-manager.agents'",
+          "group": "navigation@2"
+        },
+        {
+          "command": "copilot-workspace-manager.deleteAgent",
+          "when": "view == 'copilot-workspace-manager.agents'",
+          "group": "navigation@3"
+        },
+        {
+          "command": "copilot-workspace-manager.openAgentManager",
+          "when": "view == 'copilot-workspace-manager.agents'",
+          "group": "navigation@9"
+        }
+      ],
+      "view/item/context": [
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.107.0",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2",
+    "esbuild": "^0.25.3",
+    "eslint": "^9.25.1",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@vscode/codicons": "^0.0.44",
+    "toml": "^3.0.0",
+    "vscode-nls": "^5.2.0"
+  }
+}
