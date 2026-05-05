@@ -14,6 +14,7 @@
   "command.openCopilotFolder": ".copilot を開く",
   "command.openAgentsFolder": "agents フォルダを開く",
   "command.openHistoryView": "Copilot Coreを開く",
+  "command.openCoreManager": "Copilot Managerを開く",
   "command.openSkillManager": "Skill Managerを開く",
   "command.openAgentManager": "AGENTS Managerを開く",
   "command.openMcpManager": "MCP Managerを開く",

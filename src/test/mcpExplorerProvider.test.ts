@@ -25,15 +25,15 @@ suite('MCP explorer provider', () => {
 
 			assert.deepStrictEqual(
 				items.map((item) => item.label),
-				['github', 'remote'],
+				['User MCP config', 'github', 'remote'],
 			);
-
-			assert.ok(items[0].iconPath instanceof vscode.ThemeIcon);
-			assert.strictEqual((items[0].iconPath as vscode.ThemeIcon).id, 'mcp');
-			assert.strictEqual((items[0].iconPath as vscode.ThemeIcon).color, undefined);
 
 			assert.ok(items[1].iconPath instanceof vscode.ThemeIcon);
 			assert.strictEqual((items[1].iconPath as vscode.ThemeIcon).id, 'mcp');
+			assert.strictEqual((items[1].iconPath as vscode.ThemeIcon).color, undefined);
+
+			assert.ok(items[2].iconPath instanceof vscode.ThemeIcon);
+			assert.strictEqual((items[2].iconPath as vscode.ThemeIcon).id, 'mcp');
 		} finally {
 			if (originalCopilotHome === undefined) {
 				delete process.env.COPILOT_HOME;

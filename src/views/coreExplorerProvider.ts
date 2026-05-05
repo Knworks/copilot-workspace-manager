@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
+import fs from 'fs';
 import path from 'path';
 import { WorkspaceTreeDataProvider, WorkspaceStatusProvider } from './workspaceTreeProvider';
 import { WorkspaceTreeItem } from '../models/treeItems';
 import {
 	getCoreWorkspaceStatus,
-	getWorkspaceStatus,
+	getCopilotConfigStatus,
 	resolveCopilotPaths,
 } from '../services/workspaceStatus';
 
@@ -15,7 +16,7 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 	constructor(
 		context: vscode.ExtensionContext,
 		statusProvider: WorkspaceStatusProvider = getCoreWorkspaceStatus,
-		configStatusProvider: WorkspaceStatusProvider = getWorkspaceStatus,
+		configStatusProvider: WorkspaceStatusProvider = getCopilotConfigStatus,
 	) {
 		super(statusProvider);
 		this.context = context;
@@ -86,7 +87,9 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 		};
 		userInstructionsItem.iconPath = this.getIcon('markdown32.png');
 
-		const folderItems = ['agents', 'skills', 'hooks', 'logs', 'session-state', 'installed-plugins'].map(
+		const folderItems = ['agents', 'skills', 'logs', 'session-state', 'installed-plugins']
+			.filter((folderName) => fs.existsSync(path.join(paths.copilotDir, folderName)))
+			.map(
 			(folderName) => {
 				const folderItem = new WorkspaceTreeItem(
 					'folder',

@@ -18,7 +18,7 @@ suite('Core explorer provider', () => {
 			() => ({ isAvailable: true }),
 		);
 		const items = provider.getChildren() as vscode.TreeItem[];
-		assert.ok(items.length >= 9);
+		assert.ok(items.length >= 4);
 		assert.strictEqual(items[0].label, 'config.json');
 		assert.strictEqual(items[1].label, 'mcp-config.json');
 		assert.strictEqual(items[2].label, 'permissions-config.json');

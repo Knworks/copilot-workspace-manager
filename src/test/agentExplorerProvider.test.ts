@@ -43,7 +43,10 @@ suite('Agent explorer provider', () => {
 			],
 		);
 
-		const items = provider.getChildren() as vscode.TreeItem[];
+		const roots = provider.getChildren() as vscode.TreeItem[];
+		assert.deepStrictEqual(roots.map((item) => item.label), ['Workspace Agents']);
+
+		const items = provider.getChildren(roots[0] as never) as vscode.TreeItem[];
 		assert.deepStrictEqual(
 			items.map((item) => item.label),
 			['alpha.agent.md', 'beta.agent.md'],

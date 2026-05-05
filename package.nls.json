@@ -14,6 +14,7 @@
   "command.openCopilotFolder": "Open .copilot Folder",
   "command.openAgentsFolder": "Open Agents Folder",
   "command.openHistoryView": "Open Copilot Core",
+  "command.openCoreManager": "Open Copilot Manager",
   "command.openSkillManager": "Open Skill Manager",
   "command.openAgentManager": "Open AGENTS Manager",
   "command.openMcpManager": "Open MCP Manager",

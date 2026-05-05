@@ -5,7 +5,7 @@
   "publisher": "Knworks",
   "icon": "images/copilot-workspace-manager.png",
   "repository": "https://github.com/Knworks/copilot-workspace-manager",
-  "version": "1.1.0",
+  "version": "0.9.0",
   "engines": {
     "vscode": "^1.107.0"
   },
@@ -31,6 +31,7 @@
     "onView:copilot-workspace-manager.templates",
     "onView:copilot-workspace-manager.mcp",
     "onView:copilot-workspace-manager.agents",
+    "onCommand:copilot-workspace-manager.openCoreManager",
     "onCommand:copilot-workspace-manager.openSkillManager",
     "onCommand:copilot-workspace-manager.openAgentManager",
     "onCommand:copilot-workspace-manager.openMcpManager"
@@ -101,6 +102,11 @@
       {
         "command": "copilot-workspace-manager.openMcpManager",
         "title": "%command.openMcpManager%",
+        "icon": "$(server-process)"
+      },
+      {
+        "command": "copilot-workspace-manager.openCoreManager",
+        "title": "%command.openCoreManager%",
         "icon": "$(server-process)"
       },
       {
@@ -384,6 +390,11 @@
           "command": "copilot-workspace-manager.openCopilotFolder",
           "when": "view == 'copilot-workspace-manager.core'",
           "group": "navigation@6"
+        },
+        {
+          "command": "copilot-workspace-manager.openCoreManager",
+          "when": "view == 'copilot-workspace-manager.core'",
+          "group": "navigation@7"
         },
         {
           "command": "copilot-workspace-manager.syncCore",

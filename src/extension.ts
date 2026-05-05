@@ -23,6 +23,7 @@ import { SelectionContext } from './services/selectionContext';
 import { TreeExpansionState } from './services/treeExpansionState';
 import { ViewFocusState } from './services/viewFocusState';
 import { getSyncSettings } from './services/settings';
+import { HistoryPanelManager } from './services/historyPanel';
 import { SkillManagerPanelManager } from './services/skillManagerPanel';
 import { AgentManagerPanelManager } from './services/agentManagerPanel';
 import { McpManagerPanelManager } from './services/mcpManagerPanel';
@@ -43,6 +44,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const selectionContext = new SelectionContext();
 	const expansionState = new TreeExpansionState();
 	const viewFocusState = new ViewFocusState();
+	const coreManagerPanelManager = new HistoryPanelManager();
 	const skillManagerPanelManager = new SkillManagerPanelManager(() =>
 		skillsProvider.refresh(),
 	);
@@ -116,6 +118,7 @@ export function activate(context: vscode.ExtensionContext) {
 		...trackExpansion('prompts', promptsView),
 		...trackExpansion('skills', skillsView),
 		...trackExpansion('templates', templatesView),
+		coreManagerPanelManager,
 		skillManagerPanelManager,
 		agentManagerPanelManager,
 		mcpManagerPanelManager,
@@ -267,6 +270,14 @@ export function activate(context: vscode.ExtensionContext) {
 					return;
 				}
 				skillManagerPanelManager.show();
+			}),
+	);
+
+	const openCoreManagerDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.openCoreManager',
+		() =>
+			runSafely(() => {
+				coreManagerPanelManager.show();
 			}),
 	);
 
@@ -484,6 +495,7 @@ export function activate(context: vscode.ExtensionContext) {
 		helloWorldDisposable,
 		openFileDisposable,
 		openCopilotFolderDisposable,
+		openCoreManagerDisposable,
 		openSkillManagerDisposable,
 		openAgentManagerDisposable,
 		openMcpManagerDisposable,

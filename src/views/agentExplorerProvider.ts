@@ -36,18 +36,26 @@ export class AgentExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTr
 		this.readLocations = readLocations;
 	}
 
-	protected getAvailableChildren(): vscode.ProviderResult<WorkspaceTreeItem[]> {
-		return this.readLocations().flatMap((location) =>
-			this.readEntries(location.rootPath)
-				.filter((entry) => entry.isFile && entry.name.toLowerCase().endsWith('.agent.md'))
-				.sort((left, right) =>
-					left.name.localeCompare(right.name, undefined, {
-						numeric: true,
-						sensitivity: 'base',
-					}),
-				)
-				.map((entry) => this.toTreeItem(entry, location)),
-		);
+	protected getAvailableChildren(element?: WorkspaceTreeItem): vscode.ProviderResult<WorkspaceTreeItem[]> {
+		if (!element) {
+			return this.readLocations().map((location) => this.toRootItem(location));
+		}
+		if (element.nodeType !== 'root' || !element.fsPath) {
+			return [];
+		}
+		const location = this.getLocationForPath(element.fsPath);
+		if (!location) {
+			return [];
+		}
+		return this.readEntries(location.rootPath)
+			.filter((entry) => entry.isFile && entry.name.toLowerCase().endsWith('.agent.md'))
+			.sort((left, right) =>
+				left.name.localeCompare(right.name, undefined, {
+					numeric: true,
+					sensitivity: 'base',
+				}),
+			)
+			.map((entry) => this.toTreeItem(entry, location));
 	}
 
 	getLocationForPath(targetPath: string): AgentLocation | undefined {
@@ -80,6 +88,24 @@ export class AgentExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTr
 				};
 				item.iconPath = this.getIcon(location.kind === 'plugin');
 				return item;
+	}
+
+	private toRootItem(location: AgentLocation): WorkspaceTreeItem {
+		const item = new WorkspaceTreeItem(
+			'root',
+			'agents',
+			location.label,
+			vscode.TreeItemCollapsibleState.Collapsed,
+			location.rootPath,
+		);
+		item.id = `agents:${location.rootPath}`;
+		item.contextValue = location.kind === 'plugin' ? 'copilot-agent-readonly' : 'workspace-root';
+		item.description = location.rootPath;
+		item.tooltip = location.rootPath;
+		item.iconPath = location.kind === 'plugin'
+			? new vscode.ThemeIcon('lock', new vscode.ThemeColor('disabledForeground'))
+			: new vscode.ThemeIcon('folder-library');
+		return item;
 	}
 
 	private getIcon(isReadonly: boolean): vscode.ThemeIcon {

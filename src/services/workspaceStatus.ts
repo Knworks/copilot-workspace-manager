@@ -43,6 +43,11 @@ export function resolveCopilotPaths(
 }
 
 export function getWorkspaceStatus(homeDir?: string): WorkspaceStatus {
+	void homeDir;
+	return { isAvailable: true };
+}
+
+export function getCopilotConfigStatus(homeDir?: string): WorkspaceStatus {
 	const paths = resolveCopilotPaths(homeDir);
 
 	if (!fs.existsSync(paths.copilotDir)) {
@@ -76,32 +81,6 @@ export function getWorkspaceStatus(homeDir?: string): WorkspaceStatus {
  * because the editor is the recovery path for fixing that file.
  */
 export function getCoreWorkspaceStatus(homeDir?: string): WorkspaceStatus {
-	const paths = resolveCopilotPaths(homeDir);
-
-	if (!fs.existsSync(paths.copilotDir)) {
-		return { isAvailable: false, reason: UNAVAILABLE_REASONS.copilotMissing };
-	}
-
-	if (!fs.existsSync(paths.configPath)) {
-		return { isAvailable: false, reason: UNAVAILABLE_REASONS.configMissing };
-	}
-
-	let configContents = '';
-	try {
-		configContents = fs.readFileSync(paths.configPath, 'utf8');
-	} catch {
-		return { isAvailable: false, reason: UNAVAILABLE_REASONS.configUnreadable };
-	}
-
-	try {
-		JSON.parse(configContents);
-	} catch {
-		return {
-			isAvailable: true,
-			reason: UNAVAILABLE_REASONS.configInvalid,
-			isConfigInvalid: true,
-		};
-	}
-
+	void homeDir;
 	return { isAvailable: true };
 }

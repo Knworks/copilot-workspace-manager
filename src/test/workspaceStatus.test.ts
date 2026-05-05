@@ -3,6 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {
+	getCopilotConfigStatus,
 	getCoreWorkspaceStatus,
 	getWorkspaceStatus,
 	resolveCopilotPaths,
@@ -21,7 +22,7 @@ function withTempHome(run: (homeDir: string) => void): void {
 suite('Workspace status', () => {
 	test('reports missing copilot directory', () => {
 		withTempHome((homeDir) => {
-			const status = getWorkspaceStatus(homeDir);
+			const status = getCopilotConfigStatus(homeDir);
 			assert.strictEqual(status.isAvailable, false);
 			assert.strictEqual(status.reason, UNAVAILABLE_REASONS.copilotMissing);
 		});
@@ -32,7 +33,7 @@ suite('Workspace status', () => {
 			const paths = resolveCopilotPaths(homeDir, undefined);
 			fs.mkdirSync(paths.copilotDir, { recursive: true });
 
-			const status = getWorkspaceStatus(homeDir);
+			const status = getCopilotConfigStatus(homeDir);
 			assert.strictEqual(status.isAvailable, false);
 			assert.strictEqual(status.reason, UNAVAILABLE_REASONS.configMissing);
 		});
@@ -44,7 +45,7 @@ suite('Workspace status', () => {
 			fs.mkdirSync(paths.copilotDir, { recursive: true });
 			fs.writeFileSync(paths.configPath, 'invalid = [', 'utf8');
 
-			const status = getWorkspaceStatus(homeDir);
+			const status = getCopilotConfigStatus(homeDir);
 			assert.strictEqual(status.isAvailable, false);
 			assert.strictEqual(status.reason, UNAVAILABLE_REASONS.configInvalid);
 		});
@@ -58,8 +59,8 @@ suite('Workspace status', () => {
 
 			const status = getCoreWorkspaceStatus(homeDir);
 			assert.strictEqual(status.isAvailable, true);
-			assert.strictEqual(status.reason, UNAVAILABLE_REASONS.configInvalid);
-			assert.strictEqual(status.isConfigInvalid, true);
+			assert.strictEqual(status.reason, undefined);
+			assert.strictEqual(status.isConfigInvalid, undefined);
 		});
 	});
 
