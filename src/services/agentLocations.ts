@@ -1,10 +1,9 @@
-import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import * as vscode from 'vscode';
-import { resolveCodexPaths } from './workspaceStatus';
+import { resolveCopilotPaths } from './workspaceStatus';
 
-export type AgentLocationKind = 'project' | 'workspace' | 'user';
+export type AgentLocationKind = 'project' | 'user' | 'plugin';
 
 export type AgentLocation = {
 	kind: AgentLocationKind;
@@ -24,38 +23,28 @@ export function getAgentLocations(
 ): AgentLocation[] {
 	const locations: AgentLocation[] = [];
 	if (projectRoot) {
-		const preferredProjectRoot = path.join(projectRoot, '.codex', 'agents');
-		const legacyProjectRoot = path.join(projectRoot, '.agents', 'agents');
+		const preferredProjectRoot = path.join(projectRoot, '.github', 'agents');
 		locations.push({
 			kind: 'project',
-			label: 'Project Agents',
-			rootPath: fs.existsSync(preferredProjectRoot)
-				? preferredProjectRoot
-				: fs.existsSync(legacyProjectRoot)
-					? legacyProjectRoot
-					: preferredProjectRoot,
+			label: 'Workspace Agents',
+			rootPath: preferredProjectRoot,
 			createPath: preferredProjectRoot,
 			priority: 1,
 		});
 	}
-	const workspaceRoot = path.join(resolveCodexPaths(homeDir).codexDir, 'agents');
 	locations.push({
-		kind: 'workspace',
-		label: 'Workspace Agents',
-		rootPath: workspaceRoot,
-		createPath: workspaceRoot,
+		kind: 'user',
+		label: 'User Agents',
+		rootPath: path.join(resolveCopilotPaths(homeDir).copilotDir, 'agents'),
+		createPath: path.join(resolveCopilotPaths(homeDir).copilotDir, 'agents'),
 		priority: 2,
 	});
-	const userRoot = path.join(homeDir, '.codex', 'agents');
-	if (path.resolve(userRoot) !== path.resolve(workspaceRoot)) {
-		locations.push({
-			kind: 'user',
-			label: 'User Agents',
-			rootPath: userRoot,
-			createPath: userRoot,
-			priority: 3,
-		});
-	}
+	locations.push({
+		kind: 'plugin',
+		label: 'Plugin Agents',
+		rootPath: path.join(resolveCopilotPaths(homeDir).copilotDir, 'installed-plugins'),
+		priority: 3,
+	});
 	return locations;
 }
 

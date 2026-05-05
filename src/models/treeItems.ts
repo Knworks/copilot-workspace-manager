@@ -4,7 +4,7 @@ export type FileViewKind = 'prompts' | 'skills' | 'templates';
 export type NodeKind = FileViewKind | 'core' | 'mcp' | 'agents';
 export type NodeType = 'root' | 'folder' | 'file' | 'command' | 'mcpServer';
 
-export class CodexTreeItem extends vscode.TreeItem {
+export class WorkspaceTreeItem extends vscode.TreeItem {
 	constructor(
 		public readonly nodeType: NodeType,
 		public readonly kind: NodeKind,

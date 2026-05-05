@@ -1,18 +1,18 @@
 import path from 'path';
 import * as vscode from 'vscode';
-import { CodexTreeItem, FileViewKind } from '../models/treeItems';
+import { WorkspaceTreeItem, FileViewKind } from '../models/treeItems';
 
 export class TreeExpansionState {
 	private readonly expandedByKind = new Map<FileViewKind, Set<string>>();
 
-	registerExpanded(kind: FileViewKind, item: CodexTreeItem): void {
+	registerExpanded(kind: FileViewKind, item: WorkspaceTreeItem): void {
 		if (!item.fsPath || item.nodeType !== 'folder') {
 			return;
 		}
 		this.getExpandedSet(kind).add(item.fsPath);
 	}
 
-	registerCollapsed(kind: FileViewKind, item: CodexTreeItem): void {
+	registerCollapsed(kind: FileViewKind, item: WorkspaceTreeItem): void {
 		if (!item.fsPath || item.nodeType !== 'folder') {
 			return;
 		}
@@ -44,7 +44,7 @@ export class TreeExpansionState {
 
 	async restore(
 		kind: FileViewKind,
-		views: Record<FileViewKind, vscode.TreeView<CodexTreeItem>>,
+		views: Record<FileViewKind, vscode.TreeView<WorkspaceTreeItem>>,
 	): Promise<void> {
 		const expanded = this.expandedByKind.get(kind);
 		if (!expanded || expanded.size === 0) {
@@ -52,7 +52,7 @@ export class TreeExpansionState {
 		}
 
 		for (const targetPath of expanded) {
-			const item = new CodexTreeItem(
+			const item = new WorkspaceTreeItem(
 				'folder',
 				kind,
 				path.basename(targetPath),

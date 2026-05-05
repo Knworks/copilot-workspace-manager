@@ -1,7 +1,6 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { parse } from 'toml';
 import { messages } from '../i18n';
 
 export type WorkspaceStatus = {
@@ -11,15 +10,14 @@ export type WorkspaceStatus = {
 };
 
 export type WorkspacePaths = {
-	codexDir: string;
+	copilotDir: string;
 	configPath: string;
 };
 
-// NOTE: Use a distinct folder name to avoid VS Code language heuristics (e.g., Django templates) in user template files.
-export const TEMPLATE_FOLDER_NAME = 'codex-templates';
+export const TEMPLATE_FOLDER_NAME = 'templates';
 
 export const UNAVAILABLE_REASONS = {
-	codexMissing: messages.reasonCodexMissing,
+	copilotMissing: messages.reasonCopilotMissing,
 	configMissing: messages.reasonConfigMissing,
 	configUnreadable: messages.reasonConfigUnreadable,
 	configInvalid: messages.reasonConfigInvalid,
@@ -31,19 +29,24 @@ export function getUnavailableLabel(reason: string): string {
 	return `${UNAVAILABLE_PREFIX}${reason}`;
 }
 
-export function resolveCodexPaths(homeDir: string = os.homedir()): WorkspacePaths {
-	const codexDir = path.join(homeDir, '.codex');
+export function resolveCopilotPaths(
+	homeDir: string = os.homedir(),
+	copilotHome: string | undefined = process.env.COPILOT_HOME,
+): WorkspacePaths {
+	const copilotDir = copilotHome && copilotHome.trim()
+		? copilotHome
+		: path.join(homeDir, '.copilot');
 	return {
-		codexDir,
-		configPath: path.join(codexDir, 'config.toml'),
+		copilotDir,
+		configPath: path.join(copilotDir, 'config.json'),
 	};
 }
 
 export function getWorkspaceStatus(homeDir?: string): WorkspaceStatus {
-	const paths = resolveCodexPaths(homeDir);
+	const paths = resolveCopilotPaths(homeDir);
 
-	if (!fs.existsSync(paths.codexDir)) {
-		return { isAvailable: false, reason: UNAVAILABLE_REASONS.codexMissing };
+	if (!fs.existsSync(paths.copilotDir)) {
+		return { isAvailable: false, reason: UNAVAILABLE_REASONS.copilotMissing };
 	}
 
 	if (!fs.existsSync(paths.configPath)) {
@@ -58,7 +61,7 @@ export function getWorkspaceStatus(homeDir?: string): WorkspaceStatus {
 	}
 
 	try {
-		parse(configContents);
+		JSON.parse(configContents);
 	} catch {
 		return { isAvailable: false, reason: UNAVAILABLE_REASONS.configInvalid };
 	}
@@ -67,16 +70,16 @@ export function getWorkspaceStatus(homeDir?: string): WorkspaceStatus {
 }
 
 /**
- * Returns availability for Codex Core repair-oriented operations.
+ * Returns availability for Copilot Core repair-oriented operations.
  *
- * Core files must remain openable when `config.toml` exists but is invalid TOML,
+ * Core files must remain openable when `config.json` exists but is invalid JSON,
  * because the editor is the recovery path for fixing that file.
  */
 export function getCoreWorkspaceStatus(homeDir?: string): WorkspaceStatus {
-	const paths = resolveCodexPaths(homeDir);
+	const paths = resolveCopilotPaths(homeDir);
 
-	if (!fs.existsSync(paths.codexDir)) {
-		return { isAvailable: false, reason: UNAVAILABLE_REASONS.codexMissing };
+	if (!fs.existsSync(paths.copilotDir)) {
+		return { isAvailable: false, reason: UNAVAILABLE_REASONS.copilotMissing };
 	}
 
 	if (!fs.existsSync(paths.configPath)) {
@@ -91,7 +94,7 @@ export function getCoreWorkspaceStatus(homeDir?: string): WorkspaceStatus {
 	}
 
 	try {
-		parse(configContents);
+		JSON.parse(configContents);
 	} catch {
 		return {
 			isAvailable: true,

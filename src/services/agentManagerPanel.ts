@@ -2,8 +2,6 @@ import * as vscode from 'vscode';
 import { messages } from '../i18n';
 import {
 	AgentManagerRecord,
-	disableAgentByName,
-	enableAgentByName,
 	listAgentManagerRecords,
 	resolveAgentManagerPaths,
 } from './agentManagerService';
@@ -46,8 +44,8 @@ function filterRecords(records: AgentManagerRecord[], query: string): AgentManag
 			record.name,
 			record.description,
 			record.model,
-			record.reasoningEffort,
-			record.sandboxMode,
+			record.tools,
+			record.mcpServers,
 			record.agentPath,
 		].some((value) => value.toLocaleLowerCase().includes(normalized)),
 	);
@@ -58,25 +56,22 @@ function buildRows(records: AgentManagerRecord[]): string {
 		return `<p class="empty">${escapeHtml(messages.agentManagerNoResult)}</p>`;
 	}
 	return records.map((record) => {
-		const disabledClass = record.enabled ? '' : ' disabled';
-		return `<article class="agent-row${disabledClass}" data-filter-text="${escapeHtml(`${record.name} ${record.description} ${record.model} ${record.reasoningEffort} ${record.sandboxMode} ${record.agentPath}`.toLocaleLowerCase())}">
+		const readonlyClass = record.readonly ? ' readonly' : '';
+		return `<article class="agent-row${readonlyClass}" data-filter-text="${escapeHtml(`${record.name} ${record.description} ${record.model} ${record.tools} ${record.mcpServers} ${record.agentPath}`.toLocaleLowerCase())}">
 			<span class="codicon codicon-hubot row-icon" aria-hidden="true"></span>
 			<div class="agent-main">
 				<div class="agent-title">${escapeHtml(record.name)}</div>
 				<div class="agent-description">${escapeHtml(record.description)}</div>
 				<div class="agent-meta">
 					<span>${escapeHtml(record.model)}</span>
-					<span>${escapeHtml(record.reasoningEffort)}</span>
-					<span>${escapeHtml(record.sandboxMode)}</span>
+					<span>${escapeHtml(record.tools)}</span>
+					<span>${escapeHtml(record.mcpServers)}</span>
 				</div>
 				<div class="agent-path" title="${escapeHtml(record.location.label)}: ${escapeHtml(record.agentPath)}">${escapeHtml(record.agentPath)}</div>
 			</div>
 			<div class="agent-actions">
 				<span class="location">${escapeHtml(record.location.label)}</span>
-				<label class="switch">
-					<input type="checkbox" data-agent-name="${escapeHtml(record.name)}" ${record.enabled ? 'checked' : ''} />
-					<span></span>
-				</label>
+				${record.readonly ? '<span class="codicon codicon-lock" aria-label="Read only"></span>' : ''}
 				<button class="icon-button" type="button" data-open-path="${escapeHtml(record.agentPath)}" title="${escapeHtml(messages.agentManagerOpen)}" aria-label="${escapeHtml(messages.agentManagerOpen)}"><span class="codicon codicon-file-text" aria-hidden="true"></span></button>
 			</div>
 		</article>`;
@@ -110,20 +105,12 @@ function buildHtml(webview: vscode.Webview, records: AgentManagerRecord[], query
 		.toolbar input:focus { outline: none; border-color: var(--vscode-focusBorder, #0e639c); box-shadow: 0 0 0 1px var(--vscode-focusBorder, #0e639c); }
 		.body { padding: 10px 8px; display: grid; gap: 6px; }
 		.agent-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); }
-		.agent-row.disabled { opacity: 0.55; }
+		.agent-row.readonly { opacity: 0.75; }
 		.agent-title { font-weight: 600; }
 		.agent-description, .agent-path, .location, .agent-meta { color: var(--vscode-descriptionForeground); font-size: 12px; }
 		.agent-meta { display: flex; gap: 8px; flex-wrap: wrap; }
 		.agent-path { word-break: break-all; }
 		.agent-actions { display: flex; align-items: center; gap: 10px; }
-		.switch input { display: none; }
-		.switch span { display: inline-block; width: 34px; height: 18px; border-radius: 999px; background: #d85b74; position: relative; vertical-align: middle; }
-		.switch span::after { content: ""; position: absolute; width: 14px; height: 14px; top: 2px; left: 2px; border-radius: 50%; background: #6e6e6e; transition: left 0.12s ease; }
-		.switch input:checked + span { background: var(--vscode-testing-iconPassed); }
-		.switch input:checked + span::after { left: 18px; }
-		@media (prefers-color-scheme: dark) {
-			.switch span::after { background: #ffffff; }
-		}
 		.icon-button { width: 24px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--vscode-panel-border); border-radius: 4px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; }
 		.row-icon { font-size: 22px; color: var(--vscode-descriptionForeground); }
 		.empty { color: var(--vscode-descriptionForeground); }
@@ -156,12 +143,6 @@ function buildHtml(webview: vscode.Webview, records: AgentManagerRecord[], query
 			vscode.postMessage({ type: 'refresh' });
 		});
 		applyFilter();
-		document.addEventListener('change', (event) => {
-			const target = event.target;
-			if (target?.dataset?.agentName) {
-				vscode.postMessage({ type: 'toggleAgent', name: target.dataset.agentName, enabled: target.checked });
-			}
-		});
 		document.addEventListener('click', (event) => {
 			const target = event.target instanceof Element ? event.target : null;
 			const openButton = target?.closest('[data-open-path]');
@@ -238,18 +219,8 @@ export class AgentManagerPanelManager implements vscode.Disposable {
 			return;
 		}
 		if (message.type === 'toggleAgent') {
-			const { codexDir, configPath } = resolveAgentManagerPaths();
-			if (message.enabled) {
-				const result = enableAgentByName(codexDir, configPath, message.name);
-				if (result.overwritten) {
-					vscode.window.showInformationMessage(
-						messages.agentManagerOverwritten(message.name),
-					);
-				}
-			} else {
-				disableAgentByName(codexDir, configPath, message.name);
-			}
-			vscode.window.showInformationMessage(messages.agent.toggleUpdated);
+			void message;
+			vscode.window.showInformationMessage(messages.agent.frontmatterManaged);
 			this.onDidChangeAgents();
 			this.refresh();
 		}

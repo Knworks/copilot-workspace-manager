@@ -12,39 +12,57 @@ const contextStub = {
 
 suite('Core explorer provider', () => {
 	test('returns core items when available', () => {
-		const provider = new CoreExplorerProvider(contextStub, () => ({ isAvailable: true }));
+		const provider = new CoreExplorerProvider(
+			contextStub,
+			() => ({ isAvailable: true }),
+			() => ({ isAvailable: true }),
+		);
 		const items = provider.getChildren() as vscode.TreeItem[];
-		assert.strictEqual(items.length, 2);
-		assert.strictEqual(items[0].label, 'config.toml');
-		assert.strictEqual(items[1].label, 'AGENTS.md');
+		assert.ok(items.length >= 9);
+		assert.strictEqual(items[0].label, 'config.json');
+		assert.strictEqual(items[1].label, 'mcp-config.json');
+		assert.strictEqual(items[2].label, 'permissions-config.json');
+		assert.strictEqual(items[3].label, 'copilot-instructions.md');
 	});
 
-	test('returns AGENTS.override.md when it exists', () => {
+	test('returns repository copilot-instructions.md when workspace is open', () => {
 		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-core-'));
 		const originalHome = process.env.HOME;
 		const originalUserProfile = process.env.USERPROFILE;
 		const originalHomeDrive = process.env.HOMEDRIVE;
 		const originalHomePath = process.env.HOMEPATH;
+		const originalWorkspaceFolders = vscode.workspace.workspaceFolders;
 		try {
 			process.env.HOME = tempDir;
 			process.env.USERPROFILE = tempDir;
 			process.env.HOMEDRIVE = '';
 			process.env.HOMEPATH = tempDir;
-			const codexDir = path.join(tempDir, '.codex');
-			fs.mkdirSync(codexDir, { recursive: true });
-			fs.writeFileSync(path.join(codexDir, 'AGENTS.override.md'), 'override', 'utf8');
+			const workspaceRoot = path.join(tempDir, 'workspace');
+			fs.mkdirSync(path.join(workspaceRoot, '.github'), { recursive: true });
+			fs.writeFileSync(
+				path.join(workspaceRoot, '.github', 'copilot-instructions.md'),
+				'instructions',
+				'utf8',
+			);
+			Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+				configurable: true,
+				value: [{ uri: vscode.Uri.file(workspaceRoot) }],
+			});
 
 			const provider = new CoreExplorerProvider(contextStub, () => ({ isAvailable: true }));
 			const items = provider.getChildren() as vscode.TreeItem[];
-			assert.deepStrictEqual(
-				items.map((item) => item.label),
-				['config.toml', 'AGENTS.md', 'AGENTS.override.md'],
+			assert.ok(
+				items.some((item) => item.label === 'Repository copilot-instructions.md'),
 			);
 		} finally {
-			process.env.HOME = originalHome;
-			process.env.USERPROFILE = originalUserProfile;
-			process.env.HOMEDRIVE = originalHomeDrive;
-			process.env.HOMEPATH = originalHomePath;
+			Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+				configurable: true,
+				value: originalWorkspaceFolders,
+			});
+			restoreEnv('HOME', originalHome);
+			restoreEnv('USERPROFILE', originalUserProfile);
+			restoreEnv('HOMEDRIVE', originalHomeDrive);
+			restoreEnv('HOMEPATH', originalHomePath);
 			fs.rmSync(tempDir, { recursive: true, force: true });
 		}
 	});
@@ -64,7 +82,7 @@ suite('Core explorer provider', () => {
 		);
 
 		const items = provider.getChildren() as vscode.TreeItem[];
-		assert.strictEqual(items[0].label, 'config.toml');
+		assert.strictEqual(items[0].label, 'config.json');
 		assert.strictEqual(items[0].tooltip, 'invalid config');
 		assert.ok(items[0].iconPath instanceof vscode.ThemeIcon);
 		assert.strictEqual((items[0].iconPath as vscode.ThemeIcon).id, 'warning');
@@ -80,8 +98,12 @@ suite('Core explorer provider', () => {
 		assert.strictEqual(items[0].label, getUnavailableLabel('missing'));
 	});
 
-	test('config and agent items carry open command', () => {
-		const provider = new CoreExplorerProvider(contextStub, () => ({ isAvailable: true }));
+	test('config and instruction items carry open command', () => {
+		const provider = new CoreExplorerProvider(
+			contextStub,
+			() => ({ isAvailable: true }),
+			() => ({ isAvailable: true }),
+		);
 		const items = provider.getChildren() as vscode.TreeItem[];
 		const configCommand = items[0].command;
 		assert.ok(configCommand);
@@ -90,13 +112,17 @@ suite('Core explorer provider', () => {
 			typeof (configCommand?.arguments?.[0] as { fsPath?: string })?.fsPath === 'string',
 		);
 
-		const agentCommand = items[1].command;
-		assert.ok(agentCommand);
-		assert.strictEqual(agentCommand?.command, 'copilot-workspace-manager.openFile');
+		const instructionCommand = items[3].command;
+		assert.ok(instructionCommand);
+		assert.strictEqual(instructionCommand?.command, 'copilot-workspace-manager.openFile');
 	});
 
-	test('config and agent items carry file icons', () => {
-		const provider = new CoreExplorerProvider(contextStub, () => ({ isAvailable: true }));
+	test('config and instruction items carry file icons', () => {
+		const provider = new CoreExplorerProvider(
+			contextStub,
+			() => ({ isAvailable: true }),
+			() => ({ isAvailable: true }),
+		);
 		const items = provider.getChildren() as vscode.TreeItem[];
 		const expectedIconPath = (fileName: string): string =>
 			vscode.Uri.file(
@@ -113,14 +139,22 @@ suite('Core explorer provider', () => {
 			expectedIconPath('settingsfile32.png'),
 		);
 
-		const agentIconPath = items[1].iconPath as { light: vscode.Uri; dark: vscode.Uri };
+		const instructionIconPath = items[3].iconPath as { light: vscode.Uri; dark: vscode.Uri };
 		assert.strictEqual(
-			agentIconPath.light.fsPath,
-			expectedIconPath('agents_light.png'),
+			instructionIconPath.light.fsPath,
+			expectedIconPath('markdown32.png'),
 		);
 		assert.strictEqual(
-			agentIconPath.dark.fsPath,
-			expectedIconPath('agents_dark.png'),
+			instructionIconPath.dark.fsPath,
+			expectedIconPath('markdown32.png'),
 		);
 	});
 });
+
+function restoreEnv(key: keyof NodeJS.ProcessEnv, value: string | undefined): void {
+	if (value === undefined) {
+		delete process.env[key];
+		return;
+	}
+	process.env[key] = value;
+}

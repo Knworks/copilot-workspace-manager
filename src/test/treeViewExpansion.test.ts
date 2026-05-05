@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
-import { CodexTreeItem } from '../models/treeItems';
+import { WorkspaceTreeItem } from '../models/treeItems';
 import { expandParentFolder } from '../services/treeViewExpansion';
 
 type RevealOptions = {
@@ -13,23 +13,23 @@ suite('Tree view expansion', () => {
 	test('Given root selection When expanding Then reveal is not called', async () => {
 		// Arrange
 		const reveals: Array<{
-			item: CodexTreeItem;
+			item: WorkspaceTreeItem;
 			options: RevealOptions | undefined;
 		}> = [];
 		const viewStub = {
 			reveal: async (
-				item: CodexTreeItem,
+				item: WorkspaceTreeItem,
 				options?: RevealOptions,
 			) => {
 				reveals.push({ item, options });
 			},
-		} as unknown as vscode.TreeView<CodexTreeItem>;
+		} as unknown as vscode.TreeView<WorkspaceTreeItem>;
 		const views = {
 			prompts: viewStub,
 			skills: viewStub,
 			templates: viewStub,
 		};
-		const selection = new CodexTreeItem(
+		const selection = new WorkspaceTreeItem(
 			'root',
 			'prompts',
 			'prompts',
@@ -47,23 +47,23 @@ suite('Tree view expansion', () => {
 	test('Given folder selection When expanding Then reveal is called', async () => {
 		// Arrange
 		const reveals: Array<{
-			item: CodexTreeItem;
+			item: WorkspaceTreeItem;
 			options: RevealOptions | undefined;
 		}> = [];
 		const viewStub = {
 			reveal: async (
-				item: CodexTreeItem,
+				item: WorkspaceTreeItem,
 				options?: RevealOptions,
 			) => {
 				reveals.push({ item, options });
 			},
-		} as unknown as vscode.TreeView<CodexTreeItem>;
+		} as unknown as vscode.TreeView<WorkspaceTreeItem>;
 		const views = {
 			prompts: viewStub,
 			skills: viewStub,
 			templates: viewStub,
 		};
-		const selection = new CodexTreeItem(
+		const selection = new WorkspaceTreeItem(
 			'folder',
 			'prompts',
 			'prompts',
@@ -87,23 +87,23 @@ suite('Tree view expansion', () => {
 	test('Given file selection When expanding Then reveal is called', async () => {
 		// Arrange
 		const reveals: Array<{
-			item: CodexTreeItem;
+			item: WorkspaceTreeItem;
 			options: RevealOptions | undefined;
 		}> = [];
 		const viewStub = {
 			reveal: async (
-				item: CodexTreeItem,
+				item: WorkspaceTreeItem,
 				options?: RevealOptions,
 			) => {
 				reveals.push({ item, options });
 			},
-		} as unknown as vscode.TreeView<CodexTreeItem>;
+		} as unknown as vscode.TreeView<WorkspaceTreeItem>;
 		const views = {
 			prompts: viewStub,
 			skills: viewStub,
 			templates: viewStub,
 		};
-		const selection = new CodexTreeItem(
+		const selection = new WorkspaceTreeItem(
 			'file',
 			'prompts',
 			'note.md',

@@ -7,33 +7,29 @@ import { ensureSelection } from './services/selectionGuard';
 import {
 	getCoreWorkspaceStatus,
 	getWorkspaceStatus,
-	resolveCodexPaths,
+	resolveCopilotPaths,
 	TEMPLATE_FOLDER_NAME,
 } from './services/workspaceStatus';
-import { CodexTreeItem } from './models/treeItems';
+import { WorkspaceTreeItem } from './models/treeItems';
 import { registerFileCommands } from './commands/fileCommands';
 import { registerAgentCommands } from './commands/agentCommands';
 import { CoreExplorerProvider } from './views/coreExplorerProvider';
 import { FileExplorerProvider } from './views/fileExplorerProvider';
 import { McpExplorerProvider } from './views/mcpExplorerProvider';
 import { AgentExplorerProvider } from './views/agentExplorerProvider';
-import { toggleMcpServer } from './services/mcpService';
 import { messages } from './i18n';
 import { runSafely } from './services/errorHandling';
 import { SelectionContext } from './services/selectionContext';
 import { TreeExpansionState } from './services/treeExpansionState';
 import { ViewFocusState } from './services/viewFocusState';
 import { getSyncSettings } from './services/settings';
-import { HistoryPanelManager } from './services/historyPanel';
 import { SkillManagerPanelManager } from './services/skillManagerPanel';
 import { AgentManagerPanelManager } from './services/agentManagerPanel';
 import { McpManagerPanelManager } from './services/mcpManagerPanel';
 import {
-	syncCoreFilesBidirectional,
+	syncCoreInstructionsBidirectional,
 	syncDirectoryBidirectional,
 } from './services/syncService';
-import { reconcileAgentConfigAfterSync } from './services/agentSyncCleanupService';
-import { organizeConfigToml } from './services/configTomlOrganizerService';
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -47,7 +43,6 @@ export function activate(context: vscode.ExtensionContext) {
 	const selectionContext = new SelectionContext();
 	const expansionState = new TreeExpansionState();
 	const viewFocusState = new ViewFocusState();
-	const historyPanelManager = new HistoryPanelManager();
 	const skillManagerPanelManager = new SkillManagerPanelManager(() =>
 		skillsProvider.refresh(),
 	);
@@ -82,7 +77,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const trackExpansion = (
 		kind: 'prompts' | 'skills' | 'templates',
-		view: vscode.TreeView<CodexTreeItem>,
+		view: vscode.TreeView<WorkspaceTreeItem>,
 	) => [
 		view.onDidExpandElement((event) =>
 			expansionState.registerExpanded(kind, event.element),
@@ -93,7 +88,7 @@ export function activate(context: vscode.ExtensionContext) {
 	];
 
 	const trackSelection = (
-		view: vscode.TreeView<CodexTreeItem>,
+		view: vscode.TreeView<WorkspaceTreeItem>,
 		kind?: 'prompts' | 'skills' | 'templates',
 	) =>
 		view.onDidChangeSelection((event) => {
@@ -121,7 +116,6 @@ export function activate(context: vscode.ExtensionContext) {
 		...trackExpansion('prompts', promptsView),
 		...trackExpansion('skills', skillsView),
 		...trackExpansion('templates', templatesView),
-		historyPanelManager,
 		skillManagerPanelManager,
 		agentManagerPanelManager,
 		mcpManagerPanelManager,
@@ -158,7 +152,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const openFileDisposable = vscode.commands.registerCommand(
 		'copilot-workspace-manager.openFile',
-		(item?: CodexTreeItem) =>
+		(item?: WorkspaceTreeItem) =>
 			runSafely(async () => {
 				const status =
 					item?.kind === 'core'
@@ -183,15 +177,15 @@ export function activate(context: vscode.ExtensionContext) {
 		await vscode.env.openExternal(vscode.Uri.file(targetDir));
 	};
 
-	const openCodexFolderDisposable = vscode.commands.registerCommand(
-		'copilot-workspace-manager.openCodexFolder',
+	const openCopilotFolderDisposable = vscode.commands.registerCommand(
+		'copilot-workspace-manager.openCopilotFolder',
 		() =>
 			runSafely(async () => {
 				if (!getCoreWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const { codexDir } = resolveCodexPaths();
-				await revealFolder(codexDir);
+				const { copilotDir } = resolveCopilotPaths();
+				await revealFolder(copilotDir);
 			}),
 	);
 
@@ -202,8 +196,10 @@ export function activate(context: vscode.ExtensionContext) {
 				if (!getWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const { codexDir } = resolveCodexPaths();
-				await revealFolder(path.join(codexDir, 'prompts'));
+				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+				if (workspaceRoot) {
+					await revealFolder(path.join(workspaceRoot, '.github', 'prompts'));
+				}
 			}),
 	);
 
@@ -214,7 +210,6 @@ export function activate(context: vscode.ExtensionContext) {
 				if (!getWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const { codexDir } = resolveCodexPaths();
 				const selection = skillsView.selection[0];
 				if (selection?.fsPath) {
 					const targetDir =
@@ -224,7 +219,10 @@ export function activate(context: vscode.ExtensionContext) {
 					await revealFolder(targetDir);
 					return;
 				}
-				await revealFolder(path.join(codexDir, 'skills'));
+				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+				if (workspaceRoot) {
+					await revealFolder(path.join(workspaceRoot, '.github', 'skills'));
+				}
 			}),
 	);
 
@@ -235,8 +233,10 @@ export function activate(context: vscode.ExtensionContext) {
 				if (!getWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const { codexDir } = resolveCodexPaths();
-				await revealFolder(path.join(codexDir, TEMPLATE_FOLDER_NAME));
+				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+				if (workspaceRoot) {
+					await revealFolder(path.join(workspaceRoot, '.copilot', TEMPLATE_FOLDER_NAME));
+				}
 			}),
 	);
 
@@ -247,24 +247,15 @@ export function activate(context: vscode.ExtensionContext) {
 				if (!getWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const { codexDir } = resolveCodexPaths();
 				const selection = agentsView.selection[0];
 				if (selection?.fsPath) {
 					await revealFolder(path.dirname(selection.fsPath));
 					return;
 				}
-				await revealFolder(path.join(codexDir, 'agents'));
-			}),
-	);
-
-	const openHistoryViewDisposable = vscode.commands.registerCommand(
-		'copilot-workspace-manager.openHistoryView',
-		() =>
-			runSafely(() => {
-				if (!getCoreWorkspaceStatus().isAvailable) {
-					return;
+				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+				if (workspaceRoot) {
+					await revealFolder(path.join(workspaceRoot, '.github', 'agents'));
 				}
-				historyPanelManager.show();
 			}),
 	);
 
@@ -301,34 +292,6 @@ export function activate(context: vscode.ExtensionContext) {
 			}),
 	);
 
-	const organizeConfigTomlDisposable = vscode.commands.registerCommand(
-		'copilot-workspace-manager.organizeConfigToml',
-		() =>
-			runSafely(async () => {
-				if (!getCoreWorkspaceStatus().isAvailable) {
-					return;
-				}
-				const configPath = resolveCodexPaths().configPath;
-				try {
-					const result = organizeConfigToml(configPath);
-					vscode.window.showInformationMessage(
-						result.changed
-							? messages.configTomlOrganized(result.backupPath)
-							: messages.configTomlAlreadyOrganized(result.backupPath),
-					);
-					coreProvider.refresh();
-					mcpProvider.refresh();
-					skillsProvider.refresh();
-					agentsProvider.refresh();
-				} catch (error) {
-					console.error(error);
-					vscode.window.showErrorMessage(
-						messages.configTomlOrganizeBackupFailed,
-					);
-				}
-			}),
-	);
-
 	const confirmSync = async (targetDir: string): Promise<boolean> => {
 		const message = messages.syncConfirm(targetDir);
 		const choice = await vscode.window.showWarningMessage(
@@ -346,15 +309,20 @@ export function activate(context: vscode.ExtensionContext) {
 				if (!getCoreWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const { codexFolder } = getSyncSettings();
-				if (!codexFolder) {
+				const { copilotFolder } = getSyncSettings();
+				if (!copilotFolder) {
 					return;
 				}
-				if (!(await confirmSync(codexFolder))) {
+				if (!(await confirmSync(copilotFolder))) {
 					return;
 				}
-				const { codexDir } = resolveCodexPaths();
-				const result = syncCoreFilesBidirectional(codexDir, codexFolder);
+				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+				if (!workspaceRoot) {
+					vscode.window.showInformationMessage(messages.chainNoWorkspace);
+					return;
+				}
+				const { copilotDir } = resolveCopilotPaths();
+				const result = syncCoreInstructionsBidirectional(workspaceRoot, copilotDir);
 				if (result.skipped.length > 0) {
 					vscode.window.showWarningMessage(
 						messages.syncSkipped(result.skipped.length),
@@ -372,23 +340,31 @@ export function activate(context: vscode.ExtensionContext) {
 				if (!getWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const { promptsFolder } = getSyncSettings();
-				if (!promptsFolder) {
+				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+				if (!workspaceRoot) {
+					vscode.window.showInformationMessage(messages.chainNoWorkspace);
 					return;
 				}
-				if (!(await confirmSync(promptsFolder))) {
+				if (!(await confirmSync('Copilot prompts'))) {
 					return;
 				}
-				const { codexDir } = resolveCodexPaths();
-				const result = syncDirectoryBidirectional(
-					'prompts',
-					codexDir,
-					path.join(codexDir, 'prompts'),
-					promptsFolder,
+				const { copilotDir } = resolveCopilotPaths();
+				const commandResult = syncDirectoryBidirectional(
+					'promptCommands',
+					copilotDir,
+					path.join(copilotDir, 'prompts', 'commands'),
+					path.join(workspaceRoot, '.claude', 'commands'),
 				);
-				if (result.skipped.length > 0) {
+				const ideResult = syncDirectoryBidirectional(
+					'promptIde',
+					copilotDir,
+					path.join(copilotDir, 'prompts', 'ide'),
+					path.join(workspaceRoot, '.github', 'prompts'),
+				);
+				const skippedCount = commandResult.skipped.length + ideResult.skipped.length;
+				if (skippedCount > 0) {
 					vscode.window.showWarningMessage(
-						messages.syncSkipped(result.skipped.length),
+						messages.syncSkipped(skippedCount),
 					);
 				}
 				promptsProvider.refresh();
@@ -402,19 +378,20 @@ export function activate(context: vscode.ExtensionContext) {
 				if (!getWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const { skillsFolder } = getSyncSettings();
-				if (!skillsFolder) {
+				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+				if (!workspaceRoot) {
+					vscode.window.showInformationMessage(messages.chainNoWorkspace);
 					return;
 				}
-				if (!(await confirmSync(skillsFolder))) {
+				if (!(await confirmSync('Copilot skills'))) {
 					return;
 				}
-				const { codexDir } = resolveCodexPaths();
+				const { copilotDir } = resolveCopilotPaths();
 				const result = syncDirectoryBidirectional(
 					'skills',
-					codexDir,
-					path.join(codexDir, 'skills'),
-					skillsFolder,
+					copilotDir,
+					path.join(workspaceRoot, '.github', 'skills'),
+					path.join(copilotDir, 'skills'),
 				);
 				if (result.skipped.length > 0) {
 					vscode.window.showWarningMessage(
@@ -432,19 +409,20 @@ export function activate(context: vscode.ExtensionContext) {
 				if (!getWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const { templatesFolder } = getSyncSettings();
-				if (!templatesFolder) {
+				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+				if (!workspaceRoot) {
+					vscode.window.showInformationMessage(messages.chainNoWorkspace);
 					return;
 				}
-				if (!(await confirmSync(templatesFolder))) {
+				if (!(await confirmSync('Copilot templates'))) {
 					return;
 				}
-				const { codexDir } = resolveCodexPaths();
+				const { copilotDir } = resolveCopilotPaths();
 				const result = syncDirectoryBidirectional(
 					'templates',
-					codexDir,
-					path.join(codexDir, TEMPLATE_FOLDER_NAME),
-					templatesFolder,
+					copilotDir,
+					path.join(workspaceRoot, '.copilot', TEMPLATE_FOLDER_NAME),
+					path.join(copilotDir, TEMPLATE_FOLDER_NAME),
 				);
 				if (result.skipped.length > 0) {
 					vscode.window.showWarningMessage(
@@ -462,32 +440,26 @@ export function activate(context: vscode.ExtensionContext) {
 				if (!getWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const { agentFolder } = getSyncSettings();
-				if (!agentFolder) {
+				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+				if (!workspaceRoot) {
+					vscode.window.showInformationMessage(messages.chainNoWorkspace);
 					return;
 				}
-				if (!(await confirmSync(agentFolder))) {
+				if (!(await confirmSync('Copilot agents'))) {
 					return;
 				}
-				const { codexDir } = resolveCodexPaths();
-				const agentsDir = path.join(codexDir, 'agents');
-				const existingAgentIdsBeforeSync = readAgentIds(agentsDir);
+				const { copilotDir } = resolveCopilotPaths();
 				const result = syncDirectoryBidirectional(
 					'agents',
-					codexDir,
-					agentsDir,
-					agentFolder,
+					copilotDir,
+					path.join(workspaceRoot, '.github', 'agents'),
+					path.join(copilotDir, 'agents'),
 				);
 				if (result.skipped.length > 0) {
 					vscode.window.showWarningMessage(
 						messages.syncSkipped(result.skipped.length),
 					);
 				}
-				reconcileAgentConfigAfterSync(
-					codexDir,
-					path.join(codexDir, 'config.toml'),
-					existingAgentIdsBeforeSync,
-				);
 				agentsProvider.refresh();
 			}),
 	);
@@ -508,36 +480,13 @@ export function activate(context: vscode.ExtensionContext) {
 			}),
 	);
 
-	const toggleMcpDisposable = vscode.commands.registerCommand(
-		'copilot-workspace-manager.mcp.toggle',
-		(serverId?: string) =>
-			runSafely(() => {
-				if (!getWorkspaceStatus().isAvailable) {
-					return;
-				}
-				if (!serverId) {
-					ensureSelection(undefined);
-					return;
-				}
-				const configPath = resolveCodexPaths().configPath;
-				if (toggleMcpServer(configPath, serverId)) {
-					vscode.window.showInformationMessage(
-						messages.mcpToggleUpdated,
-					);
-					mcpProvider.refresh();
-				}
-			}),
-	);
-
 	context.subscriptions.push(
 		helloWorldDisposable,
 		openFileDisposable,
-		openCodexFolderDisposable,
-		openHistoryViewDisposable,
+		openCopilotFolderDisposable,
 		openSkillManagerDisposable,
 		openAgentManagerDisposable,
 		openMcpManagerDisposable,
-		organizeConfigTomlDisposable,
 		openPromptsFolderDisposable,
 		openSkillsFolderDisposable,
 		openTemplatesFolderDisposable,
@@ -548,7 +497,6 @@ export function activate(context: vscode.ExtensionContext) {
 		syncTemplatesDisposable,
 		syncAgentsDisposable,
 		refreshDisposable,
-		toggleMcpDisposable,
 	);
 
 	registerFileCommands(context, {

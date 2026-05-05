@@ -53,7 +53,7 @@ suite('Skill config service', () => {
 				'utf8',
 			);
 			const location: SkillLocation = {
-				kind: 'workspace',
+				kind: 'project',
 				label: 'Workspace Skills',
 				rootPath: path.join(root, 'skills'),
 				priority: 2,

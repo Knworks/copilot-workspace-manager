@@ -25,10 +25,9 @@ suite('Template service', () => {
 		}
 	});
 
-	test('uses .codex/codex-templates as template root path', () => {
+	test('uses .copilot/templates as template root path', () => {
 		const homeDir = path.join('home', 'tester');
 		const rootPath = getTemplateRootPath(homeDir);
-		assert.strictEqual(rootPath, path.join(homeDir, '.codex', 'codex-templates'));
-		assert.ok(!rootPath.includes(path.join('.codex', '.copilot-workspace-manager')));
+		assert.strictEqual(rootPath, path.join(homeDir, '.copilot', 'templates'));
 	});
 });

@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { CodexTreeItem } from '../models/treeItems';
+import { WorkspaceTreeItem } from '../models/treeItems';
 import { FileExplorerProvider } from '../views/fileExplorerProvider';
 import { getUnavailableLabel } from '../services/workspaceStatus';
 
@@ -292,22 +292,11 @@ suite('File explorer provider', () => {
 	test('skills explorer combines multiple skill locations with location metadata', () => {
 		const entriesByRoot = new Map([
 			[
-				path.join(process.env.HOME ?? '', '.codex', 'skills'),
-				[
-					{
-						name: 'workspace-skill',
-						fullPath: path.join(process.env.HOME ?? '', '.codex', 'skills', 'workspace-skill'),
-						isDirectory: true,
-						isFile: false,
-					},
-				],
-			],
-			[
-				path.join(process.env.HOME ?? '', '.agents', 'skills'),
+				path.join(process.env.HOME ?? '', '.copilot', 'skills'),
 				[
 					{
 						name: 'user-skill',
-						fullPath: path.join(process.env.HOME ?? '', '.agents', 'skills', 'user-skill'),
+						fullPath: path.join(process.env.HOME ?? '', '.copilot', 'skills', 'user-skill'),
 						isDirectory: true,
 						isFile: false,
 					},
@@ -323,14 +312,13 @@ suite('File explorer provider', () => {
 		);
 
 		const children = provider.getChildren() as vscode.TreeItem[];
-		assert.ok(children.some((item) => item.label === 'workspace-skill'));
 		assert.ok(children.some((item) => item.label === 'user-skill'));
 		const userSkill = children.find((item) => item.label === 'user-skill');
 		assert.ok(String(userSkill?.tooltip).includes('User Skills'));
 	});
 
 	test('skills explorer shows status icons only for skill root folders and SKILL.md', () => {
-		const workspaceSkillsRoot = path.join(process.env.HOME ?? '', '.codex', 'skills');
+		const workspaceSkillsRoot = path.join(process.env.HOME ?? '', '.copilot', 'skills');
 		const enabledSkillRoot = path.join(workspaceSkillsRoot, 'enabled-skill');
 		const disabledSkillRoot = path.join(workspaceSkillsRoot, 'disabled-skill');
 		const entriesByRoot = new Map<string, Array<{
@@ -401,16 +389,12 @@ suite('File explorer provider', () => {
 				[],
 			],
 		]);
-		const enabledByPath = new Map<string, boolean>([
-			[path.resolve(path.join(disabledSkillRoot, 'SKILL.md')), false],
-		]);
 		const provider = new FileExplorerProvider(
 			'skills',
 			contextStub,
 			() => ({ isAvailable: true }),
 			undefined,
 			(targetPath) => entriesByRoot.get(targetPath) ?? [],
-			() => enabledByPath,
 		);
 
 		const rootChildren = provider.getChildren() as vscode.TreeItem[];
@@ -423,17 +407,13 @@ suite('File explorer provider', () => {
 
 		const disabledRoot = byLabel(rootChildren, 'disabled-skill');
 		assert.ok(disabledRoot.iconPath instanceof vscode.ThemeIcon);
-		assert.strictEqual((disabledRoot.iconPath as vscode.ThemeIcon).id, 'circle-slash');
-		assert.strictEqual(
-			(disabledRoot.iconPath as vscode.ThemeIcon).color?.id,
-			'disabledForeground',
-		);
+		assert.strictEqual((disabledRoot.iconPath as vscode.ThemeIcon).id, 'folder-library');
 
 		const normalRoot = byLabel(rootChildren, 'notes');
 		assert.ok(normalRoot.iconPath instanceof vscode.ThemeIcon);
 		assert.strictEqual((normalRoot.iconPath as vscode.ThemeIcon).id, 'folder-library');
 
-		const enabledChildren = provider.getChildren(enabledRoot as CodexTreeItem) as vscode.TreeItem[];
+		const enabledChildren = provider.getChildren(enabledRoot as WorkspaceTreeItem) as vscode.TreeItem[];
 		const skillFile = byLabel(enabledChildren, 'SKILL.md');
 		assert.ok(skillFile.iconPath instanceof vscode.ThemeIcon);
 		assert.strictEqual((skillFile.iconPath as vscode.ThemeIcon).id, 'agent');
@@ -452,13 +432,9 @@ suite('File explorer provider', () => {
 			vscode.Uri.file(contextStub.asAbsolutePath(path.join('images', 'folder32.png'))).fsPath,
 		);
 
-		const disabledChildren = provider.getChildren(disabledRoot as CodexTreeItem) as vscode.TreeItem[];
+		const disabledChildren = provider.getChildren(disabledRoot as WorkspaceTreeItem) as vscode.TreeItem[];
 		const disabledSkillFile = byLabel(disabledChildren, 'SKILL.md');
 		assert.ok(disabledSkillFile.iconPath instanceof vscode.ThemeIcon);
-		assert.strictEqual((disabledSkillFile.iconPath as vscode.ThemeIcon).id, 'circle-slash');
-		assert.strictEqual(
-			(disabledSkillFile.iconPath as vscode.ThemeIcon).color?.id,
-			'disabledForeground',
-		);
+		assert.strictEqual((disabledSkillFile.iconPath as vscode.ThemeIcon).id, 'agent');
 	});
 });

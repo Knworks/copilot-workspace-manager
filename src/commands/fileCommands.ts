@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import path from 'path';
-import { CodexTreeItem, FileViewKind } from '../models/treeItems';
+import { WorkspaceTreeItem, FileViewKind } from '../models/treeItems';
 import { ensureSelection } from '../services/selectionGuard';
 import { getWorkspaceStatus } from '../services/workspaceStatus';
 import { messages } from '../i18n';
@@ -28,9 +28,9 @@ import { runSafely } from '../services/errorHandling';
 import { expandParentFolder } from '../services/treeViewExpansion';
 
 type FileCommandContext = {
-	getSelection: () => CodexTreeItem | undefined;
+	getSelection: () => WorkspaceTreeItem | undefined;
 	providers: Record<FileViewKind, FileExplorerProvider>;
-	views: Record<FileViewKind, vscode.TreeView<CodexTreeItem>>;
+	views: Record<FileViewKind, vscode.TreeView<WorkspaceTreeItem>>;
 	expansionState: TreeExpansionState;
 	viewFocusState: ViewFocusState;
 };
@@ -48,7 +48,7 @@ export function registerFileCommands(
 		disposables.push(
 			vscode.commands.registerCommand(
 				commandId,
-				(item?: CodexTreeItem) =>
+				(item?: WorkspaceTreeItem) =>
 					runSafely(async () => {
 						if (!ensureAvailable()) {
 							return;
@@ -82,7 +82,7 @@ export function registerFileCommands(
 		disposables.push(
 			vscode.commands.registerCommand(
 				commandId,
-				(item?: CodexTreeItem) =>
+				(item?: WorkspaceTreeItem) =>
 					runSafely(async () => {
 						if (!ensureAvailable()) {
 							return;
@@ -112,7 +112,7 @@ export function registerFileCommands(
 	disposables.push(
 		vscode.commands.registerCommand(
 			'copilot-workspace-manager.addFile',
-			(item?: CodexTreeItem) =>
+			(item?: WorkspaceTreeItem) =>
 				runSafely(async () => {
 					if (!ensureAvailable()) {
 						return;
@@ -158,7 +158,7 @@ export function registerFileCommands(
 	disposables.push(
 		vscode.commands.registerCommand(
 			'copilot-workspace-manager.addFolder',
-			(item?: CodexTreeItem) =>
+			(item?: WorkspaceTreeItem) =>
 				runSafely(async () => {
 					if (!ensureAvailable()) {
 						return;
@@ -211,7 +211,7 @@ export function registerFileCommands(
 	disposables.push(
 		vscode.commands.registerCommand(
 			'copilot-workspace-manager.rename',
-			(item?: CodexTreeItem) =>
+			(item?: WorkspaceTreeItem) =>
 				runSafely(async () => {
 					const selection = resolveSelection(item, getSelection);
 					if (
@@ -295,7 +295,7 @@ export function registerFileCommands(
 	disposables.push(
 		vscode.commands.registerCommand(
 			'copilot-workspace-manager.delete',
-			(item?: CodexTreeItem) =>
+			(item?: WorkspaceTreeItem) =>
 				runSafely(async () => {
 					const selection = resolveSelection(item, getSelection);
 					if (
@@ -345,25 +345,25 @@ function ensureAvailable(): boolean {
 	return getWorkspaceStatus().isAvailable;
 }
 
-export function isRootNode(item: CodexTreeItem): boolean {
+export function isRootNode(item: WorkspaceTreeItem): boolean {
 	return item.nodeType === 'root';
 }
 
 const FILE_VIEW_KINDS: FileViewKind[] = ['prompts', 'skills', 'templates'];
 
 function resolveSelection(
-	item: CodexTreeItem | undefined,
-	getSelection: () => CodexTreeItem | undefined,
-): CodexTreeItem | undefined {
+	item: WorkspaceTreeItem | undefined,
+	getSelection: () => WorkspaceTreeItem | undefined,
+): WorkspaceTreeItem | undefined {
 	return item ?? getSelection();
 }
 
 export function resolveSelectionForView(
 	viewKind: FileViewKind,
-	item: CodexTreeItem | undefined,
-	selection: CodexTreeItem | undefined,
+	item: WorkspaceTreeItem | undefined,
+	selection: WorkspaceTreeItem | undefined,
 	rootPath: string,
-): CodexTreeItem {
+): WorkspaceTreeItem {
 	if (item?.kind === viewKind) {
 		return item;
 	}
@@ -375,20 +375,20 @@ export function resolveSelectionForView(
 
 export function resolveAddViewSelection(
 	hasSelection: boolean,
-	item: CodexTreeItem | undefined,
-	selection: CodexTreeItem | undefined,
-): CodexTreeItem | undefined {
+	item: WorkspaceTreeItem | undefined,
+	selection: WorkspaceTreeItem | undefined,
+): WorkspaceTreeItem | undefined {
 	if (!hasSelection) {
 		return undefined;
 	}
 	return item ?? selection;
 }
 
-export function requiresFolderSelectionForFileAdd(item: CodexTreeItem): boolean {
+export function requiresFolderSelectionForFileAdd(item: WorkspaceTreeItem): boolean {
 	return item.kind === 'skills' && item.nodeType !== 'folder';
 }
 
-export function shouldPickSkillLocationForAdd(item: CodexTreeItem): boolean {
+export function shouldPickSkillLocationForAdd(item: WorkspaceTreeItem): boolean {
 	return item.kind === 'skills' && item.nodeType === 'root';
 }
 
@@ -397,7 +397,7 @@ function isFileViewKind(kind: string): kind is FileViewKind {
 }
 
 function resolveProvider(
-	item: CodexTreeItem,
+	item: WorkspaceTreeItem,
 	providers: Record<FileViewKind, FileExplorerProvider>,
 ): FileExplorerProvider | null {
 	if (!isFileViewKind(item.kind)) {
@@ -411,7 +411,7 @@ function resolveProvider(
 }
 
 function resolveTargetDirectory(
-	item: CodexTreeItem,
+	item: WorkspaceTreeItem,
 	provider: FileExplorerProvider,
 ): string | null {
 	if (!item.fsPath) {
@@ -428,7 +428,7 @@ function resolveTargetDirectory(
 }
 
 async function resolveTargetDirectoryForAdd(
-	item: CodexTreeItem,
+	item: WorkspaceTreeItem,
 	provider: FileExplorerProvider,
 ): Promise<string | null> {
 	const targetDir = resolveTargetDirectory(item, provider);
@@ -463,8 +463,8 @@ async function resolveTargetDirectoryForAdd(
 	return selectedTargetDir;
 }
 
-function createRootItem(viewKind: FileViewKind, rootPath: string): CodexTreeItem {
-	const rootItem = new CodexTreeItem(
+function createRootItem(viewKind: FileViewKind, rootPath: string): WorkspaceTreeItem {
+	const rootItem = new WorkspaceTreeItem(
 		'root',
 		viewKind,
 		path.basename(rootPath),
@@ -477,9 +477,9 @@ function createRootItem(viewKind: FileViewKind, rootPath: string): CodexTreeItem
 }
 
 async function addFileWithSelection(
-	selection: CodexTreeItem,
+	selection: WorkspaceTreeItem,
 	provider: FileExplorerProvider,
-	views: Record<FileViewKind, vscode.TreeView<CodexTreeItem>>,
+	views: Record<FileViewKind, vscode.TreeView<WorkspaceTreeItem>>,
 ): Promise<void> {
 	if (requiresFolderSelectionForFileAdd(selection)) {
 		vscode.window.showInformationMessage(messages.file.skillFileFolderRequired);
@@ -532,9 +532,9 @@ async function addFileWithSelection(
 }
 
 async function addFolderWithSelection(
-	selection: CodexTreeItem,
+	selection: WorkspaceTreeItem,
 	provider: FileExplorerProvider,
-	views: Record<FileViewKind, vscode.TreeView<CodexTreeItem>>,
+	views: Record<FileViewKind, vscode.TreeView<WorkspaceTreeItem>>,
 ): Promise<void> {
 	const targetDir = await resolveTargetDirectoryForAdd(selection, provider);
 	if (!targetDir) {

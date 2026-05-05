@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { messages } from '../i18n';
 import { listSkillRecords, setSkillEnabled, SkillRecord } from './skillConfigService';
-import { resolveCodexPaths } from './workspaceStatus';
+import { resolveCopilotPaths } from './workspaceStatus';
 import { CODICON_RESOURCE_ROOTS, getCodiconCssHref, getCodiconIconPath } from './webviewAssets';
 
 const SKILL_MANAGER_VIEW_TYPE = 'copilot-workspace-manager.skillManager';
@@ -216,7 +216,7 @@ export class SkillManagerPanelManager implements vscode.Disposable {
 			return;
 		}
 		if (message.type === 'toggleSkill') {
-			const { configPath } = resolveCodexPaths();
+			const { configPath } = resolveCopilotPaths();
 			setSkillEnabled(configPath, message.skillPath, message.enabled);
 			vscode.window.showInformationMessage(messages.mcpToggleUpdated);
 			this.onDidChangeSkills();
@@ -245,7 +245,7 @@ export class SkillManagerPanelManager implements vscode.Disposable {
 	}
 
 	private readRecords(): SkillRecord[] {
-		const { configPath } = resolveCodexPaths();
+		const { configPath } = resolveCopilotPaths();
 		return listSkillRecords(configPath);
 	}
 }

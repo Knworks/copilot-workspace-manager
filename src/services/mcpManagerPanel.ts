@@ -7,7 +7,7 @@ import {
 	saveMcpServer,
 } from './mcpManagerService';
 import { toggleMcpServer } from './mcpService';
-import { resolveCodexPaths } from './workspaceStatus';
+import { resolveCopilotPaths } from './workspaceStatus';
 import { CODICON_RESOURCE_ROOTS, getCodiconCssHref, getCodiconIconPath } from './webviewAssets';
 
 const MCP_MANAGER_VIEW_TYPE = 'copilot-workspace-manager.mcpManager';
@@ -518,7 +518,7 @@ export class McpManagerPanelManager implements vscode.Disposable {
 	}
 
 	private async handleMessage(message: InboundMessage): Promise<void> {
-		const { configPath } = resolveCodexPaths();
+		const { configPath } = resolveCopilotPaths();
 		if (message.type === 'ready') {
 			return;
 		}
@@ -580,7 +580,7 @@ export class McpManagerPanelManager implements vscode.Disposable {
 	}
 
 	private readModels(): McpFormModel[] {
-		return listMcpFormModels(resolveCodexPaths().configPath);
+		return listMcpFormModels(resolveCopilotPaths().configPath);
 	}
 }
 

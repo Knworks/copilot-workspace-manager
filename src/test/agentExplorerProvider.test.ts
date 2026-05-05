@@ -2,27 +2,24 @@ import * as assert from 'assert';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { getUnavailableLabel } from '../services/workspaceStatus';
-import {
-	AgentExplorerProvider,
-	parseEnabledAgentIds,
-} from '../views/agentExplorerProvider';
+import { AgentExplorerProvider } from '../views/agentExplorerProvider';
 
 const contextStub = {} as vscode.ExtensionContext;
 
 suite('Agent explorer provider', () => {
-	test('returns only .toml files with open command and status icons', () => {
+	test('returns only .agent.md files with open command and status icons', () => {
 		const provider = new AgentExplorerProvider(
 			contextStub,
 			() => ({ isAvailable: true }),
 			() => [
 				{
-					name: 'beta.toml',
-					fullPath: path.join('root', 'agents', 'beta.toml'),
+					name: 'beta.agent.md',
+					fullPath: path.join('root', 'agents', 'beta.agent.md'),
 					isFile: true,
 				},
 				{
-					name: 'alpha.toml',
-					fullPath: path.join('root', 'agents', 'alpha.toml'),
+					name: 'alpha.agent.md',
+					fullPath: path.join('root', 'agents', 'alpha.agent.md'),
 					isFile: true,
 				},
 				{
@@ -36,10 +33,9 @@ suite('Agent explorer provider', () => {
 					isFile: false,
 				},
 			],
-			() => new Set(['alpha']),
 			() => [
 				{
-					kind: 'workspace',
+					kind: 'project',
 					label: 'Workspace Agents',
 					rootPath: path.join('root', 'agents'),
 					priority: 2,
@@ -50,12 +46,12 @@ suite('Agent explorer provider', () => {
 		const items = provider.getChildren() as vscode.TreeItem[];
 		assert.deepStrictEqual(
 			items.map((item) => item.label),
-			['alpha.toml', 'beta.toml'],
+			['alpha.agent.md', 'beta.agent.md'],
 		);
 		assert.strictEqual(items[0].command?.command, 'copilot-workspace-manager.openFile');
 		assert.strictEqual(items[1].command?.command, 'copilot-workspace-manager.openFile');
-		assert.strictEqual(items[0].contextValue, 'codex-agent-file');
-		assert.strictEqual(items[1].contextValue, 'codex-agent-file');
+		assert.strictEqual(items[0].contextValue, 'copilot-agent-file');
+		assert.strictEqual(items[1].contextValue, 'copilot-agent-file');
 		assert.strictEqual(items[0].description, 'Workspace Agents');
 
 		assert.ok(items[0].iconPath instanceof vscode.ThemeIcon);
@@ -63,11 +59,7 @@ suite('Agent explorer provider', () => {
 		assert.strictEqual((items[0].iconPath as vscode.ThemeIcon).color, undefined);
 
 		assert.ok(items[1].iconPath instanceof vscode.ThemeIcon);
-		assert.strictEqual((items[1].iconPath as vscode.ThemeIcon).id, 'circle-slash');
-		assert.strictEqual(
-			(items[1].iconPath as vscode.ThemeIcon).color?.id,
-			'disabledForeground',
-		);
+		assert.strictEqual((items[1].iconPath as vscode.ThemeIcon).id, 'hubot');
 	});
 
 	test('returns unavailable item when not available', () => {
@@ -75,7 +67,6 @@ suite('Agent explorer provider', () => {
 			contextStub,
 			() => ({ isAvailable: false, reason: 'missing' }),
 			() => [],
-			() => new Set<string>(),
 			() => [],
 		);
 		const items = provider.getChildren() as vscode.TreeItem[];
@@ -83,13 +74,4 @@ suite('Agent explorer provider', () => {
 		assert.strictEqual(items[0].label, getUnavailableLabel('missing'));
 	});
 
-	test('parseEnabledAgentIds parses normal and quoted headers', () => {
-		const parsed = parseEnabledAgentIds([
-			'[agents.alpha]',
-			'description = "Alpha"',
-			'[agents."beta-prod"]',
-			'description = "Beta"',
-		].join('\n'));
-		assert.deepStrictEqual(Array.from(parsed).sort(), ['alpha', 'beta-prod']);
-	});
 });

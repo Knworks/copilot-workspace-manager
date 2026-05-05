@@ -1,9 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { CodexTreeItem } from '../models/treeItems';
-import { resolveCodexPaths } from '../services/workspaceStatus';
-import { CodexTreeDataProvider, WorkspaceStatusProvider } from './codexTreeProvider';
+import { WorkspaceTreeItem } from '../models/treeItems';
+import { WorkspaceTreeDataProvider, WorkspaceStatusProvider } from './workspaceTreeProvider';
 import {
 	AgentLocation,
 	findAgentLocationForPath,
@@ -17,46 +16,37 @@ type AgentEntry = {
 };
 
 type AgentEntryReader = (agentsDir: string) => AgentEntry[];
-type EnabledAgentReader = (configPath: string) => Set<string>;
 type AgentLocationReader = () => AgentLocation[];
 
-const AGENT_CONFIG_HEADER_PATTERN = /^\s*\[agents\.(?:"([^"]+)"|([A-Za-z0-9_-]+))\]\s*$/;
-
 /**
- * Provides the Agents tree view by listing `.codex/agents/*.toml` files.
- * Icon state is derived from whether `[agents.<id>]` exists in config.toml.
+ * Provides the Agents tree view by listing Copilot CLI `.agent.md` files.
  */
-export class AgentExplorerProvider extends CodexTreeDataProvider<CodexTreeItem> {
+export class AgentExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTreeItem> {
 	private readonly readEntries: AgentEntryReader;
-	private readonly readEnabledAgents: EnabledAgentReader;
 	private readonly readLocations: AgentLocationReader;
 
 	constructor(
 		_context: vscode.ExtensionContext,
 		statusProvider?: WorkspaceStatusProvider,
 		readEntries: AgentEntryReader = listAgentEntries,
-		readEnabledAgents: EnabledAgentReader = readEnabledAgentIds,
 		readLocations: AgentLocationReader = getAgentLocations,
 	) {
 		super(statusProvider);
 		this.readEntries = readEntries;
-		this.readEnabledAgents = readEnabledAgents;
 		this.readLocations = readLocations;
 	}
 
-	protected getAvailableChildren(): vscode.ProviderResult<CodexTreeItem[]> {
-		const { configPath } = resolveCodexPaths();
-		const enabledAgents = this.readEnabledAgents(configPath);
+	protected getAvailableChildren(): vscode.ProviderResult<WorkspaceTreeItem[]> {
 		return this.readLocations().flatMap((location) =>
 			this.readEntries(location.rootPath)
-				.filter((entry) => entry.isFile && path.extname(entry.name).toLowerCase() === '.toml')
+				.filter((entry) => entry.isFile && entry.name.toLowerCase().endsWith('.agent.md'))
 				.sort((left, right) =>
 					left.name.localeCompare(right.name, undefined, {
 						numeric: true,
 						sensitivity: 'base',
 					}),
 				)
-				.map((entry) => this.toTreeItem(entry, enabledAgents, location)),
+				.map((entry) => this.toTreeItem(entry, location)),
 		);
 	}
 
@@ -70,11 +60,9 @@ export class AgentExplorerProvider extends CodexTreeDataProvider<CodexTreeItem> 
 
 	private toTreeItem(
 		entry: AgentEntry,
-		enabledAgents: Set<string>,
 		location: AgentLocation,
-	): CodexTreeItem {
-				const isEnabled = enabledAgents.has(getAgentId(entry.name));
-				const item = new CodexTreeItem(
+	): WorkspaceTreeItem {
+				const item = new WorkspaceTreeItem(
 					'file',
 					'agents',
 					entry.name,
@@ -82,7 +70,7 @@ export class AgentExplorerProvider extends CodexTreeDataProvider<CodexTreeItem> 
 					entry.fullPath,
 				);
 				item.id = entry.fullPath;
-				item.contextValue = 'codex-agent-file';
+				item.contextValue = location.kind === 'plugin' ? 'copilot-agent-readonly' : 'copilot-agent-file';
 				item.description = location.label;
 				item.tooltip = `${location.label}: ${entry.fullPath}`;
 				item.command = {
@@ -90,19 +78,14 @@ export class AgentExplorerProvider extends CodexTreeDataProvider<CodexTreeItem> 
 					title: 'Open agent file',
 					arguments: [item],
 				};
-				item.iconPath = this.getIcon(isEnabled);
+				item.iconPath = this.getIcon(location.kind === 'plugin');
 				return item;
 	}
 
-	private getIcon(isEnabled: boolean): vscode.ThemeIcon {
-		if (isEnabled) {
-			return new vscode.ThemeIcon('hubot');
-		}
-
-		return new vscode.ThemeIcon(
-			'circle-slash',
-			new vscode.ThemeColor('disabledForeground'),
-		);
+	private getIcon(isReadonly: boolean): vscode.ThemeIcon {
+		return isReadonly
+			? new vscode.ThemeIcon('lock', new vscode.ThemeColor('disabledForeground'))
+			: new vscode.ThemeIcon('hubot');
 	}
 }
 
@@ -117,38 +100,3 @@ function listAgentEntries(agentsDir: string): AgentEntry[] {
 	}));
 }
 
-/**
- * Extracts enabled agent ids from config.toml text by scanning `[agents.*]` headers.
- */
-export function parseEnabledAgentIds(contents: string): Set<string> {
-	const enabledAgentIds = new Set<string>();
-	const lines = contents.split(/\r?\n/);
-	for (const line of lines) {
-		const match = line.match(AGENT_CONFIG_HEADER_PATTERN);
-		if (!match) {
-			continue;
-		}
-		const agentId = match[1] ?? match[2];
-		if (!agentId) {
-			continue;
-		}
-		enabledAgentIds.add(agentId);
-	}
-	return enabledAgentIds;
-}
-
-function readEnabledAgentIds(configPath: string): Set<string> {
-	try {
-		if (!fs.existsSync(configPath)) {
-			return new Set<string>();
-		}
-		const contents = fs.readFileSync(configPath, 'utf8');
-		return parseEnabledAgentIds(contents);
-	} catch {
-		return new Set<string>();
-	}
-}
-
-function getAgentId(fileName: string): string {
-	return path.basename(fileName, path.extname(fileName));
-}

@@ -1,9 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { CodexTreeItem } from '../models/treeItems';
+import { WorkspaceTreeItem } from '../models/treeItems';
 import { ensureSelection } from '../services/selectionGuard';
-import { getWorkspaceStatus, resolveCodexPaths } from '../services/workspaceStatus';
+import { getWorkspaceStatus } from '../services/workspaceStatus';
 import { messages } from '../i18n';
 import { runSafely } from '../services/errorHandling';
 import { sanitizeName } from '../services/fileNaming';
@@ -11,25 +11,10 @@ import {
 	listTemplateCandidates,
 	readTemplateContents,
 } from '../services/templateService';
-import {
-	appendAgentConfigRawBlock,
-	appendAgentConfigBlock,
-	extractAgentConfigBlock,
-	getAgentDescription,
-	hasAgentConfigBlock,
-	upsertAgentConfigBlock,
-} from '../services/agentConfigService';
-import {
-	getDisabledAgentsStorePath,
-	saveDisabledAgentBlock,
-	takeDisabledAgentBlock,
-} from '../services/disabledAgentsStore';
-import { stabilizeManagedConfigToml } from '../services/configTomlOrganizerService';
 import { AgentExplorerProvider } from '../views/agentExplorerProvider';
-import { removeSyncStateEntry } from '../services/syncService';
 
 type AgentCommandContext = {
-	getSelection: () => CodexTreeItem | undefined;
+	getSelection: () => WorkspaceTreeItem | undefined;
 	agentProvider: AgentExplorerProvider;
 };
 
@@ -54,7 +39,7 @@ export function registerAgentCommands(
 	disposables.push(
 		vscode.commands.registerCommand(
 			'copilot-workspace-manager.editAgent',
-			(item?: CodexTreeItem) =>
+			(item?: WorkspaceTreeItem) =>
 				runSafely(async () => {
 					if (!ensureAvailable()) {
 						return;
@@ -71,7 +56,7 @@ export function registerAgentCommands(
 	disposables.push(
 		vscode.commands.registerCommand(
 			'copilot-workspace-manager.deleteAgent',
-			(item?: CodexTreeItem) =>
+			(item?: WorkspaceTreeItem) =>
 				runSafely(async () => {
 					if (!ensureAvailable()) {
 						return;
@@ -88,7 +73,7 @@ export function registerAgentCommands(
 	disposables.push(
 		vscode.commands.registerCommand(
 			'copilot-workspace-manager.enableAgent',
-			(item?: CodexTreeItem) =>
+			(item?: WorkspaceTreeItem) =>
 				runSafely(async () => {
 					if (!ensureAvailable()) {
 						return;
@@ -105,7 +90,7 @@ export function registerAgentCommands(
 	disposables.push(
 		vscode.commands.registerCommand(
 			'copilot-workspace-manager.disableAgent',
-			(item?: CodexTreeItem) =>
+			(item?: WorkspaceTreeItem) =>
 				runSafely(async () => {
 					if (!ensureAvailable()) {
 						return;
@@ -124,7 +109,6 @@ export function registerAgentCommands(
 }
 
 async function addAgent(agentProvider: AgentExplorerProvider): Promise<void> {
-	const { codexDir, configPath } = resolveCodexPaths();
 	const agentsDir = await pickAgentLocationRoot(agentProvider);
 	if (!agentsDir) {
 		return;
@@ -143,27 +127,13 @@ async function addAgent(agentProvider: AgentExplorerProvider): Promise<void> {
 	}
 
 	fs.mkdirSync(agentsDir, { recursive: true });
-	const agentFilePath = path.join(agentsDir, `${agentName}.toml`);
+	const agentFilePath = path.join(agentsDir, toAgentFileName(agentName));
 	if (fs.existsSync(agentFilePath)) {
 		vscode.window.showWarningMessage(messages.agent.fileExists(agentName));
 		return;
 	}
 
-	fs.writeFileSync(agentFilePath, templateContent, 'utf8');
-
-	const configContents = fs.readFileSync(configPath, 'utf8');
-	const appendResult = appendAgentConfigBlock(configContents, agentName, description);
-	if (!appendResult.appended) {
-		vscode.window.showWarningMessage(messages.agent.configExists(agentName));
-		agentProvider.refresh();
-		return;
-	}
-
-	fs.writeFileSync(
-		configPath,
-		stabilizeManagedConfigToml(appendResult.contents),
-		'utf8',
-	);
+	fs.writeFileSync(agentFilePath, buildAgentMarkdown(agentName, description, templateContent), 'utf8');
 	agentProvider.refresh();
 }
 
@@ -171,10 +141,8 @@ async function editAgent(
 	agentFilePath: string,
 	agentProvider: AgentExplorerProvider,
 ): Promise<void> {
-	const { configPath } = resolveCodexPaths();
-	const currentName = path.basename(agentFilePath, path.extname(agentFilePath));
-	const configContents = fs.readFileSync(configPath, 'utf8');
-	const currentDescription = getAgentDescription(configContents, currentName) ?? '';
+	const currentName = getAgentId(agentFilePath);
+	const currentDescription = readFrontmatterValue(agentFilePath, 'description') ?? '';
 
 	const nextName = await promptAgentName(currentName);
 	if (!nextName) {
@@ -185,7 +153,7 @@ async function editAgent(
 		return;
 	}
 
-	const nextFilePath = path.join(path.dirname(agentFilePath), `${nextName}.toml`);
+	const nextFilePath = path.join(path.dirname(agentFilePath), toAgentFileName(nextName));
 	if (
 		!isSamePath(agentFilePath, nextFilePath) &&
 		fs.existsSync(nextFilePath)
@@ -193,27 +161,14 @@ async function editAgent(
 		vscode.window.showWarningMessage(messages.agent.fileExists(nextName));
 		return;
 	}
-	if (
-		currentName !== nextName &&
-		hasAgentConfigBlock(configContents, nextName)
-	) {
-		vscode.window.showWarningMessage(messages.agent.configExists(nextName));
-		return;
-	}
-
 	if (!isSamePath(agentFilePath, nextFilePath)) {
 		fs.renameSync(agentFilePath, nextFilePath);
 	}
 
-	const updatedConfig = upsertAgentConfigBlock(
-		configContents,
-		currentName,
-		nextName,
-		nextDescription,
-	);
+	const contents = fs.readFileSync(nextFilePath, 'utf8');
 	fs.writeFileSync(
-		configPath,
-		stabilizeManagedConfigToml(updatedConfig),
+		nextFilePath,
+		upsertAgentFrontmatter(contents, nextName, nextDescription),
 		'utf8',
 	);
 	agentProvider.refresh();
@@ -223,9 +178,6 @@ async function deleteAgent(
 	agentFilePath: string,
 	agentProvider: AgentExplorerProvider,
 ): Promise<void> {
-	const { codexDir, configPath } = resolveCodexPaths();
-	const agentId = path.basename(agentFilePath, path.extname(agentFilePath));
-	const storePath = getDisabledAgentsStorePath(codexDir);
 	const location = agentProvider.getLocationForPath(agentFilePath);
 	const warning =
 		location?.kind === 'user'
@@ -240,20 +192,6 @@ async function deleteAgent(
 		return;
 	}
 	fs.rmSync(agentFilePath, { force: true });
-
-	const configContents = fs.readFileSync(configPath, 'utf8');
-	const extracted = extractAgentConfigBlock(configContents, agentId);
-	if (extracted.removed) {
-		fs.writeFileSync(
-			configPath,
-			stabilizeManagedConfigToml(extracted.contents),
-			'utf8',
-		);
-	}
-
-	// Delete stale disabled backup to avoid resurrecting deleted agents.
-	takeDisabledAgentBlock(storePath, agentId);
-	removeSyncStateEntry(codexDir, 'agents', `${agentId}.toml`);
 	agentProvider.refresh();
 }
 
@@ -282,25 +220,7 @@ async function enableAgent(
 	agentFilePath: string,
 	agentProvider: AgentExplorerProvider,
 ): Promise<void> {
-	const { codexDir, configPath } = resolveCodexPaths();
-	const storePath = getDisabledAgentsStorePath(codexDir);
-	const agentId = path.basename(agentFilePath, path.extname(agentFilePath));
-	const configContents = fs.readFileSync(configPath, 'utf8');
-	if (hasAgentConfigBlock(configContents, agentId)) {
-		vscode.window.showWarningMessage(messages.agent.configExists(agentId));
-		return;
-	}
-
-	const stashedBlock = takeDisabledAgentBlock(storePath, agentId);
-	const nextContents = stashedBlock
-		? appendAgentConfigRawBlock(configContents, stashedBlock)
-		: appendAgentConfigBlock(configContents, agentId, '').contents;
-	fs.writeFileSync(
-		configPath,
-		stabilizeManagedConfigToml(nextContents),
-		'utf8',
-	);
-	vscode.window.showInformationMessage(messages.agent.toggleUpdated);
+	vscode.window.showInformationMessage(messages.agent.frontmatterManaged);
 	agentProvider.refresh();
 }
 
@@ -308,23 +228,7 @@ async function disableAgent(
 	agentFilePath: string,
 	agentProvider: AgentExplorerProvider,
 ): Promise<void> {
-	const { codexDir, configPath } = resolveCodexPaths();
-	const storePath = getDisabledAgentsStorePath(codexDir);
-	const agentId = path.basename(agentFilePath, path.extname(agentFilePath));
-	const configContents = fs.readFileSync(configPath, 'utf8');
-	const extracted = extractAgentConfigBlock(configContents, agentId);
-	if (!extracted.removed || !extracted.block) {
-		vscode.window.showWarningMessage(messages.agent.notEnabled(agentId));
-		return;
-	}
-
-	fs.writeFileSync(
-		configPath,
-		stabilizeManagedConfigToml(extracted.contents),
-		'utf8',
-	);
-	saveDisabledAgentBlock(storePath, agentId, extracted.block);
-	vscode.window.showInformationMessage(messages.agent.toggleUpdated);
+	vscode.window.showInformationMessage(messages.agent.frontmatterManaged);
 	agentProvider.refresh();
 }
 
@@ -333,9 +237,9 @@ function ensureAvailable(): boolean {
 }
 
 function resolveAgentSelection(
-	item: CodexTreeItem | undefined,
-	getSelection: () => CodexTreeItem | undefined,
-): CodexTreeItem | undefined {
+	item: WorkspaceTreeItem | undefined,
+	getSelection: () => WorkspaceTreeItem | undefined,
+): WorkspaceTreeItem | undefined {
 	const selection = item ?? getSelection();
 	if (!selection) {
 		return undefined;
@@ -356,12 +260,49 @@ async function promptAgentName(defaultValue?: string): Promise<string | undefine
 		return undefined;
 	}
 	const sanitized = sanitizeName(value.trim());
-	const withoutExt = path.basename(sanitized, path.extname(sanitized));
+	const withoutExt = stripAgentExtension(sanitized);
 	if (!withoutExt) {
 		vscode.window.showErrorMessage(messages.agent.invalidName);
 		return undefined;
 	}
 	return withoutExt;
+}
+
+function toAgentFileName(agentName: string): string {
+	return `${stripAgentExtension(agentName)}.agent.md`;
+}
+
+function stripAgentExtension(fileName: string): string {
+	return fileName.replace(/(?:\.agent)?\.md$/i, '');
+}
+
+function getAgentId(agentFilePath: string): string {
+	return stripAgentExtension(path.basename(agentFilePath));
+}
+
+function buildAgentMarkdown(name: string, description: string, body: string): string {
+	const frontmatter = [
+		'---',
+		`name: ${JSON.stringify(name)}`,
+		`description: ${JSON.stringify(description)}`,
+		'---',
+		'',
+	].join('\n');
+	return body.trim() ? `${frontmatter}${body}` : frontmatter;
+}
+
+function upsertAgentFrontmatter(contents: string, name: string, description: string): string {
+	const body = contents.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
+	return buildAgentMarkdown(name, description, body);
+}
+
+function readFrontmatterValue(agentFilePath: string, key: string): string | undefined {
+	if (!fs.existsSync(agentFilePath)) {
+		return undefined;
+	}
+	const contents = fs.readFileSync(agentFilePath, 'utf8');
+	const match = contents.match(new RegExp(`^${key}:\\s*["']?([^"'\\r\\n]+)["']?`, 'm'));
+	return match?.[1];
 }
 
 async function promptAgentDescription(defaultValue = ''): Promise<string | undefined> {

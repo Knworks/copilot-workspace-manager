@@ -5,7 +5,7 @@ import path from 'path';
 import {
 	getCoreWorkspaceStatus,
 	getWorkspaceStatus,
-	resolveCodexPaths,
+	resolveCopilotPaths,
 	UNAVAILABLE_REASONS,
 } from '../services/workspaceStatus';
 
@@ -19,18 +19,18 @@ function withTempHome(run: (homeDir: string) => void): void {
 }
 
 suite('Workspace status', () => {
-	test('reports missing codex directory', () => {
+	test('reports missing copilot directory', () => {
 		withTempHome((homeDir) => {
 			const status = getWorkspaceStatus(homeDir);
 			assert.strictEqual(status.isAvailable, false);
-			assert.strictEqual(status.reason, UNAVAILABLE_REASONS.codexMissing);
+			assert.strictEqual(status.reason, UNAVAILABLE_REASONS.copilotMissing);
 		});
 	});
 
-	test('reports missing config.toml', () => {
+	test('reports missing config.json', () => {
 		withTempHome((homeDir) => {
-			const paths = resolveCodexPaths(homeDir);
-			fs.mkdirSync(paths.codexDir, { recursive: true });
+			const paths = resolveCopilotPaths(homeDir, undefined);
+			fs.mkdirSync(paths.copilotDir, { recursive: true });
 
 			const status = getWorkspaceStatus(homeDir);
 			assert.strictEqual(status.isAvailable, false);
@@ -38,10 +38,10 @@ suite('Workspace status', () => {
 		});
 	});
 
-	test('reports invalid config.toml', () => {
+	test('reports invalid config.json', () => {
 		withTempHome((homeDir) => {
-			const paths = resolveCodexPaths(homeDir);
-			fs.mkdirSync(paths.codexDir, { recursive: true });
+			const paths = resolveCopilotPaths(homeDir, undefined);
+			fs.mkdirSync(paths.copilotDir, { recursive: true });
 			fs.writeFileSync(paths.configPath, 'invalid = [', 'utf8');
 
 			const status = getWorkspaceStatus(homeDir);
@@ -50,10 +50,10 @@ suite('Workspace status', () => {
 		});
 	});
 
-	test('core status allows invalid config.toml for repair operations', () => {
+	test('core status allows invalid config.json for repair operations', () => {
 		withTempHome((homeDir) => {
-			const paths = resolveCodexPaths(homeDir);
-			fs.mkdirSync(paths.codexDir, { recursive: true });
+			const paths = resolveCopilotPaths(homeDir, undefined);
+			fs.mkdirSync(paths.copilotDir, { recursive: true });
 			fs.writeFileSync(paths.configPath, 'invalid = [', 'utf8');
 
 			const status = getCoreWorkspaceStatus(homeDir);
@@ -65,13 +65,22 @@ suite('Workspace status', () => {
 
 	test('reports available workspace', () => {
 		withTempHome((homeDir) => {
-			const paths = resolveCodexPaths(homeDir);
-			fs.mkdirSync(paths.codexDir, { recursive: true });
-			fs.writeFileSync(paths.configPath, 'title = \"ok\"', 'utf8');
+			const paths = resolveCopilotPaths(homeDir, undefined);
+			fs.mkdirSync(paths.copilotDir, { recursive: true });
+			fs.writeFileSync(paths.configPath, '{ "title": "ok" }', 'utf8');
 
 			const status = getWorkspaceStatus(homeDir);
 			assert.strictEqual(status.isAvailable, true);
 			assert.strictEqual(status.reason, undefined);
+		});
+	});
+
+	test('COPILOT_HOME overrides default config root', () => {
+		withTempHome((homeDir) => {
+			const customHome = path.join(homeDir, 'custom-copilot');
+			const paths = resolveCopilotPaths(homeDir, customHome);
+			assert.strictEqual(paths.copilotDir, customHome);
+			assert.strictEqual(paths.configPath, path.join(customHome, 'config.json'));
 		});
 	});
 });

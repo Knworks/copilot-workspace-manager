@@ -75,11 +75,7 @@ suite('View title menus', () => {
 				viewId: 'copilot-workspace-manager.agents',
 			},
 			{
-				command: 'copilot-workspace-manager.openCodexFolder',
-				viewId: 'copilot-workspace-manager.core',
-			},
-			{
-				command: 'copilot-workspace-manager.openHistoryView',
+				command: 'copilot-workspace-manager.openCopilotFolder',
 				viewId: 'copilot-workspace-manager.core',
 			},
 		];
@@ -88,27 +84,23 @@ suite('View title menus', () => {
 			{
 				command: 'copilot-workspace-manager.syncCore',
 				viewId: 'copilot-workspace-manager.core',
-				configKey: 'config.copilot-workspace-manager.codexFolder',
+				configKey: 'config.copilot-workspace-manager.copilotFolder',
 			},
 			{
 				command: 'copilot-workspace-manager.syncPrompts',
 				viewId: 'copilot-workspace-manager.prompts',
-				configKey: 'config.copilot-workspace-manager.promptsFolder',
 			},
 			{
 				command: 'copilot-workspace-manager.syncSkills',
 				viewId: 'copilot-workspace-manager.skills',
-				configKey: 'config.copilot-workspace-manager.skillsFolder',
 			},
 			{
 				command: 'copilot-workspace-manager.syncTemplates',
 				viewId: 'copilot-workspace-manager.templates',
-				configKey: 'config.copilot-workspace-manager.templatesFolder',
 			},
 			{
 				command: 'copilot-workspace-manager.syncAgents',
 				viewId: 'copilot-workspace-manager.agents',
-				configKey: 'config.copilot-workspace-manager.agentFolder',
 			},
 		];
 
@@ -184,7 +176,7 @@ suite('View title menus', () => {
 			}
 		}
 
-		for (const { command, configKey } of syncCommands) {
+		for (const { command, configKey } of syncCommands.filter((item) => item.configKey)) {
 			const entry = viewTitle.find(
 				(item: { command?: string }) => item.command === command,
 			);

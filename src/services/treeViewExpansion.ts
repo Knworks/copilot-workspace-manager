@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
-import { CodexTreeItem, FileViewKind } from '../models/treeItems';
+import { WorkspaceTreeItem, FileViewKind } from '../models/treeItems';
 
 export async function expandParentFolder(
-	selection: CodexTreeItem,
-	views: Record<FileViewKind, vscode.TreeView<CodexTreeItem>>,
+	selection: WorkspaceTreeItem,
+	views: Record<FileViewKind, vscode.TreeView<WorkspaceTreeItem>>,
 ): Promise<void> {
 	if (selection.nodeType === 'root') {
 		return;

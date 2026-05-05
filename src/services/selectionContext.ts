@@ -1,13 +1,13 @@
-import { CodexTreeItem } from '../models/treeItems';
+import { WorkspaceTreeItem } from '../models/treeItems';
 
 export class SelectionContext {
-	private current?: CodexTreeItem;
+	private current?: WorkspaceTreeItem;
 
-	setSelection(item?: CodexTreeItem): void {
+	setSelection(item?: WorkspaceTreeItem): void {
 		this.current = item;
 	}
 
-	getSelection(): CodexTreeItem | undefined {
+	getSelection(): WorkspaceTreeItem | undefined {
 		return this.current;
 	}
 }

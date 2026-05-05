@@ -33,7 +33,7 @@ const createConfig = (values: Record<string, unknown>): ConfigurationReader => (
 suite('Sync settings', () => {
 	test('returns configured values', () => {
 		const config = createConfig({
-			codexFolder: '/tmp/codex',
+			copilotFolder: '/tmp/copilot',
 			promptsFolder: '/tmp/prompts',
 			skillsFolder: '/tmp/skills',
 			templatesFolder: '/tmp/templates',
@@ -43,7 +43,7 @@ suite('Sync settings', () => {
 		const settings = getSyncSettings(config);
 
 		assert.deepStrictEqual(settings, {
-			codexFolder: '/tmp/codex',
+			copilotFolder: '/tmp/copilot',
 			promptsFolder: '/tmp/prompts',
 			skillsFolder: '/tmp/skills',
 			templatesFolder: '/tmp/templates',
@@ -57,7 +57,7 @@ suite('Sync settings', () => {
 		const settings = getSyncSettings(config);
 
 		assert.deepStrictEqual(settings, {
-			codexFolder: '',
+			copilotFolder: '',
 			promptsFolder: '',
 			skillsFolder: '',
 			templatesFolder: '',

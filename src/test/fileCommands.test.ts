@@ -8,7 +8,7 @@ import {
 	shouldPickSkillLocationForAdd,
 	shouldDeleteRenameTarget,
 } from '../commands/fileCommands';
-import { CodexTreeItem } from '../models/treeItems';
+import { WorkspaceTreeItem } from '../models/treeItems';
 
 suite('File commands', () => {
 	test('does not delete when source and target are identical', () => {
@@ -26,14 +26,14 @@ suite('File commands', () => {
 	});
 
 test('resolveAddViewSelection ignores inactive selection', () => {
-	const selection = new CodexTreeItem(
+	const selection = new WorkspaceTreeItem(
 		'folder',
 		'prompts',
 		'docs',
 		0,
 		path.join('root', 'docs'),
 	);
-	const item = new CodexTreeItem(
+	const item = new WorkspaceTreeItem(
 		'folder',
 		'prompts',
 		'docs-2',
@@ -47,7 +47,7 @@ test('resolveAddViewSelection ignores inactive selection', () => {
 });
 
 	test('resolveAddViewSelection returns selection when active', () => {
-		const selection = new CodexTreeItem(
+		const selection = new WorkspaceTreeItem(
 			'folder',
 			'prompts',
 			'docs',
@@ -58,14 +58,14 @@ test('resolveAddViewSelection ignores inactive selection', () => {
 	});
 
 test('resolveAddViewSelection prefers item over selection', () => {
-	const selection = new CodexTreeItem(
+	const selection = new WorkspaceTreeItem(
 		'folder',
 		'prompts',
 		'docs',
 		0,
 		path.join('root', 'docs'),
 	);
-	const item = new CodexTreeItem(
+	const item = new WorkspaceTreeItem(
 		'folder',
 		'prompts',
 		'docs-2',
@@ -76,28 +76,28 @@ test('resolveAddViewSelection prefers item over selection', () => {
 });
 
 	test('requiresFolderSelectionForFileAdd requires a folder only for skills files', () => {
-		const root = new CodexTreeItem(
+		const root = new WorkspaceTreeItem(
 			'root',
 			'skills',
 			'skills',
 			0,
 			path.join('root', 'skills'),
 		);
-		const file = new CodexTreeItem(
+		const file = new WorkspaceTreeItem(
 			'file',
 			'skills',
 			'guide.md',
 			0,
 			path.join('root', 'skills', 'sample', 'guide.md'),
 		);
-		const folder = new CodexTreeItem(
+		const folder = new WorkspaceTreeItem(
 			'folder',
 			'skills',
 			'sample',
 			0,
 			path.join('root', 'skills', 'sample'),
 		);
-		const promptFolder = new CodexTreeItem(
+		const promptFolder = new WorkspaceTreeItem(
 			'folder',
 			'prompts',
 			'docs',
@@ -112,28 +112,28 @@ test('resolveAddViewSelection prefers item over selection', () => {
 	});
 
 	test('shouldPickSkillLocationForAdd only prompts at skills root', () => {
-		const root = new CodexTreeItem(
+		const root = new WorkspaceTreeItem(
 			'root',
 			'skills',
 			'skills',
 			0,
 			path.join('root', 'skills'),
 		);
-		const folder = new CodexTreeItem(
+		const folder = new WorkspaceTreeItem(
 			'folder',
 			'skills',
 			'sample',
 			0,
 			path.join('root', 'skills', 'sample'),
 		);
-		const file = new CodexTreeItem(
+		const file = new WorkspaceTreeItem(
 			'file',
 			'skills',
 			'guide.md',
 			0,
 			path.join('root', 'skills', 'sample', 'guide.md'),
 		);
-		const promptRoot = new CodexTreeItem(
+		const promptRoot = new WorkspaceTreeItem(
 			'root',
 			'prompts',
 			'prompts',

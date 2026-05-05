@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
 import { messages } from '../i18n';
 import { listTrustedDirectories } from './coreDiagnosticsService';
 import { stabilizeManagedConfigToml } from './configTomlOrganizerService';
-import { resolveCodexPaths } from './workspaceStatus';
+import { resolveCopilotPaths } from './workspaceStatus';
 
 export type FeatureFlagRecord = {
 	key: string;
@@ -176,7 +176,7 @@ function getWorkspaceRoot(): string | undefined {
 }
 
 export function listFeatureFlagRecords(
-	configPath: string = resolveCodexPaths().configPath,
+	configPath: string = resolveCopilotPaths().configPath,
 ): FeatureFlagRecord[] {
 	const configured = readConfiguredFeatureFlags(configPath);
 	return FEATURE_DEFINITIONS.map((definition) => {
@@ -256,7 +256,7 @@ export function setFeatureFlag(
 }
 
 export function listHookDiagnostics(
-	configPath: string = resolveCodexPaths().configPath,
+	configPath: string = resolveCopilotPaths().configPath,
 	homeDir: string = os.homedir(),
 	workspaceRoot: string | undefined = getWorkspaceRoot(),
 ): HookDiagnosticsSnapshot {
@@ -268,7 +268,7 @@ export function listHookDiagnostics(
 				(directory) => path.resolve(directory.path) === path.resolve(workspaceRoot),
 			)
 		: false;
-	const userCodexDir = resolveCodexPaths(homeDir).codexDir;
+	const userCopilotDir = resolveCopilotPaths(homeDir).copilotDir;
 
 	const layers: Array<{
 		layer: 'user' | 'project';
@@ -278,16 +278,16 @@ export function listHookDiagnostics(
 	}> = [
 		{
 			layer: 'user',
-			configPath: path.join(userCodexDir, 'config.toml'),
-			hooksJsonPath: path.join(userCodexDir, 'hooks.json'),
+			configPath: path.join(userCopilotDir, 'config.json'),
+			hooksJsonPath: path.join(userCopilotDir, 'hooks.json'),
 			active: hooksEnabled,
 		},
 	];
 	if (workspaceRoot) {
 		layers.push({
 			layer: 'project',
-			configPath: path.join(workspaceRoot, '.codex', 'config.toml'),
-			hooksJsonPath: path.join(workspaceRoot, '.codex', 'hooks.json'),
+			configPath: path.join(workspaceRoot, '.github', 'copilot-instructions.md'),
+			hooksJsonPath: path.join(workspaceRoot, '.github', 'hooks.json'),
 			active: hooksEnabled && projectTrusted,
 		});
 	}

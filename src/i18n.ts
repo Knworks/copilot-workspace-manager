@@ -64,21 +64,21 @@ export const messages = {
 		'message.unavailableUnknown',
 		'Unknown reason.',
 	),
-	reasonCodexMissing: localize(
-		'message.reason.codexMissing',
-		'.codex does not exist.',
+	reasonCopilotMissing: localize(
+		'message.reason.copilotMissing',
+		'.copilot does not exist.',
 	),
 	reasonConfigMissing: localize(
 		'message.reason.configMissing',
-		'config.toml does not exist.',
+		'config.json does not exist.',
 	),
 	reasonConfigUnreadable: localize(
 		'message.reason.configUnreadable',
-		'config.toml cannot be read.',
+		'config.json cannot be read.',
 	),
 	reasonConfigInvalid: localize(
 		'message.reason.configInvalid',
-		'config.toml cannot be parsed.',
+		'config.json cannot be parsed.',
 	),
 	openFolderMissing: localize(
 		'message.openFolderMissing',
@@ -123,11 +123,11 @@ export const messages = {
 		),
 	historyPanelTitle: localize(
 		'message.historyPanelTitle',
-		'Codex History',
+		'Copilot History',
 	),
 	coreViewPanelTitle: localize(
 		'message.coreViewPanelTitle',
-		'Codex Manager',
+		'Copilot Core',
 	),
 	coreViewConversationHistoryTab: localize(
 		'message.coreViewConversationHistoryTab',
@@ -723,6 +723,10 @@ export const messages = {
 		toggleUpdated: localize(
 			'message.agent.toggleUpdated',
 			'Agent settings updated. Please restart Codex to apply changes.',
+		),
+		frontmatterManaged: localize(
+			'message.agent.frontmatterManaged',
+			'Copilot agents are managed by editing .agent.md frontmatter.',
 		),
 		deleteConfirm: (agentName: string) =>
 			localize(

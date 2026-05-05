@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import path from 'path';
 import * as vscode from 'vscode';
-import { CodexTreeItem } from '../models/treeItems';
+import { WorkspaceTreeItem } from '../models/treeItems';
 import { TreeExpansionState } from '../services/treeExpansionState';
 
 suite('Tree expansion state', () => {
@@ -11,7 +11,7 @@ suite('Tree expansion state', () => {
 		const childPath = path.join(rootPath, 'child');
 		state.registerExpanded(
 			'prompts',
-			new CodexTreeItem(
+			new WorkspaceTreeItem(
 				'folder',
 				'prompts',
 				'docs',
@@ -21,7 +21,7 @@ suite('Tree expansion state', () => {
 		);
 		state.registerExpanded(
 			'prompts',
-			new CodexTreeItem(
+			new WorkspaceTreeItem(
 				'folder',
 				'prompts',
 				'child',
@@ -40,7 +40,7 @@ suite('Tree expansion state', () => {
 	test('collapsed paths are removed from expansion state', () => {
 		const state = new TreeExpansionState();
 		const rootPath = path.join('root', 'docs');
-		const item = new CodexTreeItem(
+		const item = new WorkspaceTreeItem(
 			'folder',
 			'prompts',
 			'docs',

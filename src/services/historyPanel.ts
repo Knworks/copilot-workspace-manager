@@ -17,7 +17,7 @@ import {
 	listHookDiagnostics,
 	setFeatureFlag,
 } from './coreManagerConfigService';
-import { getCoreWorkspaceStatus, resolveCodexPaths } from './workspaceStatus';
+import { getCoreWorkspaceStatus, resolveCopilotPaths } from './workspaceStatus';
 import { CODICON_RESOURCE_ROOTS, getCodiconCssHref, getCodiconIconPath } from './webviewAssets';
 
 const HISTORY_VIEW_TYPE = 'copilot-workspace-manager.coreView';
@@ -407,7 +407,7 @@ function buildAgentsChainPayload(
 }
 
 function buildTrustedDirectoriesHtml(): string {
-	const trustedDirectories = listTrustedDirectories(resolveCodexPaths().configPath);
+	const trustedDirectories = listTrustedDirectories(resolveCopilotPaths().configPath);
 	const coreStatus = getCoreWorkspaceStatus();
 	const trustedHtml = trustedDirectories.map((directory) => `<article class="trusted-row turn-card">
 		<span class="codicon ${directory.exists ? 'codicon-pass-filled trusted-ok' : 'codicon-warning trusted-warning'}" aria-hidden="true"></span>
@@ -423,7 +423,7 @@ function buildTrustedDirectoriesHtml(): string {
 }
 
 function buildFeatureFlagsHtml(): string {
-	const configPath = resolveCodexPaths().configPath;
+	const configPath = resolveCopilotPaths().configPath;
 	const flags = listFeatureFlagRecords(configPath);
 	const coreStatus = getCoreWorkspaceStatus();
 	const rows = flags
@@ -1905,7 +1905,7 @@ export class HistoryPanelManager implements vscode.Disposable {
 		if (!targetPath) {
 			return;
 		}
-		addTrustedDirectory(resolveCodexPaths().configPath, targetPath);
+		addTrustedDirectory(resolveCopilotPaths().configPath, targetPath);
 		vscode.window.showInformationMessage(messages.mcpToggleUpdated);
 		this.refreshTab('trusted');
 	}
@@ -1919,13 +1919,13 @@ export class HistoryPanelManager implements vscode.Disposable {
 		if (choice !== messages.dialogOk) {
 			return;
 		}
-		removeTrustedDirectory(resolveCodexPaths().configPath, targetPath);
+		removeTrustedDirectory(resolveCopilotPaths().configPath, targetPath);
 		vscode.window.showInformationMessage(messages.mcpToggleUpdated);
 		this.refreshTab('trusted');
 	}
 
 	private async setFeatureFlag(featureKey: string, enabled: boolean): Promise<void> {
-		setFeatureFlag(resolveCodexPaths().configPath, featureKey, enabled);
+		setFeatureFlag(resolveCopilotPaths().configPath, featureKey, enabled);
 		vscode.window.showInformationMessage(messages.mcpToggleUpdated);
 		this.refreshTab('features');
 		if (featureKey === 'codex_hooks') {

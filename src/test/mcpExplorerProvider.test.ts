@@ -1,16 +1,23 @@
 import * as assert from 'assert';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import * as vscode from 'vscode';
 import { McpExplorerProvider } from '../views/mcpExplorerProvider';
 import * as mcpService from '../services/mcpService';
 
 suite('MCP explorer provider', () => {
-	test('uses codicon status icons for enabled and disabled servers', () => {
+	test('uses codicon mcp icons for JSON servers', () => {
 		const originalReadMcpServers = mcpService.readMcpServers;
+		const originalCopilotHome = process.env.COPILOT_HOME;
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-explorer-'));
 		try {
+			process.env.COPILOT_HOME = tempDir;
+			fs.writeFileSync(path.join(tempDir, 'config.json'), '{}', 'utf8');
 			(mcpService as unknown as { readMcpServers: typeof mcpService.readMcpServers }).readMcpServers =
 				() => [
 					{ id: 'github', enabled: true, headerLineIndex: 0 },
-					{ id: 'remote', enabled: false, headerLineIndex: 3 },
+					{ id: 'remote', enabled: true, headerLineIndex: 1 },
 				];
 
 			const provider = new McpExplorerProvider({} as vscode.ExtensionContext);
@@ -26,12 +33,14 @@ suite('MCP explorer provider', () => {
 			assert.strictEqual((items[0].iconPath as vscode.ThemeIcon).color, undefined);
 
 			assert.ok(items[1].iconPath instanceof vscode.ThemeIcon);
-			assert.strictEqual((items[1].iconPath as vscode.ThemeIcon).id, 'circle-slash');
-			assert.strictEqual(
-				(items[1].iconPath as vscode.ThemeIcon).color?.id,
-				'disabledForeground',
-			);
+			assert.strictEqual((items[1].iconPath as vscode.ThemeIcon).id, 'mcp');
 		} finally {
+			if (originalCopilotHome === undefined) {
+				delete process.env.COPILOT_HOME;
+			} else {
+				process.env.COPILOT_HOME = originalCopilotHome;
+			}
+			fs.rmSync(tempDir, { recursive: true, force: true });
 			(mcpService as unknown as { readMcpServers: typeof mcpService.readMcpServers }).readMcpServers =
 				originalReadMcpServers;
 		}

@@ -1,37 +1,26 @@
 import * as vscode from 'vscode';
-import { CodexTreeDataProvider } from './codexTreeProvider';
-import { CodexTreeItem } from '../models/treeItems';
-import { messages } from '../i18n';
-import { readMcpServers } from '../services/mcpService';
-import { resolveCodexPaths } from '../services/workspaceStatus';
+import { WorkspaceTreeDataProvider } from './workspaceTreeProvider';
+import { WorkspaceTreeItem } from '../models/treeItems';
+import { getMcpConfigPath, readMcpServers } from '../services/mcpService';
+import { getCoreWorkspaceStatus, resolveCopilotPaths } from '../services/workspaceStatus';
 
-export class McpExplorerProvider extends CodexTreeDataProvider<CodexTreeItem> {
+export class McpExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTreeItem> {
 	constructor(_context: vscode.ExtensionContext) {
-		super();
+		super(getCoreWorkspaceStatus);
 	}
 
-	protected getAvailableChildren(): vscode.ProviderResult<CodexTreeItem[]> {
-		const configPath = resolveCodexPaths().configPath;
+	protected getAvailableChildren(): vscode.ProviderResult<WorkspaceTreeItem[]> {
+		const configPath = getMcpConfigPath(resolveCopilotPaths().copilotDir);
 		const servers = readMcpServers(configPath);
 		return servers.map((server) => {
-			const item = new CodexTreeItem(
+			const item = new WorkspaceTreeItem(
 				'mcpServer',
 				'mcp',
 				server.id,
 				vscode.TreeItemCollapsibleState.None,
 			);
-			item.contextValue = 'codex-mcp-server';
-			item.command = {
-				command: 'copilot-workspace-manager.mcp.toggle',
-				title: messages.mcpToggleAction,
-				arguments: [server.id],
-			};
-			item.iconPath = server.enabled
-				? new vscode.ThemeIcon('mcp')
-				: new vscode.ThemeIcon(
-						'circle-slash',
-						new vscode.ThemeColor('disabledForeground'),
-					);
+			item.contextValue = 'copilot-mcp-server';
+			item.iconPath = new vscode.ThemeIcon('mcp');
 			return item;
 		});
 	}

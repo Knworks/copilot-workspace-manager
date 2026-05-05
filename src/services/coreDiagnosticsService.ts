@@ -3,7 +3,7 @@ import os from 'os';
 import path from 'path';
 import * as vscode from 'vscode';
 import { parse } from 'toml';
-import { resolveCodexPaths } from './workspaceStatus';
+import { resolveCopilotPaths } from './workspaceStatus';
 import { stabilizeManagedConfigToml } from './configTomlOrganizerService';
 
 export type AgentsChainStatus = 'Active' | 'Skipped' | 'Missing' | 'Error';
@@ -30,11 +30,11 @@ export function buildAgentsLoadingChain(
 	workspaceRoot: string | undefined = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
 	homeDir: string = os.homedir(),
 ): AgentsChainNode[] {
-	const { codexDir, configPath } = resolveCodexPaths(homeDir);
+	const { copilotDir, configPath } = resolveCopilotPaths(homeDir);
 	const fallbackNames = readFallbackNames(configPath);
 	const nodes: AgentsChainNode[] = [];
 	nodes.push(
-		...buildTierNodes(codexDir, 'Global', ['AGENTS.override.md', 'AGENTS.md']),
+		...buildTierNodes(copilotDir, 'Global', ['AGENTS.md']),
 	);
 	if (workspaceRoot) {
 		nodes.push(

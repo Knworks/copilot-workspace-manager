@@ -19,115 +19,72 @@ function withTempDir(run: (root: string) => void): void {
 }
 
 suite('Agent manager service', () => {
-	test('listAgentManagerRecords reads config and agent toml details', () => {
+	test('listAgentManagerRecords reads .agent.md frontmatter details', () => {
 		withTempDir((root) => {
-			const codexDir = path.join(root, '.codex');
-			const agentsDir = path.join(codexDir, 'agents');
+			const agentsDir = path.join(root, '.github', 'agents');
 			fs.mkdirSync(agentsDir, { recursive: true });
 			fs.writeFileSync(
-				path.join(agentsDir, 'reviewer.toml'),
-				'model = "gpt-5.4"\nmodel_reasoning_effort = "high"\nsandbox_mode = "workspace-write"\n',
-				'utf8',
-			);
-			const configPath = path.join(codexDir, 'config.toml');
-			fs.writeFileSync(
-				configPath,
-				'[agents.reviewer]\ndescription = "Reviews code"\nconfig_file = "agents/reviewer.toml"\n',
+				path.join(agentsDir, 'reviewer.agent.md'),
+				[
+					'---',
+					'name: reviewer',
+					'description: Reviews code',
+					'model: gpt-5.4',
+					'tools: read, edit',
+					'mcp-servers: github',
+					'---',
+					'Review instructions.',
+				].join('\n'),
 				'utf8',
 			);
 			const location: AgentLocation = {
-				kind: 'workspace',
+				kind: 'project',
 				label: 'Workspace Agents',
 				rootPath: agentsDir,
-				priority: 2,
+				priority: 1,
 			};
 
-			const records = listAgentManagerRecords(configPath, [location]);
+			const records = listAgentManagerRecords('', [location]);
 
 			assert.strictEqual(records.length, 1);
 			assert.strictEqual(records[0].name, 'reviewer');
 			assert.strictEqual(records[0].description, 'Reviews code');
 			assert.strictEqual(records[0].model, 'gpt-5.4');
-			assert.strictEqual(records[0].reasoningEffort, 'high');
-			assert.strictEqual(records[0].sandboxMode, 'workspace-write');
-			assert.strictEqual(records[0].enabled, true);
+			assert.strictEqual(records[0].tools, 'read, edit');
+			assert.strictEqual(records[0].mcpServers, 'github');
+			assert.strictEqual(records[0].readonly, false);
 		});
 	});
 
-	test('disableAgentByName stashes block and removes config entry', () => {
+	test('plugin agents are marked readonly', () => {
 		withTempDir((root) => {
-			const codexDir = path.join(root, '.codex');
-			fs.mkdirSync(codexDir, { recursive: true });
-			const configPath = path.join(codexDir, 'config.toml');
-			fs.writeFileSync(
-				configPath,
-				'[agents.reviewer]\ndescription = "Reviews code"\nconfig_file = "agents/reviewer.toml"\n',
-				'utf8',
-			);
-
-			disableAgentByName(codexDir, configPath, 'reviewer');
-
-			assert.ok(!fs.readFileSync(configPath, 'utf8').includes('[agents.reviewer]'));
-			assert.ok(
-				fs.readFileSync(
-					path.join(codexDir, '.copilot-workspace-manager', 'agents-disabled.json'),
-					'utf8',
-				).includes('Reviews code'),
-			);
-		});
-	});
-
-	test('listAgentManagerRecords keeps disabled agent description from stash', () => {
-		withTempDir((root) => {
-			const codexDir = path.join(root, '.codex');
-			const agentsDir = path.join(codexDir, 'agents');
+			const agentsDir = path.join(root, '.copilot', 'installed-plugins', 'plugin', 'agents');
 			fs.mkdirSync(agentsDir, { recursive: true });
-			fs.writeFileSync(path.join(agentsDir, 'reviewer.toml'), '', 'utf8');
-			const configPath = path.join(codexDir, 'config.toml');
-			fs.writeFileSync(
-				configPath,
-				'[agents.reviewer]\ndescription = "Reviews code"\nconfig_file = "agents/reviewer.toml"\n',
-				'utf8',
-			);
+			fs.writeFileSync(path.join(agentsDir, 'plugin.agent.md'), '---\nname: plugin\n---\n', 'utf8');
 			const location: AgentLocation = {
-				kind: 'workspace',
-				label: 'Workspace Agents',
+				kind: 'plugin',
+				label: 'Plugin Agents',
 				rootPath: agentsDir,
-				priority: 2,
+				priority: 3,
 			};
 
-			disableAgentByName(codexDir, configPath, 'reviewer');
-			const records = listAgentManagerRecords(configPath, [location]);
+			const records = listAgentManagerRecords('', [location]);
 
 			assert.strictEqual(records.length, 1);
-			assert.strictEqual(records[0].enabled, false);
-			assert.strictEqual(records[0].description, 'Reviews code');
+			assert.strictEqual(records[0].readonly, true);
 		});
 	});
 
-	test('enableAgentByName restores stashed block and overwrites existing entry', () => {
+	test('enable and disable are no-ops for frontmatter-managed agents', () => {
 		withTempDir((root) => {
-			const codexDir = path.join(root, '.codex');
-			fs.mkdirSync(codexDir, { recursive: true });
-			const configPath = path.join(codexDir, 'config.toml');
-			fs.writeFileSync(
-				configPath,
-				'[agents.reviewer]\ndescription = "old"\nconfig_file = "agents/reviewer.toml"\n',
-				'utf8',
-			);
-			disableAgentByName(codexDir, configPath, 'reviewer');
-			fs.writeFileSync(
-				configPath,
-				'[agents.reviewer]\ndescription = "new"\nconfig_file = "agents/reviewer.toml"\n',
-				'utf8',
-			);
+			const configPath = path.join(root, 'config.json');
+			fs.writeFileSync(configPath, '{"ok":true}', 'utf8');
 
-			const result = enableAgentByName(codexDir, configPath, 'reviewer');
+			disableAgentByName(root, configPath, 'reviewer');
+			const result = enableAgentByName(root, configPath, 'reviewer');
 
-			const contents = fs.readFileSync(configPath, 'utf8');
-			assert.strictEqual(result.overwritten, true);
-			assert.ok(contents.includes('description = "old"'));
-			assert.ok(!contents.includes('description = "new"'));
+			assert.strictEqual(result.overwritten, false);
+			assert.strictEqual(fs.readFileSync(configPath, 'utf8'), '{"ok":true}');
 		});
 	});
 });

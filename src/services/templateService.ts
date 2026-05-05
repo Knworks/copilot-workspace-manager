@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { resolveCodexPaths, TEMPLATE_FOLDER_NAME } from './workspaceStatus';
+import { resolveCopilotPaths, TEMPLATE_FOLDER_NAME } from './workspaceStatus';
 
 export type TemplateCandidate = {
 	label: string;
@@ -8,7 +8,7 @@ export type TemplateCandidate = {
 };
 
 export function getTemplateRootPath(homeDir?: string): string {
-	return path.join(resolveCodexPaths(homeDir).codexDir, TEMPLATE_FOLDER_NAME);
+	return path.join(resolveCopilotPaths(homeDir).copilotDir, TEMPLATE_FOLDER_NAME);
 }
 
 export function listTemplateCandidates(rootPath?: string): TemplateCandidate[] {

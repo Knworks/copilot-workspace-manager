@@ -2,9 +2,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import * as vscode from 'vscode';
-import { resolveCodexPaths } from './workspaceStatus';
+import { resolveCopilotPaths } from './workspaceStatus';
 
-export type SkillLocationKind = 'project' | 'workspace' | 'user' | 'system';
+export type SkillLocationKind = 'project' | 'compatible' | 'user' | 'plugin';
 
 export type SkillLocation = {
 	kind: SkillLocationKind;
@@ -19,7 +19,7 @@ function getProjectRoot(): string | undefined {
 }
 
 /**
- * Resolves Skill storage locations in Codex CLI precedence order.
+ * Resolves Skill storage locations for GitHub Copilot CLI and compatible folders.
  */
 export function getSkillLocations(
 	homeDir: string = os.homedir(),
@@ -27,39 +27,41 @@ export function getSkillLocations(
 ): SkillLocation[] {
 	const locations: SkillLocation[] = [];
 	if (projectRoot) {
-		const preferredProjectRoot = path.join(projectRoot, '.agents', 'skills');
-		const legacyProjectRoot = path.join(projectRoot, '.codex', 'skills');
+		const preferredProjectRoot = path.join(projectRoot, '.github', 'skills');
 		locations.push({
 			kind: 'project',
-			label: 'Project Skills',
-			rootPath: fs.existsSync(preferredProjectRoot)
-				? preferredProjectRoot
-				: fs.existsSync(legacyProjectRoot)
-					? legacyProjectRoot
-					: preferredProjectRoot,
+			label: 'Workspace Skills',
+			rootPath: preferredProjectRoot,
 			createPath: preferredProjectRoot,
 			priority: 1,
 		});
+		for (const compatibleRoot of [
+			path.join(projectRoot, '.agents', 'skills'),
+			path.join(projectRoot, '.claude', 'skills'),
+		]) {
+			if (fs.existsSync(compatibleRoot)) {
+				locations.push({
+					kind: 'compatible',
+					label: 'Workspace Compatible Skills',
+					rootPath: compatibleRoot,
+					createPath: compatibleRoot,
+					priority: 2,
+				});
+			}
+		}
 	}
 	locations.push(
 		{
-			kind: 'workspace',
-			label: 'Workspace Skills',
-			rootPath: path.join(resolveCodexPaths(homeDir).codexDir, 'skills'),
-			createPath: path.join(resolveCodexPaths(homeDir).codexDir, 'skills'),
-			priority: 2,
-		},
-		{
 			kind: 'user',
 			label: 'User Skills',
-			rootPath: path.join(homeDir, '.agents', 'skills'),
-			createPath: path.join(homeDir, '.agents', 'skills'),
+			rootPath: path.join(resolveCopilotPaths(homeDir).copilotDir, 'skills'),
+			createPath: path.join(resolveCopilotPaths(homeDir).copilotDir, 'skills'),
 			priority: 3,
 		},
 		{
-			kind: 'system',
-			label: 'System Skills',
-			rootPath: path.join(resolveCodexPaths(homeDir).codexDir, 'skills', '.system'),
+			kind: 'plugin',
+			label: 'Plugin Skills',
+			rootPath: path.join(resolveCopilotPaths(homeDir).copilotDir, 'installed-plugins'),
 			priority: 4,
 		},
 	);

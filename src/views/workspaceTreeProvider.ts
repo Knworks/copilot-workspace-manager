@@ -4,7 +4,7 @@ import { messages } from '../i18n';
 
 export type WorkspaceStatusProvider = () => { isAvailable: boolean; reason?: string };
 
-export abstract class CodexTreeDataProvider<T extends vscode.TreeItem>
+export abstract class WorkspaceTreeDataProvider<T extends vscode.TreeItem>
 	implements vscode.TreeDataProvider<T>
 {
 	private readonly statusProvider: WorkspaceStatusProvider;
