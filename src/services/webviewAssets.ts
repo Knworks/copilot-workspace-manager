@@ -34,6 +34,17 @@ export function getCodiconCssHref(webview: vscode.Webview): string | undefined {
 		: undefined;
 }
 
+export function getWebviewFontFamily(): string {
+	const editorFontFamily = vscode.workspace
+		.getConfiguration('editor')
+		.get<string>('fontFamily')
+		?.trim();
+	if (!editorFontFamily) {
+		return 'var(--vscode-font-family)';
+	}
+	return editorFontFamily.replace(/[<>&;{}\\\r\n]/g, '');
+}
+
 export function getCodiconIconPath(
 	iconName: string,
 ): vscode.Uri | { light: vscode.Uri; dark: vscode.Uri } | undefined {

@@ -5,7 +5,12 @@ import {
 	listAgentManagerRecords,
 	resolveAgentManagerPaths,
 } from './agentManagerService';
-import { CODICON_RESOURCE_ROOTS, getCodiconCssHref, getCodiconIconPath } from './webviewAssets';
+import {
+	CODICON_RESOURCE_ROOTS,
+	getCodiconCssHref,
+	getCodiconIconPath,
+	getWebviewFontFamily,
+} from './webviewAssets';
 
 const AGENT_MANAGER_VIEW_TYPE = 'copilot-workspace-manager.agentManager';
 
@@ -81,6 +86,7 @@ function buildRows(records: AgentManagerRecord[]): string {
 function buildHtml(webview: vscode.Webview, records: AgentManagerRecord[], query: string): string {
 	const nonce = createNonce();
 	const codiconCssHref = getCodiconCssHref(webview);
+	const fontFamily = getWebviewFontFamily();
 	const csp = [
 		"default-src 'none'",
 		`font-src ${webview.cspSource} data:`,
@@ -99,7 +105,7 @@ function buildHtml(webview: vscode.Webview, records: AgentManagerRecord[], query
 	${codiconLink}
 	<title>${escapeHtml(messages.agentManagerTitle)}</title>
 	<style>
-		body { margin: 0; font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); }
+		body { margin: 0; font-family: ${fontFamily}; color: var(--vscode-foreground); background: var(--vscode-editor-background); }
 		.toolbar { padding: 10px 12px; border-bottom: 1px solid var(--vscode-panel-border); display: flex; gap: 8px; align-items: center; }
 		.toolbar input { flex: 1; box-sizing: border-box; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 8px; padding: 6px 8px; }
 		.toolbar input:focus { outline: none; border-color: var(--vscode-focusBorder, #0e639c); box-shadow: 0 0 0 1px var(--vscode-focusBorder, #0e639c); }

@@ -20,7 +20,12 @@ import {
 	listHookDiagnostics,
 } from './coreManagerConfigService';
 import { getCoreWorkspaceStatus, resolveCopilotPaths } from './workspaceStatus';
-import { CODICON_RESOURCE_ROOTS, getCodiconCssHref, getCodiconIconPath } from './webviewAssets';
+import {
+	CODICON_RESOURCE_ROOTS,
+	getCodiconCssHref,
+	getCodiconIconPath,
+	getWebviewFontFamily,
+} from './webviewAssets';
 
 const HISTORY_VIEW_TYPE = 'copilot-workspace-manager.coreView';
 export const HISTORY_MESSAGE_PREVIEW_MAX_CHARS = 100;
@@ -347,6 +352,7 @@ function buildHistoryWebviewHtml(
 	codiconCssHref: string | undefined,
 ): string {
 	const nonce = createNonce();
+	const fontFamily = getWebviewFontFamily();
 	const labels = JSON.stringify({
 		searchPlaceholder: messages.historySearchPlaceholder,
 		clear: messages.historyClear,
@@ -398,7 +404,7 @@ function buildHistoryWebviewHtml(
 	${codiconLink}
 	<title>${messages.coreViewPanelTitle}</title>
 	<style>
-		body { margin: 0; font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); }
+		body { margin: 0; font-family: ${fontFamily}; color: var(--vscode-foreground); background: var(--vscode-editor-background); }
 		.root { display: grid; grid-template-rows: auto 1fr; height: 100vh; }
 		.tabs { display: flex; gap: 4px; padding: 8px 12px 0; border-bottom: 1px solid var(--vscode-panel-border); }
 		.tab { border: 1px solid var(--vscode-panel-border); border-bottom: 0; padding: 6px 10px; border-radius: 4px 4px 0 0; background: var(--vscode-tab-inactiveBackground); color: var(--vscode-tab-inactiveForeground); display: inline-flex; gap: 6px; align-items: center; }
@@ -434,6 +440,7 @@ function buildHistoryWebviewHtml(
 		.section-title { margin: 0 0 6px; font-size: 12px; color: var(--vscode-descriptionForeground); }
 		.chain-section-title { margin: 0 0 2px; font-size: 12px; color: var(--vscode-descriptionForeground); }
 		.markdown-content p { margin: 0 0 12px 0; line-height: 1.6; }
+		.markdown-content code, .markdown-content pre, .markdown-content pre code, .raw-events pre { font-family: inherit; }
 		.markdown-content pre, .raw-events pre { background: var(--vscode-textCodeBlock-background); padding: 8px; border-radius: 4px; overflow: auto; }
 		mark.search-highlight { background: var(--vscode-editor-findMatchHighlightBackground); }
 		.message-heading { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--vscode-foreground); }
@@ -462,7 +469,7 @@ function buildHistoryWebviewHtml(
 		.chain-status-problems { color: var(--vscode-editorWarning-foreground); }
 		.chain-status-details { color: #f8afcf; }
 		.chain-detail-card { position: relative; display: grid; gap: 8px; padding: 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); }
-		.chain-preview-block { padding: 4px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editor-background); }
+		.chain-preview-block { padding: 8px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editor-background); }
 		.required-switch { display: inline-flex; align-items: center; cursor: pointer; user-select: none; gap: 8px; }
 		.required-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
 		.required-switch span.switch-track { display: inline-block; width: 34px; height: 18px; border-radius: 999px; background: var(--vscode-checkbox-background, var(--vscode-input-background)); border: 1px solid var(--vscode-checkbox-border, var(--vscode-panel-border)); position: relative; vertical-align: middle; box-sizing: border-box; transition: background 0.15s ease, border-color 0.15s ease; }
