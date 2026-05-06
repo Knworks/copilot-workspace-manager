@@ -437,18 +437,7 @@ async function resolveTargetDirectoryForAdd(
 	}
 
 	const locations = provider.getRootOptions();
-	const creatableLocations = locations.filter((location) => {
-		if (!location.createPath) {
-			return false;
-		}
-		if (item.kind !== 'skills') {
-			return true;
-		}
-		if (location.kind === 'plugin') {
-			return false;
-		}
-		return !location.rootPath.endsWith(`${path.sep}.agents${path.sep}skills`);
-	});
+	const creatableLocations = getCreatableLocationsForAdd(item.kind, locations);
 	const currentLocation = provider.getLocationForPath(targetDir);
 	const sortedLocations = [
 		...creatableLocations.filter((location) => location.kind === currentLocation?.kind),
@@ -472,6 +461,21 @@ async function resolveTargetDirectoryForAdd(
 		return targetDir;
 	}
 	return selectedTargetDir;
+}
+
+export function getCreatableLocationsForAdd(
+	viewKind: WorkspaceTreeItem['kind'],
+	locations: Array<{ createPath?: string; kind: string; label: string; rootPath: string }>,
+): Array<{ createPath?: string; kind: string; label: string; rootPath: string }> {
+	return locations.filter((location) => {
+		if (!location.createPath) {
+			return false;
+		}
+		if (viewKind !== 'skills') {
+			return true;
+		}
+		return location.kind !== 'plugin';
+	});
 }
 
 function createRootItem(viewKind: FileViewKind, rootPath: string): WorkspaceTreeItem {

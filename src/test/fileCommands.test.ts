@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import path from 'path';
 import {
+	getCreatableLocationsForAdd,
 	isCaseOnlyRename,
 	isSamePath,
 	requiresFolderSelectionForFileAdd,
@@ -145,5 +146,31 @@ test('resolveAddViewSelection prefers item over selection', () => {
 		assert.strictEqual(shouldPickSkillLocationForAdd(folder), false);
 		assert.strictEqual(shouldPickSkillLocationForAdd(file), false);
 		assert.strictEqual(shouldPickSkillLocationForAdd(promptRoot), false);
+	});
+
+	test('getCreatableLocationsForAdd keeps all workspace and user skill roots but excludes plugin roots', () => {
+		const locations = [
+			{ kind: 'project', label: 'Workspace Skills', rootPath: path.join('repo', '.github', 'skills'), createPath: path.join('repo', '.github', 'skills') },
+			{ kind: 'project', label: 'Workspace Skills', rootPath: path.join('repo', '.agents', 'skills'), createPath: path.join('repo', '.agents', 'skills') },
+			{ kind: 'project', label: 'Workspace Skills', rootPath: path.join('repo', '.claude', 'skills'), createPath: path.join('repo', '.claude', 'skills') },
+			{ kind: 'user', label: 'User Skills', rootPath: path.join('home', '.copilot', 'skills'), createPath: path.join('home', '.copilot', 'skills') },
+			{ kind: 'user', label: 'User Skills', rootPath: path.join('home', '.agents', 'skills'), createPath: path.join('home', '.agents', 'skills') },
+			{ kind: 'user', label: 'User Skills', rootPath: path.join('home', '.claude', 'skills'), createPath: path.join('home', '.claude', 'skills') },
+			{ kind: 'plugin', label: 'Plugin Skills', rootPath: path.join('home', '.copilot', 'installed-plugins', 'x', 'skills'), createPath: path.join('home', '.copilot', 'installed-plugins', 'x', 'skills') },
+		];
+
+		const creatable = getCreatableLocationsForAdd('skills', locations);
+
+		assert.deepStrictEqual(
+			creatable.map((location) => location.createPath),
+			[
+				path.join('repo', '.github', 'skills'),
+				path.join('repo', '.agents', 'skills'),
+				path.join('repo', '.claude', 'skills'),
+				path.join('home', '.copilot', 'skills'),
+				path.join('home', '.agents', 'skills'),
+				path.join('home', '.claude', 'skills'),
+			],
+		);
 	});
 });
