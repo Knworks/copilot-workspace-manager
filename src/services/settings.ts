@@ -10,7 +10,6 @@ export const SETTINGS_SECTION = 'copilot-workspace-manager';
  */
 export type SyncSettings = {
 	copilotFolder: string;
-	promptsFolder: string;
 	skillsFolder: string;
 	templatesFolder: string;
 	agentFolder: string;
@@ -42,7 +41,6 @@ export function getSyncSettings(
 ): SyncSettings {
 	return {
 		copilotFolder: readStringSetting(configuration.get('copilotFolder')),
-		promptsFolder: readStringSetting(configuration.get('promptsFolder')),
 		skillsFolder: readStringSetting(configuration.get('skillsFolder')),
 		templatesFolder: readStringSetting(configuration.get('templatesFolder')),
 		agentFolder: readStringSetting(configuration.get('agentFolder')),

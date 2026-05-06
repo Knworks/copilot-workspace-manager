@@ -33,7 +33,6 @@ suite('Sync settings', () => {
 	test('returns configured values', () => {
 		const config = createConfig({
 			copilotFolder: '/tmp/copilot',
-			promptsFolder: '/tmp/prompts',
 			skillsFolder: '/tmp/skills',
 			templatesFolder: '/tmp/templates',
 			agentFolder: '/tmp/agents',
@@ -43,7 +42,6 @@ suite('Sync settings', () => {
 
 		assert.deepStrictEqual(settings, {
 			copilotFolder: '/tmp/copilot',
-			promptsFolder: '/tmp/prompts',
 			skillsFolder: '/tmp/skills',
 			templatesFolder: '/tmp/templates',
 			agentFolder: '/tmp/agents',
@@ -57,7 +55,6 @@ suite('Sync settings', () => {
 
 		assert.deepStrictEqual(settings, {
 			copilotFolder: '',
-			promptsFolder: '',
 			skillsFolder: '',
 			templatesFolder: '',
 			agentFolder: '',

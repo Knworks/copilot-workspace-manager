@@ -14,10 +14,22 @@ type FileEntry = {
 type SyncState = Record<string, Record<string, true>>;
 
 const WORKSPACE_META_DIR = '.copilot-workspace-manager';
-const SYNC_STATE_FILE = 'workspace-sync.json';
+const SYNC_STATE_FILE = 'copilot-workspace-sync.json';
 
-function getSyncStatePath(stateRoot: string): string {
+export function getSyncStatePath(stateRoot: string): string {
 	return path.join(stateRoot, WORKSPACE_META_DIR, SYNC_STATE_FILE);
+}
+
+export function buildSyncScopeKey(
+	scopeName: string,
+	configuredDir: string,
+	targetDir: string,
+): string {
+	return [
+		scopeName,
+		path.resolve(configuredDir).toLowerCase(),
+		path.resolve(targetDir).toLowerCase(),
+	].join('::');
 }
 
 /**

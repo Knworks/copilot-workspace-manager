@@ -63,6 +63,34 @@ async function activateExtension(): Promise<void> {
 	await extension.activate();
 }
 
+async function withSyncSettings(
+	values: Partial<Record<'copilotFolder' | 'skillsFolder' | 'templatesFolder' | 'agentFolder', string>>,
+	run: () => Promise<void>,
+): Promise<void> {
+	const originalGetConfiguration = vscode.workspace.getConfiguration;
+	(vscode.workspace as unknown as { getConfiguration: typeof originalGetConfiguration }).getConfiguration =
+		((section?: string) => {
+			if (section !== 'copilot-workspace-manager') {
+				return originalGetConfiguration(section);
+			}
+			return {
+				get: <T>(key: string) => values[key as keyof typeof values] as T | undefined,
+				inspect: <T>(key: string) => ({
+					key,
+					globalValue: values[key as keyof typeof values] as T | undefined,
+				}),
+				has: () => true,
+				update: async () => undefined,
+			} as vscode.WorkspaceConfiguration;
+		}) as typeof originalGetConfiguration;
+	try {
+		await run();
+	} finally {
+		(vscode.workspace as unknown as { getConfiguration: typeof originalGetConfiguration }).getConfiguration =
+			originalGetConfiguration;
+	}
+}
+
 async function withConfirmedSync(run: () => Promise<void>): Promise<void> {
 	const originalWarning = vscode.window.showWarningMessage;
 	(vscode.window as unknown as { showWarningMessage: typeof originalWarning })
@@ -76,48 +104,66 @@ async function withConfirmedSync(run: () => Promise<void>): Promise<void> {
 }
 
 suite('Sync commands', () => {
-	test('syncPrompts keeps workspace commands in the project commands directory', async () => {
+	test('syncSkills syncs the configured folder with the user skills directory', async () => {
 		await withTempWorkspace(async (homeDir, workspaceRoot) => {
 			await activateExtension();
 			const copilotRoot = path.join(homeDir, '.copilot');
-			fs.mkdirSync(path.join(workspaceRoot, '.claude', 'commands'), { recursive: true });
+			const externalSkillsDir = path.join(homeDir, 'external-skills');
+			fs.mkdirSync(path.join(workspaceRoot, '.github', 'skills'), { recursive: true });
+			fs.mkdirSync(path.join(workspaceRoot, '.claude', 'skills'), { recursive: true });
+			fs.mkdirSync(path.join(externalSkillsDir, 'review'), { recursive: true });
 			fs.mkdirSync(copilotRoot, { recursive: true });
 			fs.writeFileSync(path.join(copilotRoot, 'config.json'), '{}', 'utf8');
 			fs.writeFileSync(
-				path.join(workspaceRoot, '.claude', 'commands', 'review.md'),
-				'command',
+				path.join(externalSkillsDir, 'review', 'SKILL.md'),
+				'---\nname: review\n---\n',
 				'utf8',
 			);
 
-			await withConfirmedSync(async () => {
-				await vscode.commands.executeCommand('copilot-workspace-manager.syncPrompts');
+			await withSyncSettings({ skillsFolder: externalSkillsDir }, async () => {
+				await withConfirmedSync(async () => {
+					await vscode.commands.executeCommand('copilot-workspace-manager.syncSkills');
+				});
 			});
 
-			assert.strictEqual(
-				fs.readFileSync(path.join(workspaceRoot, '.claude', 'commands', 'review.md'), 'utf8'),
-				'command',
+			assert.ok(
+				fs.existsSync(path.join(copilotRoot, 'skills', 'review', 'SKILL.md')),
+			);
+			assert.ok(
+				!fs.existsSync(path.join(workspaceRoot, '.github', 'skills', 'review', 'SKILL.md')),
 			);
 		});
 	});
 
-	test('syncAgents copies .agent.md files through the fixed workspace/user pair', async () => {
+	test('syncAgents syncs the configured folder with the user agent root only', async () => {
 		await withTempWorkspace(async (homeDir, workspaceRoot) => {
 			await activateExtension();
 			const copilotRoot = path.join(homeDir, '.copilot');
+			const externalAgentsDir = path.join(homeDir, 'external-agents');
 			fs.mkdirSync(path.join(workspaceRoot, '.github', 'agents'), { recursive: true });
+			fs.mkdirSync(path.join(workspaceRoot, '.claude', 'agents'), { recursive: true });
+			fs.mkdirSync(externalAgentsDir, { recursive: true });
 			fs.mkdirSync(copilotRoot, { recursive: true });
 			fs.writeFileSync(path.join(copilotRoot, 'config.json'), '{}', 'utf8');
 			fs.writeFileSync(
-				path.join(workspaceRoot, '.github', 'agents', 'reviewer.agent.md'),
+				path.join(externalAgentsDir, 'reviewer.agent.md'),
 				'---\nname: reviewer\n---\n',
 				'utf8',
 			);
 
-			await withConfirmedSync(async () => {
-				await vscode.commands.executeCommand('copilot-workspace-manager.syncAgents');
+			await withSyncSettings({ agentFolder: externalAgentsDir }, async () => {
+				await withConfirmedSync(async () => {
+					await vscode.commands.executeCommand('copilot-workspace-manager.syncAgents');
+				});
 			});
 
 			assert.ok(fs.existsSync(path.join(copilotRoot, 'agents', 'reviewer.agent.md')));
+			assert.ok(
+				!fs.existsSync(path.join(workspaceRoot, '.github', 'agents', 'reviewer.agent.md')),
+			);
+			assert.ok(
+				!fs.existsSync(path.join(workspaceRoot, '.claude', 'agents', 'reviewer.agent.md')),
+			);
 		});
 	});
 });

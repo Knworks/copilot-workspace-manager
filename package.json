@@ -135,11 +135,6 @@
         "icon": "$(sync)"
       },
       {
-        "command": "copilot-workspace-manager.syncPrompts",
-        "title": "%command.sync%",
-        "icon": "$(sync)"
-      },
-      {
         "command": "copilot-workspace-manager.syncSkills",
         "title": "%command.sync%",
         "icon": "$(sync)"
@@ -250,27 +245,21 @@
           "default": "",
           "description": "%configuration.copilotFolder.description%"
         },
-        "copilot-workspace-manager.promptsFolder": {
-          "type": "string",
-          "order": 1,
-          "default": "",
-          "description": "%configuration.promptsFolder.description%"
-        },
         "copilot-workspace-manager.skillsFolder": {
           "type": "string",
-          "order": 2,
+          "order": 1,
           "default": "",
           "description": "%configuration.skillsFolder.description%"
         },
         "copilot-workspace-manager.templatesFolder": {
           "type": "string",
-          "order": 3,
+          "order": 2,
           "default": "",
           "description": "%configuration.templatesFolder.description%"
         },
         "copilot-workspace-manager.agentFolder": {
           "type": "string",
-          "order": 4,
+          "order": 3,
           "default": "",
           "description": "%configuration.agentFolder.description%"
         },
@@ -278,7 +267,7 @@
           "type": "number",
           "default": 100,
           "minimum": 1,
-          "order": 5,
+          "order": 4,
           "description": "%configuration.maxSessionHistoryCount.description%"
         }
       }
@@ -326,18 +315,13 @@
           "group": "navigation@6"
         },
         {
-          "command": "copilot-workspace-manager.syncPrompts",
-          "when": "view == 'copilot-workspace-manager.prompts'",
-          "group": "navigation@7"
-        },
-        {
           "command": "copilot-workspace-manager.openSkillsFolder",
           "when": "view == 'copilot-workspace-manager.skills'",
           "group": "navigation@6"
         },
         {
           "command": "copilot-workspace-manager.syncSkills",
-          "when": "view == 'copilot-workspace-manager.skills'",
+          "when": "view == 'copilot-workspace-manager.skills' && config.copilot-workspace-manager.skillsFolder",
           "group": "navigation@7"
         },
         {
@@ -357,12 +341,12 @@
         },
         {
           "command": "copilot-workspace-manager.syncTemplates",
-          "when": "view == 'copilot-workspace-manager.templates'",
+          "when": "view == 'copilot-workspace-manager.templates' && config.copilot-workspace-manager.templatesFolder",
           "group": "navigation@7"
         },
         {
           "command": "copilot-workspace-manager.syncAgents",
-          "when": "view == 'copilot-workspace-manager.agents'",
+          "when": "view == 'copilot-workspace-manager.agents' && config.copilot-workspace-manager.agentFolder",
           "group": "navigation@7"
         },
         {

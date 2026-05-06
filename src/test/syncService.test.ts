@@ -3,6 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {
+	getSyncStatePath,
 	removeSyncStateEntry,
 	syncCoreInstructionsBidirectional,
 	syncDirectoryBidirectional,
@@ -95,7 +96,7 @@ suite('Sync service', () => {
 
 			syncDirectoryBidirectional('templates', codexRoot, codexDir, targetDir);
 			assert.ok(fs.existsSync(path.join(targetDir, 'old.md')));
-			const statePath = path.join(codexRoot, '.copilot-workspace-manager', 'workspace-sync.json');
+			const statePath = getSyncStatePath(codexRoot);
 			assert.ok(fs.existsSync(statePath));
 			const initialState = JSON.parse(
 				fs.readFileSync(statePath, 'utf8'),
@@ -201,7 +202,7 @@ suite('Sync service', () => {
 			fs.writeFileSync(path.join(codexDir, 'reviewer.toml'), 'x', 'utf8');
 
 			syncDirectoryBidirectional('agents', codexRoot, codexDir, targetDir);
-			const statePath = path.join(codexRoot, '.copilot-workspace-manager', 'workspace-sync.json');
+			const statePath = getSyncStatePath(codexRoot);
 			const initialState = JSON.parse(
 				fs.readFileSync(statePath, 'utf8'),
 			) as Record<string, Record<string, unknown>>;

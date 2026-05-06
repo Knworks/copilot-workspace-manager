@@ -75,20 +75,19 @@ suite('View title menus', () => {
 				configKey: 'config.copilot-workspace-manager.copilotFolder',
 			},
 			{
-				command: 'copilot-workspace-manager.syncPrompts',
-				viewId: 'copilot-workspace-manager.prompts',
-			},
-			{
 				command: 'copilot-workspace-manager.syncSkills',
 				viewId: 'copilot-workspace-manager.skills',
+				configKey: 'config.copilot-workspace-manager.skillsFolder',
 			},
 			{
 				command: 'copilot-workspace-manager.syncTemplates',
 				viewId: 'copilot-workspace-manager.templates',
+				configKey: 'config.copilot-workspace-manager.templatesFolder',
 			},
 			{
 				command: 'copilot-workspace-manager.syncAgents',
 				viewId: 'copilot-workspace-manager.agents',
+				configKey: 'config.copilot-workspace-manager.agentFolder',
 			},
 		];
 

@@ -28,7 +28,7 @@ import { SkillManagerPanelManager } from './services/skillManagerPanel';
 import { AgentManagerPanelManager } from './services/agentManagerPanel';
 import { McpManagerPanelManager } from './services/mcpManagerPanel';
 import {
-	syncCoreInstructionsBidirectional,
+	buildSyncScopeKey,
 	syncCoreFilesBidirectional,
 	syncDirectoryBidirectional,
 } from './services/syncService';
@@ -320,6 +320,28 @@ export function activate(context: vscode.ExtensionContext) {
 		return choice === messages.dialogOk;
 	};
 
+	const syncConfiguredFolder = (
+		scopeName: string,
+		configuredDir: string,
+		targetDirs: string[],
+		stateRoot: string,
+	): number => {
+		let skippedCount = 0;
+		for (const targetDir of targetDirs) {
+			if (path.resolve(configuredDir) === path.resolve(targetDir)) {
+				continue;
+			}
+			const result = syncDirectoryBidirectional(
+				buildSyncScopeKey(scopeName, configuredDir, targetDir),
+				stateRoot,
+				configuredDir,
+				targetDir,
+			);
+			skippedCount += result.skipped.length;
+		}
+		return skippedCount;
+	};
+
 	const syncCoreDisposable = vscode.commands.registerCommand(
 		'copilot-workspace-manager.syncCore',
 		() =>
@@ -345,38 +367,6 @@ export function activate(context: vscode.ExtensionContext) {
 			}),
 	);
 
-	const syncPromptsDisposable = vscode.commands.registerCommand(
-		'copilot-workspace-manager.syncPrompts',
-		() =>
-			runSafely(async () => {
-				if (!getWorkspaceStatus().isAvailable) {
-					return;
-				}
-				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-				if (!workspaceRoot) {
-					vscode.window.showInformationMessage(messages.chainNoWorkspace);
-					return;
-				}
-				if (!(await confirmSync('Copilot prompts'))) {
-					return;
-				}
-				const { copilotDir } = resolveCopilotPaths();
-				const commandResult = syncDirectoryBidirectional(
-					'promptCommands',
-					resolveCopilotPaths().managerDir,
-					path.join(workspaceRoot, '.claude', 'commands'),
-					path.join(workspaceRoot, '.claude', 'commands'),
-				);
-				const skippedCount = commandResult.skipped.length;
-				if (skippedCount > 0) {
-					vscode.window.showWarningMessage(
-						messages.syncSkipped(skippedCount),
-					);
-				}
-				promptsProvider.refresh();
-			}),
-	);
-
 	const syncSkillsDisposable = vscode.commands.registerCommand(
 		'copilot-workspace-manager.syncSkills',
 		() =>
@@ -384,24 +374,23 @@ export function activate(context: vscode.ExtensionContext) {
 				if (!getWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-				if (!workspaceRoot) {
-					vscode.window.showInformationMessage(messages.chainNoWorkspace);
+				const { skillsFolder } = getSyncSettings();
+				if (!skillsFolder) {
 					return;
 				}
-				if (!(await confirmSync('Copilot skills'))) {
+				if (!(await confirmSync(skillsFolder))) {
 					return;
 				}
 				const { copilotDir } = resolveCopilotPaths();
-				const result = syncDirectoryBidirectional(
+				const skippedCount = syncConfiguredFolder(
 					'skills',
+					skillsFolder,
+					[path.join(copilotDir, 'skills')],
 					copilotDir,
-					path.join(workspaceRoot, '.github', 'skills'),
-					path.join(copilotDir, 'skills'),
 				);
-				if (result.skipped.length > 0) {
+				if (skippedCount > 0) {
 					vscode.window.showWarningMessage(
-						messages.syncSkipped(result.skipped.length),
+						messages.syncSkipped(skippedCount),
 					);
 				}
 				skillsProvider.refresh();
@@ -415,24 +404,24 @@ export function activate(context: vscode.ExtensionContext) {
 				if (!getWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-				if (!workspaceRoot) {
-					vscode.window.showInformationMessage(messages.chainNoWorkspace);
+				const { templatesFolder } = getSyncSettings();
+				if (!templatesFolder) {
 					return;
 				}
-				if (!(await confirmSync('Copilot templates'))) {
+				if (!(await confirmSync(templatesFolder))) {
 					return;
 				}
+				const { copilotDir } = resolveCopilotPaths();
 				const { managerDir } = resolveCopilotPaths();
-				const result = syncDirectoryBidirectional(
+				const skippedCount = syncConfiguredFolder(
 					'templates',
-					managerDir,
-					path.join(managerDir, TEMPLATE_FOLDER_NAME),
-					path.join(managerDir, TEMPLATE_FOLDER_NAME),
+					templatesFolder,
+					[path.join(managerDir, TEMPLATE_FOLDER_NAME)],
+					copilotDir,
 				);
-				if (result.skipped.length > 0) {
+				if (skippedCount > 0) {
 					vscode.window.showWarningMessage(
-						messages.syncSkipped(result.skipped.length),
+						messages.syncSkipped(skippedCount),
 					);
 				}
 				templatesProvider.refresh();
@@ -446,24 +435,23 @@ export function activate(context: vscode.ExtensionContext) {
 				if (!getWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-				if (!workspaceRoot) {
-					vscode.window.showInformationMessage(messages.chainNoWorkspace);
+				const { agentFolder } = getSyncSettings();
+				if (!agentFolder) {
 					return;
 				}
-				if (!(await confirmSync('Copilot agents'))) {
+				if (!(await confirmSync(agentFolder))) {
 					return;
 				}
 				const { copilotDir } = resolveCopilotPaths();
-				const result = syncDirectoryBidirectional(
+				const skippedCount = syncConfiguredFolder(
 					'agents',
+					agentFolder,
+					[path.join(copilotDir, 'agents')],
 					copilotDir,
-					path.join(workspaceRoot, '.github', 'agents'),
-					path.join(copilotDir, 'agents'),
 				);
-				if (result.skipped.length > 0) {
+				if (skippedCount > 0) {
 					vscode.window.showWarningMessage(
-						messages.syncSkipped(result.skipped.length),
+						messages.syncSkipped(skippedCount),
 					);
 				}
 				agentsProvider.refresh();
@@ -499,7 +487,6 @@ export function activate(context: vscode.ExtensionContext) {
 		openTemplatesFolderDisposable,
 		openAgentsFolderDisposable,
 		syncCoreDisposable,
-		syncPromptsDisposable,
 		syncSkillsDisposable,
 		syncTemplatesDisposable,
 		syncAgentsDisposable,
