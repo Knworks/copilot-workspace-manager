@@ -217,7 +217,7 @@
       },
       {
         "command": "copilot-workspace-manager.addSkillsFolder",
-        "title": "%command.addFolder%",
+        "title": "%command.addSkillFolder%",
         "icon": "$(new-folder)"
       },
       {
@@ -294,11 +294,6 @@
           "command": "copilot-workspace-manager.addSkillsFolder",
           "when": "view == 'copilot-workspace-manager.skills'",
           "group": "navigation@1"
-        },
-        {
-          "command": "copilot-workspace-manager.addSkillsFile",
-          "when": "view == 'copilot-workspace-manager.skills'",
-          "group": "navigation@2"
         },
         {
           "command": "copilot-workspace-manager.addTemplatesFile",
@@ -407,6 +402,16 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "copilot-workspace-manager.addFolder",
+          "when": "view == 'copilot-workspace-manager.skills' && viewItem == 'workspace-folder'",
+          "group": "inline@1"
+        },
+        {
+          "command": "copilot-workspace-manager.addFile",
+          "when": "view == 'copilot-workspace-manager.skills' && viewItem == 'workspace-folder'",
+          "group": "inline@2"
+        }
       ]
     }
   },

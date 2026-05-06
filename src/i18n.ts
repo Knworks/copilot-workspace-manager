@@ -675,6 +675,10 @@ export const messages = {
 			'message.skillLocationPickPlaceholder',
 			'Select a Skill location.',
 		),
+		skillSubfolderPickPlaceholder: localize(
+			'message.skillSubfolderPickPlaceholder',
+			'Select a Skill subfolder to create.',
+		),
 		skillFileFolderRequired: localize(
 			'message.skillFileFolderRequired',
 			'Select a folder in Skills before adding a file.',

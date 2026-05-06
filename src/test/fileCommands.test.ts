@@ -6,6 +6,7 @@ import {
 	isSamePath,
 	requiresFolderSelectionForFileAdd,
 	resolveAddViewSelection,
+	resolveFolderAddViewSelection,
 	shouldPickSkillLocationForAdd,
 	shouldDeleteRenameTarget,
 } from '../commands/fileCommands';
@@ -75,6 +76,67 @@ test('resolveAddViewSelection prefers item over selection', () => {
 	);
 	assert.strictEqual(resolveAddViewSelection(true, item, selection), item);
 });
+
+	test('resolveFolderAddViewSelection ignores tree selection for toolbar commands', () => {
+		const rootPath = path.join('root', 'skills');
+		const folder = new WorkspaceTreeItem(
+			'folder',
+			'skills',
+			'sample',
+			0,
+			path.join('root', 'skills', 'sample'),
+		);
+
+		const resolved =
+			resolveFolderAddViewSelection(
+				'skills',
+				undefined,
+				folder,
+				rootPath,
+			);
+
+		assert.strictEqual(resolved.nodeType, 'root');
+		assert.strictEqual(resolved.kind, 'skills');
+		assert.strictEqual(resolved.fsPath, rootPath);
+	});
+
+	test('resolveFolderAddViewSelection falls back to root when no folder is selected', () => {
+		const rootPath = path.join('root', 'skills');
+		const file = new WorkspaceTreeItem(
+			'file',
+			'skills',
+			'SKILL.md',
+			0,
+			path.join('root', 'skills', 'sample', 'SKILL.md'),
+		);
+
+		const resolved = resolveFolderAddViewSelection(
+			'skills',
+			undefined,
+			file,
+			rootPath,
+		);
+
+		assert.strictEqual(resolved.nodeType, 'root');
+		assert.strictEqual(resolved.kind, 'skills');
+		assert.strictEqual(resolved.fsPath, rootPath);
+	});
+
+	test('resolveFolderAddViewSelection uses explicit folder items', () => {
+		const rootPath = path.join('root', 'skills');
+		const folder = new WorkspaceTreeItem(
+			'folder',
+			'skills',
+			'sample',
+			0,
+			path.join('root', 'skills', 'sample'),
+		);
+
+		assert.strictEqual(
+			resolveFolderAddViewSelection('skills', folder, undefined, rootPath),
+			folder,
+		);
+	});
 
 	test('requiresFolderSelectionForFileAdd requires a folder only for skills files', () => {
 		const root = new WorkspaceTreeItem(

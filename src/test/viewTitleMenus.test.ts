@@ -39,10 +39,6 @@ suite('View title menus', () => {
 				viewId: 'copilot-workspace-manager.skills',
 			},
 			{
-				command: 'copilot-workspace-manager.addSkillsFile',
-				viewId: 'copilot-workspace-manager.skills',
-			},
-			{
 				command: 'copilot-workspace-manager.addTemplatesFile',
 				viewId: 'copilot-workspace-manager.templates',
 			},
@@ -168,6 +164,19 @@ suite('View title menus', () => {
 			}
 		}
 
+		assert.ok(
+			!viewTitle.some(
+				(item: { command?: string }) =>
+					item.command === 'copilot-workspace-manager.addSkillsFile',
+			),
+			'Skills view title should not include Add File',
+		);
+		const addSkillsFolderCommand = commandDefinitions.find(
+			(item: { command?: string }) =>
+				item.command === 'copilot-workspace-manager.addSkillsFolder',
+		);
+		assert.strictEqual(addSkillsFolderCommand?.title, '%command.addSkillFolder%');
+
 		for (const { command, configKey } of syncCommands.filter((item) => item.configKey)) {
 			const entry = viewTitle.find(
 				(item: { command?: string }) => item.command === command,
@@ -193,6 +202,27 @@ suite('View title menus', () => {
 			assert.ok(
 				!when.includes("view == 'copilot-workspace-manager.templates'"),
 				`${command} should not target templates view`,
+			);
+		}
+
+		const itemContext = menus['view/item/context'];
+		assert.ok(Array.isArray(itemContext));
+		for (const command of [
+			'copilot-workspace-manager.addFolder',
+			'copilot-workspace-manager.addFile',
+		]) {
+			const entry = itemContext.find(
+				(item: { command?: string }) => item.command === command,
+			);
+			assert.ok(entry, `Missing view/item/context menu for ${command}`);
+			const when = entry.when ?? '';
+			assert.ok(
+				when.includes("view == 'copilot-workspace-manager.skills'"),
+				`${command} is missing skills view condition`,
+			);
+			assert.ok(
+				when.includes("viewItem == 'workspace-folder'"),
+				`${command} is missing folder item condition`,
 			);
 		}
 	});

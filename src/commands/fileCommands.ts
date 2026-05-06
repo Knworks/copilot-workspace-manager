@@ -88,19 +88,10 @@ export function registerFileCommands(
 							return;
 						}
 						const provider = providers[viewKind];
-						const viewSelection = views[viewKind].selection[0];
-						const hasSelection =
-							viewFocusState.isActive(viewKind) &&
-							views[viewKind].selection.length > 0;
-						const activeSelection = resolveAddViewSelection(
-							hasSelection,
-							item,
-							viewSelection,
-						);
-						const selection = resolveSelectionForView(
+						const selection = resolveFolderAddViewSelection(
 							viewKind,
-							activeSelection,
-							activeSelection,
+							undefined,
+							undefined,
 							provider.getRootPath(),
 						);
 						await addFolderWithSelection(selection, provider, views);
@@ -168,18 +159,10 @@ export function registerFileCommands(
 					if (!item && activeKind) {
 						const provider = providers[activeKind];
 						const viewSelection = views[activeKind].selection[0];
-						const hasSelection =
-							viewFocusState.isActive(activeKind) &&
-							views[activeKind].selection.length > 0;
-						const activeSelection = resolveAddViewSelection(
-							hasSelection,
+						const selection = resolveFolderAddViewSelection(
+							activeKind,
 							undefined,
 							viewSelection,
-						);
-						const selection = resolveSelectionForView(
-							activeKind,
-							activeSelection,
-							activeSelection,
 							provider.getRootPath(),
 						);
 						await addFolderWithSelection(selection, provider, views);
@@ -350,6 +333,7 @@ export function isRootNode(item: WorkspaceTreeItem): boolean {
 }
 
 const FILE_VIEW_KINDS: FileViewKind[] = ['prompts', 'skills', 'templates'];
+const SKILL_SUBFOLDER_OPTIONS = ['references', 'scripts', 'assets'] as const;
 
 function resolveSelection(
 	item: WorkspaceTreeItem | undefined,
@@ -386,6 +370,18 @@ export function resolveAddViewSelection(
 		return undefined;
 	}
 	return item ?? selection;
+}
+
+export function resolveFolderAddViewSelection(
+	viewKind: FileViewKind,
+	item: WorkspaceTreeItem | undefined,
+	_selection: WorkspaceTreeItem | undefined,
+	rootPath: string,
+): WorkspaceTreeItem {
+	if (item?.kind === viewKind && item.nodeType === 'folder') {
+		return item;
+	}
+	return createRootItem(viewKind, rootPath);
 }
 
 export function requiresFolderSelectionForFileAdd(item: WorkspaceTreeItem): boolean {
@@ -571,6 +567,23 @@ async function addFolderWithSelection(
 		return;
 	}
 
+	const selectedSkillSubfolder = await pickSkillSubfolderName(selection);
+	if (selectedSkillSubfolder === null) {
+		return;
+	}
+	if (selectedSkillSubfolder) {
+		const targetPath = path.join(targetDir, selectedSkillSubfolder);
+		if (pathExists(targetPath)) {
+			vscode.window.showErrorMessage(messages.file.renameFolderExists);
+			return;
+		}
+
+		createFolder(targetDir, selectedSkillSubfolder);
+		await expandParentFolder(selection, views);
+		provider.refresh();
+		return;
+	}
+
 	const folderNameInput = await vscode.window.showInputBox({
 		prompt: messages.file.inputFolderName,
 	});
@@ -593,6 +606,23 @@ async function addFolderWithSelection(
 	createFolder(targetDir, normalizedName);
 	await expandParentFolder(selection, views);
 	provider.refresh();
+}
+
+async function pickSkillSubfolderName(
+	selection: WorkspaceTreeItem,
+): Promise<string | null | undefined> {
+	if (selection.kind !== 'skills' || selection.nodeType !== 'folder') {
+		return undefined;
+	}
+
+	const selected = await vscode.window.showQuickPick(
+		SKILL_SUBFOLDER_OPTIONS.map((name) => ({
+			label: `${name}/`,
+			name,
+		})),
+		{ placeHolder: messages.file.skillSubfolderPickPlaceholder },
+	);
+	return selected?.name ?? null;
 }
 
 async function pickTemplateContents(): Promise<string | null> {

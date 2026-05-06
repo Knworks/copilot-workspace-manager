@@ -169,6 +169,7 @@ suite('Localization keys', () => {
 			'message.templateNone',
 			'message.templatePickPlaceholder',
 			'message.skillLocationPickPlaceholder',
+			'message.skillSubfolderPickPlaceholder',
 			'message.skillFileFolderRequired',
 			'message.userSkillsDeleteWarning',
 			'message.agent.inputName',
