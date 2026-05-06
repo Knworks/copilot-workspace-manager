@@ -54,36 +54,100 @@ suite('Core diagnostics service', () => {
 
 	test('trusted directories can be listed added and removed', () => {
 		withTempDir((root) => {
-			const configPath = path.join(root, 'config.json');
+			const settingsPath = path.join(root, 'settings.json');
 			const projectPath = path.join(root, 'project');
 			fs.mkdirSync(projectPath, { recursive: true });
 
-			addTrustedDirectory(configPath, projectPath);
-			let trusted = listTrustedDirectories(configPath);
+			addTrustedDirectory(settingsPath, projectPath);
+			let trusted = listTrustedDirectories(settingsPath);
 			assert.strictEqual(trusted.length, 1);
 			assert.strictEqual(trusted[0].path, projectPath);
 			assert.strictEqual(trusted[0].exists, true);
+			assert.strictEqual(trusted[0].sourceLabel, 'User Settings');
+			assert.strictEqual(trusted[0].sourcePath, settingsPath);
 
-			assert.strictEqual(removeTrustedDirectory(configPath, projectPath), true);
-			trusted = listTrustedDirectories(configPath);
+			const saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
+				trustedFolders?: string[];
+				trusted_folders?: string[];
+			};
+			assert.deepStrictEqual(saved.trustedFolders, [projectPath]);
+			assert.strictEqual(saved.trusted_folders, undefined);
+
+			assert.strictEqual(removeTrustedDirectory(settingsPath, projectPath), true);
+			trusted = listTrustedDirectories(settingsPath);
 			assert.strictEqual(trusted.length, 0);
 		});
 	});
 
-	test('trusted directories read JSON trusted_folders', () => {
+	test('trusted directories read JSON trustedFolders from user and workspace settings', () => {
 		withTempDir((root) => {
-			const configPath = path.join(root, 'config.json');
-			const projectPath = '\\\\?\\Z:\\copilot-workspace-manager-test\\missing-project';
+			const userSettingsPath = path.join(root, 'settings.json');
+			const workspaceSettingsPath = path.join(root, '.github', 'copilot', 'settings.json');
+			const userProjectPath = '\\\\?\\Z:\\copilot-workspace-manager-test\\missing-user-project';
+			const workspaceProjectPath = '\\\\?\\Z:\\copilot-workspace-manager-test\\missing-workspace-project';
+			fs.mkdirSync(path.dirname(workspaceSettingsPath), { recursive: true });
 			fs.writeFileSync(
-				configPath,
-				JSON.stringify({ trusted_folders: [projectPath] }, null, 2),
+				userSettingsPath,
+				JSON.stringify({ trustedFolders: [userProjectPath] }, null, 2),
+				'utf8',
+			);
+			fs.writeFileSync(
+				workspaceSettingsPath,
+				JSON.stringify({ trustedFolders: [workspaceProjectPath] }, null, 2),
 				'utf8',
 			);
 
-			const trusted = listTrustedDirectories(configPath);
-			assert.strictEqual(trusted.length, 1);
-			assert.strictEqual(trusted[0].path, projectPath);
-			assert.strictEqual(trusted[0].exists, false);
+			const trusted = listTrustedDirectories(userSettingsPath, workspaceSettingsPath);
+			assert.strictEqual(trusted.length, 2);
+			assert.deepStrictEqual(
+				trusted.map((entry) => ({
+					path: entry.path,
+					sourceLabel: entry.sourceLabel,
+					sourcePath: entry.sourcePath,
+					exists: entry.exists,
+				})),
+				[
+					{
+						path: userProjectPath,
+						sourceLabel: 'User Settings',
+						sourcePath: userSettingsPath,
+						exists: false,
+					},
+					{
+						path: workspaceProjectPath,
+						sourceLabel: 'Workspace Settings',
+						sourcePath: workspaceSettingsPath,
+						exists: false,
+					},
+				],
+			);
+		});
+	});
+
+	test('removeTrustedDirectory keeps camelCase and snake_case arrays aligned when both exist', () => {
+		withTempDir((root) => {
+			const settingsPath = path.join(root, 'settings.json');
+			const projectPath = path.join(root, 'project');
+			fs.writeFileSync(
+				settingsPath,
+				JSON.stringify(
+					{
+						trustedFolders: [projectPath],
+						trusted_folders: [projectPath],
+					},
+					null,
+					2,
+				),
+				'utf8',
+			);
+
+			assert.strictEqual(removeTrustedDirectory(settingsPath, projectPath), true);
+			const saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
+				trustedFolders?: string[];
+				trusted_folders?: string[];
+			};
+			assert.deepStrictEqual(saved.trustedFolders, []);
+			assert.deepStrictEqual(saved.trusted_folders, []);
 		});
 	});
 });

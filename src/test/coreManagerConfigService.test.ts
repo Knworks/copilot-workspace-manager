@@ -22,14 +22,15 @@ suite('Core manager config service', () => {
 			const workspaceRoot = path.join(root, 'workspace');
 			const userCopilotDir = path.join(homeDir, '.copilot');
 			const configPath = path.join(userCopilotDir, 'config.json');
+			const userSettingsPath = path.join(userCopilotDir, 'settings.json');
+			const workspaceSettingsPath = path.join(workspaceRoot, '.github', 'copilot', 'settings.json');
 			fs.mkdirSync(userCopilotDir, { recursive: true });
-			fs.mkdirSync(path.join(workspaceRoot, '.github'), { recursive: true });
+			fs.mkdirSync(path.dirname(workspaceSettingsPath), { recursive: true });
 			fs.writeFileSync(
 				configPath,
 				JSON.stringify(
 					{
 						features: { codex_hooks: true },
-						trusted_folders: [workspaceRoot],
 						hooks: {
 							PreToolUse: [
 								{
@@ -42,6 +43,11 @@ suite('Core manager config service', () => {
 					null,
 					2,
 				),
+				'utf8',
+			);
+			fs.writeFileSync(
+				userSettingsPath,
+				JSON.stringify({ trustedFolders: [workspaceRoot] }, null, 2),
 				'utf8',
 			);
 			fs.writeFileSync(
@@ -101,8 +107,9 @@ suite('Core manager config service', () => {
 			const workspaceRoot = path.join(root, 'workspace');
 			const userCopilotDir = path.join(homeDir, '.copilot');
 			const configPath = path.join(userCopilotDir, 'config.json');
+			const workspaceSettingsPath = path.join(workspaceRoot, '.github', 'copilot', 'settings.json');
 			fs.mkdirSync(userCopilotDir, { recursive: true });
-			fs.mkdirSync(path.join(workspaceRoot, '.github'), { recursive: true });
+			fs.mkdirSync(path.dirname(workspaceSettingsPath), { recursive: true });
 			fs.writeFileSync(
 				configPath,
 				JSON.stringify({ features: { codex_hooks: true } }, null, 2),

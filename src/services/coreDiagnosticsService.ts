@@ -22,6 +22,8 @@ export type TrustedDirectory = {
 	path: string;
 	exists: boolean;
 	reason?: string;
+	sourceLabel: string;
+	sourcePath: string;
 };
 
 export function buildAgentsLoadingChain(
@@ -37,48 +39,33 @@ export function buildAgentsLoadingChain(
 	return applyPriority(nodes);
 }
 
-export function listTrustedDirectories(configPath: string): TrustedDirectory[] {
-	if (!fs.existsSync(configPath)) {
-		return [];
-	}
-	try {
-		const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8')) as { trusted_folders?: unknown };
-		const trustedFolders = Array.isArray(parsed.trusted_folders) ? parsed.trusted_folders : [];
-		return trustedFolders
-			.filter((value): value is string => typeof value === 'string')
-			.map((targetPath) => ({
-				path: targetPath,
-				exists: fs.existsSync(targetPath),
-				reason: fs.existsSync(targetPath)
-					? undefined
-					: 'Directory does not exist or cannot be accessed.',
-			}));
-	} catch {
-		return [];
-	}
+export function listTrustedDirectories(
+	userSettingsPath: string,
+	workspaceSettingsPath?: string,
+): TrustedDirectory[] {
+	return [
+		...readTrustedDirectories(userSettingsPath, 'User Settings'),
+		...readTrustedDirectories(workspaceSettingsPath, 'Workspace Settings'),
+	];
 }
 
-export function addTrustedDirectory(configPath: string, projectPath: string): void {
-	const parsed = readConfig(configPath);
-	const trustedFolders = new Set(
-		Array.isArray(parsed.trusted_folders) ? parsed.trusted_folders.filter((value): value is string => typeof value === 'string') : [],
-	);
+export function addTrustedDirectory(settingsPath: string, projectPath: string): void {
+	const parsed = readConfig(settingsPath);
+	const trustedFolders = new Set(readTrustedFolderValues(parsed));
 	trustedFolders.add(projectPath);
-	parsed.trusted_folders = [...trustedFolders];
-	writeConfig(configPath, parsed);
+	setTrustedFolderValues(parsed, [...trustedFolders]);
+	writeConfig(settingsPath, parsed);
 }
 
-export function removeTrustedDirectory(configPath: string, projectPath: string): boolean {
-	const parsed = readConfig(configPath);
-	const trustedFolders = Array.isArray(parsed.trusted_folders)
-		? parsed.trusted_folders.filter((value): value is string => typeof value === 'string')
-		: [];
+export function removeTrustedDirectory(settingsPath: string, projectPath: string): boolean {
+	const parsed = readConfig(settingsPath);
+	const trustedFolders = readTrustedFolderValues(parsed);
 	const nextFolders = trustedFolders.filter((targetPath) => targetPath !== projectPath);
 	if (nextFolders.length === trustedFolders.length) {
 		return false;
 	}
-	parsed.trusted_folders = nextFolders;
-	writeConfig(configPath, parsed);
+	setTrustedFolderValues(parsed, nextFolders);
+	writeConfig(settingsPath, parsed);
 	return true;
 }
 
@@ -149,4 +136,43 @@ function readConfig(configPath: string): Record<string, unknown> {
 function writeConfig(configPath: string, config: Record<string, unknown>): void {
 	fs.mkdirSync(path.dirname(configPath), { recursive: true });
 	fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+}
+
+function readTrustedDirectories(
+	settingsPath: string | undefined,
+	sourceLabel: string,
+): TrustedDirectory[] {
+	if (!settingsPath || !fs.existsSync(settingsPath)) {
+		return [];
+	}
+	try {
+		const parsed = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as Record<string, unknown>;
+		return readTrustedFolderValues(parsed).map((targetPath) => ({
+			path: targetPath,
+			exists: fs.existsSync(targetPath),
+			reason: fs.existsSync(targetPath)
+				? undefined
+				: 'Directory does not exist or cannot be accessed.',
+			sourceLabel,
+			sourcePath: settingsPath,
+		}));
+	} catch {
+		return [];
+	}
+}
+
+function readTrustedFolderValues(config: Record<string, unknown>): string[] {
+	const values = Array.isArray(config.trustedFolders)
+		? config.trustedFolders
+		: Array.isArray(config.trusted_folders)
+			? config.trusted_folders
+			: [];
+	return values.filter((value): value is string => typeof value === 'string');
+}
+
+function setTrustedFolderValues(config: Record<string, unknown>, trustedFolders: string[]): void {
+	config.trustedFolders = trustedFolders;
+	if ('trusted_folders' in config) {
+		config.trusted_folders = trustedFolders;
+	}
 }

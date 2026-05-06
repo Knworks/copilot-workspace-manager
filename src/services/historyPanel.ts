@@ -38,7 +38,7 @@ type HistoryPanelInboundMessage =
 	| { type: 'copyText'; text: string }
 	| { type: 'refreshTab'; tab: CoreViewTab }
 	| { type: 'addTrustedDirectory' }
-	| { type: 'removeTrustedDirectory'; targetPath: string }
+	| { type: 'removeTrustedDirectory'; targetPath: string; sourcePath: string }
 	| { type: 'openPath'; targetPath: string }
 	| { type: 'createHooksFile'; targetPath: string }
 	| { type: 'createEmptyFile'; targetPath: string };
@@ -303,14 +303,25 @@ function buildAgentsChainPayload(
 }
 
 function buildTrustedDirectoriesHtml(): string {
-	const trustedDirectories = listTrustedDirectories(resolveCopilotPaths().configPath);
+	const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+	const trustedDirectories = listTrustedDirectories(
+		path.join(resolveCopilotPaths().copilotDir, 'settings.json'),
+		workspaceRoot
+			? path.join(workspaceRoot, '.github', 'copilot', 'settings.json')
+			: undefined,
+	);
 	const coreStatus = getCoreWorkspaceStatus();
-	const rows = trustedDirectories.map((directory) => `<article class="trusted-row turn-card">
-		<span class="codicon ${directory.exists ? 'codicon-pass-filled trusted-ok' : 'codicon-warning trusted-warning'}" aria-hidden="true"></span>
-		<span class="trusted-path">${escapeHtml(directory.path)}</span>
-		<button class="icon-button" type="button" data-remove-trusted="${escapeHtml(directory.path)}" ${coreStatus.isConfigInvalid ? 'disabled' : ''}><span class="codicon codicon-trash" aria-hidden="true"></span></button>
+	const rows = trustedDirectories.map((directory) => `<article class="trusted-row">
+		<span class="codicon codicon-workspace-trusted ${directory.exists ? 'trusted-ok' : 'trusted-warning'}" aria-hidden="true"></span>
+		<div class="trusted-main">
+			<div class="trusted-title">${escapeHtml(directory.sourceLabel)}</div>
+			<div class="trusted-path">${escapeHtml(directory.path)}</div>
+		</div>
+		<div class="trusted-actions">
+			<button class="icon-button" type="button" data-remove-trusted="${escapeHtml(directory.path)}" data-remove-trusted-source="${escapeHtml(directory.sourcePath)}" ${coreStatus.isConfigInvalid ? 'disabled' : ''}><span class="codicon codicon-trash" aria-hidden="true"></span></button>
+		</div>
 	</article>`).join('');
-	return `<div class="tab-toolbar">
+	return `<div class="tab-toolbar tab-toolbar-actions-right">
 		<button id="addTrusted" class="icon-button" type="button"><span class="codicon codicon-add" aria-hidden="true"></span></button>
 		${buildRefreshButtonHtml('trusted')}
 	</div>
@@ -412,6 +423,8 @@ function buildHistoryWebviewHtml(
 		.diag-tab { display: none; min-height: 0; }
 		.diag-tab.active { display: grid; grid-template-rows: auto 1fr; }
 		.top-pane, .tab-toolbar { padding: 10px 12px; border-bottom: 1px solid var(--vscode-panel-border); }
+		.tab-toolbar { display: flex; gap: 8px; align-items: center; }
+		.tab-toolbar-actions-right { justify-content: flex-end; }
 		.toolbar { display: flex; gap: 8px; align-items: center; }
 		.toolbar input { flex: 1; box-sizing: border-box; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 8px; padding: 6px 8px; }
 		.toolbar input:focus { outline: none; border-color: var(--vscode-focusBorder, #0e639c); box-shadow: 0 0 0 1px var(--vscode-focusBorder, #0e639c); }
@@ -428,9 +441,10 @@ function buildHistoryWebviewHtml(
 		.turn-issue-badge { color: var(--vscode-editorWarning-foreground); }
 		.preview-empty { color: var(--vscode-descriptionForeground); }
 		.answer-block, .chain-list, .chain-detail, .trusted-list, .settings-list, .history-list, .history-section { display: grid; gap: 6px; }
+		.trusted-list, .settings-list { padding: 10px 8px; }
 		.history-section.compact { gap: 3px; }
 		.history-section.compact .section-title { margin-bottom: 4px; }
-		.frame-header, .setting-card, .trusted-row { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+		.frame-header, .setting-card { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
 		.message-frame { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; }
 		.message-main { display: grid; gap: 4px; min-width: 0; }
 		.copy-button { border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); padding: 4px 6px; cursor: pointer; }
@@ -462,6 +476,11 @@ function buildHistoryWebviewHtml(
 		.chain-main { display: grid; gap: 4px; min-width: 0; padding-right: 90px; }
 		.chain-title { font-weight: 600; word-break: break-word; }
 		.chain-subtitle, .chain-status-meta, .chain-path { color: var(--vscode-descriptionForeground); font-size: 12px; }
+		.trusted-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); }
+		.trusted-main { display: grid; gap: 4px; min-width: 0; }
+		.trusted-title { font-weight: 600; }
+		.trusted-path { color: var(--vscode-descriptionForeground); font-size: 12px; word-break: break-all; }
+		.trusted-actions { display: flex; align-items: center; gap: 10px; }
 		.chain-status-badge { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border: 1px solid color-mix(in srgb, currentColor 24%, var(--vscode-panel-border)); border-radius: 999px; background: color-mix(in srgb, currentColor 16%, var(--vscode-editorWidget-background)); color: var(--vscode-descriptionForeground); box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 8%, transparent); font-size: 11px; line-height: 1; white-space: nowrap; }
 		.chain-status-badge .codicon { font-size: 12px; }
 		.chain-status-current { color: var(--vscode-testing-iconPassed); }
@@ -485,7 +504,7 @@ function buildHistoryWebviewHtml(
 		<nav class="tabs" aria-label="${escapeHtml(messages.coreViewTabsAriaLabel)}">
 			<button class="tab active" data-tab="history" type="button"><span class="codicon codicon-history" aria-hidden="true"></span><span>${messages.coreViewConversationHistoryTab}</span></button>
 			<button class="tab" data-tab="chain" type="button"><span class="codicon codicon-copilot" aria-hidden="true"></span><span>${messages.coreViewAgentsChainTab}</span></button>
-			<button class="tab" data-tab="trusted" type="button">${messages.coreViewTrustedDirectoriesTab}</button>
+			<button class="tab" data-tab="trusted" type="button"><span class="codicon codicon-workspace-trusted" aria-hidden="true"></span><span>${messages.coreViewTrustedDirectoriesTab}</span></button>
 			<button class="tab" data-tab="hooks" type="button">${messages.coreViewHooksTab}</button>
 		</nav>
 		<section id="historyTab" class="diag-tab active">
@@ -667,8 +686,8 @@ function buildHistoryWebviewHtml(
 				return;
 			}
 			const removeTrustedButton = target?.closest('[data-remove-trusted]');
-			if (removeTrustedButton?.dataset?.removeTrusted) {
-				vscode.postMessage({ type: 'removeTrustedDirectory', targetPath: removeTrustedButton.dataset.removeTrusted });
+			if (removeTrustedButton?.dataset?.removeTrusted && removeTrustedButton?.dataset?.removeTrustedSource) {
+				vscode.postMessage({ type: 'removeTrustedDirectory', targetPath: removeTrustedButton.dataset.removeTrusted, sourcePath: removeTrustedButton.dataset.removeTrustedSource });
 				return;
 			}
 			const openPathButton = target?.closest('[data-open-path]');
@@ -924,9 +943,10 @@ export class HistoryPanelManager implements vscode.Disposable {
 		}
 		if (
 			incoming.type === 'removeTrustedDirectory' &&
-			typeof incoming.targetPath === 'string'
+			typeof incoming.targetPath === 'string' &&
+			typeof incoming.sourcePath === 'string'
 		) {
-			void this.removeTrustedDirectory(incoming.targetPath);
+			void this.removeTrustedDirectory(incoming.sourcePath, incoming.targetPath);
 			return;
 		}
 		if (incoming.type === 'openPath' && typeof incoming.targetPath === 'string') {
@@ -958,12 +978,12 @@ export class HistoryPanelManager implements vscode.Disposable {
 		if (!targetPath) {
 			return;
 		}
-		addTrustedDirectory(resolveCopilotPaths().configPath, targetPath);
+		addTrustedDirectory(path.join(resolveCopilotPaths().copilotDir, 'settings.json'), targetPath);
 		vscode.window.showInformationMessage(messages.mcpToggleUpdated);
 		this.refreshTab('trusted');
 	}
 
-	private async removeTrustedDirectory(targetPath: string): Promise<void> {
+	private async removeTrustedDirectory(sourcePath: string, targetPath: string): Promise<void> {
 		const choice = await vscode.window.showWarningMessage(
 			messages.trustedDirectoryDeleteConfirm(targetPath),
 			{ modal: true },
@@ -972,7 +992,7 @@ export class HistoryPanelManager implements vscode.Disposable {
 		if (choice !== messages.dialogOk) {
 			return;
 		}
-		removeTrustedDirectory(resolveCopilotPaths().configPath, targetPath);
+		removeTrustedDirectory(sourcePath, targetPath);
 		vscode.window.showInformationMessage(messages.mcpToggleUpdated);
 		this.refreshTab('trusted');
 	}

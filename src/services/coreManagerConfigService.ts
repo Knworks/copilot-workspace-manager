@@ -80,7 +80,12 @@ export function listHookDiagnostics(
 	workspaceRoot: string | undefined = getWorkspaceRoot(),
 ): HookDiagnosticsSnapshot {
 	const hooksEnabled = readHooksEnabled(configPath);
-	const trustedDirectories = listTrustedDirectories(configPath);
+	const trustedDirectories = listTrustedDirectories(
+		path.join(resolveCopilotPaths(homeDir).copilotDir, 'settings.json'),
+		workspaceRoot
+			? path.join(workspaceRoot, '.github', 'copilot', 'settings.json')
+			: undefined,
+	);
 	const projectTrusted = workspaceRoot
 		? trustedDirectories.some(
 				(directory) => path.resolve(directory.path) === path.resolve(workspaceRoot),
