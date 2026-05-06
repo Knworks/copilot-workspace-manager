@@ -334,6 +334,7 @@ export function isRootNode(item: WorkspaceTreeItem): boolean {
 
 const FILE_VIEW_KINDS: FileViewKind[] = ['prompts', 'skills', 'templates'];
 const SKILL_SUBFOLDER_OPTIONS = ['references', 'scripts', 'assets'] as const;
+const SKILL_MARKDOWN_FILE_NAME = 'SKILL.md';
 
 function resolveSelection(
 	item: WorkspaceTreeItem | undefined,
@@ -491,6 +492,14 @@ function createRootItem(viewKind: FileViewKind, rootPath: string): WorkspaceTree
 	return rootItem;
 }
 
+export function buildSkillMarkdownTemplate(skillName: string): string {
+	return `---
+name: ${skillName}
+description: ""
+---
+`;
+}
+
 async function addFileWithSelection(
 	selection: WorkspaceTreeItem,
 	provider: FileExplorerProvider,
@@ -522,7 +531,7 @@ async function addFileWithSelection(
 
 	const normalizedName = sanitizeName(
 		selection.kind === 'skills' && !fileNameInput.trim()
-			? 'SKILL.md'
+			? SKILL_MARKDOWN_FILE_NAME
 			: fileNameInput,
 	);
 	if (!normalizedName) {
@@ -547,7 +556,9 @@ async function addFileWithSelection(
 		resolvedName = suggestedName;
 	}
 
-	const templateContent = await pickTemplateContents();
+	const templateContent = shouldCreateSkillMarkdownTemplate(selection, resolvedName)
+		? buildSkillMarkdownTemplate(path.basename(targetDir))
+		: await pickTemplateContents();
 	if (templateContent === null) {
 		return;
 	}
@@ -585,7 +596,10 @@ async function addFolderWithSelection(
 	}
 
 	const folderNameInput = await vscode.window.showInputBox({
-		prompt: messages.file.inputFolderName,
+		prompt:
+			selection.kind === 'skills' && selection.nodeType === 'root'
+				? messages.file.inputSkillFolderName
+				: messages.file.inputFolderName,
 	});
 	if (!folderNameInput) {
 		return;
@@ -606,6 +620,17 @@ async function addFolderWithSelection(
 	createFolder(targetDir, normalizedName);
 	await expandParentFolder(selection, views);
 	provider.refresh();
+}
+
+function shouldCreateSkillMarkdownTemplate(
+	selection: WorkspaceTreeItem,
+	fileName: string,
+): boolean {
+	return (
+		selection.kind === 'skills' &&
+		selection.nodeType === 'folder' &&
+		fileName === SKILL_MARKDOWN_FILE_NAME
+	);
 }
 
 async function pickSkillSubfolderName(

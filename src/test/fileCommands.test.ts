@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import path from 'path';
 import {
+	buildSkillMarkdownTemplate,
 	getCreatableLocationsForAdd,
 	isCaseOnlyRename,
 	isSamePath,
@@ -233,6 +234,17 @@ test('resolveAddViewSelection prefers item over selection', () => {
 				path.join('home', '.agents', 'skills'),
 				path.join('home', '.claude', 'skills'),
 			],
+		);
+	});
+
+	test('buildSkillMarkdownTemplate creates the default SKILL.md frontmatter', () => {
+		assert.strictEqual(
+			buildSkillMarkdownTemplate('sample-skill'),
+			`---
+name: sample-skill
+description: ""
+---
+`,
 		);
 	});
 });

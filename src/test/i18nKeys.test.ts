@@ -153,6 +153,7 @@ suite('Localization keys', () => {
 			'message.inputFileName',
 			'message.inputSkillFileName',
 			'message.inputFolderName',
+			'message.inputSkillFolderName',
 			'message.inputRenameName',
 			'message.invalidName',
 			'message.renameRootNotAllowed',
