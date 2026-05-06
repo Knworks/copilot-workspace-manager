@@ -1,4 +1,3 @@
-import fs from 'fs';
 import path from 'path';
 import * as vscode from 'vscode';
 import { messages } from '../i18n';
@@ -16,7 +15,8 @@ import {
 	removeTrustedDirectory,
 } from './coreDiagnosticsService';
 import {
-	createHooksJsonFile,
+	HookEntryRecord,
+	HookSourceRecord,
 	listHookDiagnostics,
 } from './coreManagerConfigService';
 import { getCoreWorkspaceStatus, resolveCopilotPaths } from './workspaceStatus';
@@ -38,10 +38,9 @@ type HistoryPanelInboundMessage =
 	| { type: 'copyText'; text: string }
 	| { type: 'refreshTab'; tab: CoreViewTab }
 	| { type: 'addTrustedDirectory' }
+	| { type: 'addHooksFile' }
 	| { type: 'removeTrustedDirectory'; targetPath: string; sourcePath: string }
-	| { type: 'openPath'; targetPath: string }
-	| { type: 'createHooksFile'; targetPath: string }
-	| { type: 'createEmptyFile'; targetPath: string };
+	| { type: 'openPath'; targetPath: string };
 
 type CoreViewTab = 'history' | 'chain' | 'trusted' | 'hooks';
 
@@ -102,6 +101,16 @@ type AgentsChainDisplayPayload = {
 	};
 	workspaceRoot?: string;
 	emptyStateMessage?: string;
+};
+
+type HooksDisplayPayload = {
+	sources: HookSourceRecord[];
+	entries: HookEntryRecord[];
+	emptyStateMessage?: string;
+};
+
+type HookFileQuickPickItem = vscode.QuickPickItem & {
+	fileName: string;
 };
 
 function normalizeQuery(query: string): string {
@@ -328,34 +337,30 @@ function buildTrustedDirectoriesHtml(): string {
 	<div class="trusted-list">${rows || `<p class="muted">${messages.historyNoResult}</p>`}</div>`;
 }
 
-function buildHooksHtml(): string {
+function buildHooksPayload(): HooksDisplayPayload {
 	const diagnostics = listHookDiagnostics();
-	const warnings = diagnostics.warnings
-		.map((warning) => `<article class="warning-card">${escapeHtml(warning)}</article>`)
-		.join('');
-	const sources = diagnostics.sources
-		.map((source) => `<article class="hooks-source-item">
-			<div><strong>${escapeHtml(source.layer)} / ${escapeHtml(source.format)}</strong></div>
-			<div class="muted">${escapeHtml(source.path)}</div>
-			<div class="muted">${escapeHtml(messages.hooksEntryCount(source.entryCount))}</div>
-		</article>`)
-		.join('');
-	const entries = diagnostics.entries
-		.map((entry) => `<article class="hook-entry-card">
-			<div><strong>${escapeHtml(entry.event)}</strong></div>
-			<div class="muted">${escapeHtml(entry.command ?? messages.hooksNoCommand)}</div>
-		</article>`)
-		.join('');
-	return `<div class="tab-toolbar">${buildRefreshButtonHtml('hooks')}</div>
-	<div class="settings-list">
-		${warnings}
-		${sources || `<p class="muted">${messages.historyNoResult}</p>`}
-		${entries || `<p class="muted">${messages.hooksNoEntries}</p>`}
-	</div>`;
+	return {
+		sources: diagnostics.sources,
+		entries: diagnostics.entries,
+		emptyStateMessage: diagnostics.sources.length > 0 ? undefined : messages.historyNoResult,
+	};
 }
 
 function serializeAgentsChain(payload: AgentsChainDisplayPayload): string {
 	return JSON.stringify(payload);
+}
+
+function sanitizeHookFileName(value: string): string {
+	return value.replace(/\.json$/i, '').trim();
+}
+
+async function fileExists(targetPath: string): Promise<boolean> {
+	try {
+		await vscode.workspace.fs.stat(vscode.Uri.file(targetPath));
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 function buildHistoryWebviewHtml(
@@ -394,6 +399,14 @@ function buildHistoryWebviewHtml(
 		chainDetailClassification: messages.chainDetailClassification,
 		chainDetailPath: messages.chainDetailPath,
 		chainDetailExplanation: messages.chainDetailExplanation,
+		hooksOpenSource: messages.hooksOpenSource,
+		hooksNoEntries: messages.hooksNoEntries,
+		hooksNoCommand: messages.hooksNoCommand,
+		hooksMatcherLabel: messages.hooksMatcherLabel,
+		hooksMatcherNotUsed: messages.hooksMatcherNotUsed,
+		hooksTypeLabel: messages.hooksTypeLabel,
+		hooksTimeoutLabel: messages.hooksTimeoutLabel,
+		hooksStatusMessageLabel: messages.hooksStatusMessageLabel,
 	});
 	const csp = [
 		"default-src 'none'",
@@ -440,7 +453,7 @@ function buildHistoryWebviewHtml(
 		.turn-meta { display: inline-flex; gap: 8px; align-items: center; }
 		.turn-issue-badge { color: var(--vscode-editorWarning-foreground); }
 		.preview-empty { color: var(--vscode-descriptionForeground); }
-		.answer-block, .chain-list, .chain-detail, .trusted-list, .settings-list, .history-list, .history-section { display: grid; gap: 6px; }
+		.answer-block, .chain-list, .chain-detail, .trusted-list, .settings-list, .history-list, .history-section, .hooks-list { display: grid; gap: 6px; }
 		.trusted-list, .settings-list { padding: 10px 8px; }
 		.history-section.compact { gap: 3px; }
 		.history-section.compact .section-title { margin-bottom: 4px; }
@@ -481,6 +494,17 @@ function buildHistoryWebviewHtml(
 		.trusted-title { font-weight: 600; }
 		.trusted-path { color: var(--vscode-descriptionForeground); font-size: 12px; word-break: break-all; }
 		.trusted-actions { display: flex; align-items: center; gap: 10px; }
+		.hook-source-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); cursor: pointer; }
+		.hook-source-row.active { border-color: var(--vscode-focusBorder); background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
+		.hook-source-main { display: grid; gap: 4px; min-width: 0; }
+		.hook-source-title { font-weight: 600; }
+		.hook-source-path, .hook-source-meta, .hook-entry-meta, .hook-entry-detail-label { color: var(--vscode-descriptionForeground); font-size: 12px; }
+		.hook-source-path { word-break: break-all; }
+		.hook-source-actions { display: flex; align-items: center; gap: 10px; }
+		.hook-entry-list { display: grid; gap: 6px; }
+		.hook-entry-card { display: grid; gap: 8px; }
+		.hook-entry-heading { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+		.hook-entry-detail-grid { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; }
 		.chain-status-badge { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border: 1px solid color-mix(in srgb, currentColor 24%, var(--vscode-panel-border)); border-radius: 999px; background: color-mix(in srgb, currentColor 16%, var(--vscode-editorWidget-background)); color: var(--vscode-descriptionForeground); box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 8%, transparent); font-size: 11px; line-height: 1; white-space: nowrap; }
 		.chain-status-badge .codicon { font-size: 12px; }
 		.chain-status-current { color: var(--vscode-testing-iconPassed); }
@@ -505,7 +529,7 @@ function buildHistoryWebviewHtml(
 			<button class="tab active" data-tab="history" type="button"><span class="codicon codicon-history" aria-hidden="true"></span><span>${messages.coreViewConversationHistoryTab}</span></button>
 			<button class="tab" data-tab="chain" type="button"><span class="codicon codicon-copilot" aria-hidden="true"></span><span>${messages.coreViewAgentsChainTab}</span></button>
 			<button class="tab" data-tab="trusted" type="button"><span class="codicon codicon-workspace-trusted" aria-hidden="true"></span><span>${messages.coreViewTrustedDirectoriesTab}</span></button>
-			<button class="tab" data-tab="hooks" type="button">${messages.coreViewHooksTab}</button>
+			<button class="tab" data-tab="hooks" type="button"><span class="codicon codicon-symbol-event" aria-hidden="true"></span><span>${messages.coreViewHooksTab}</span></button>
 		</nav>
 		<section id="historyTab" class="diag-tab active">
 			<section class="top-pane">
@@ -543,14 +567,22 @@ function buildHistoryWebviewHtml(
 			</section>
 		</section>
 		<section id="trustedTab" class="diag-tab"><div id="trustedContent"></div></section>
-		<section id="hooksTab" class="diag-tab"><div id="hooksContent"></div></section>
+		<section id="hooksTab" class="diag-tab">
+			<div class="tab-toolbar tab-toolbar-actions-right"><button id="addHooksFile" class="icon-button" type="button" title="${escapeHtml(messages.hooksAddFile)}" aria-label="${escapeHtml(messages.hooksAddFile)}"><span class="codicon codicon-add" aria-hidden="true"></span></button>${buildRefreshButtonHtml('hooks')}</div>
+			<section class="bottom-pane">
+				<aside class="left-pane"><div id="hooksList" class="hooks-list"></div></aside>
+				<main id="hooksPreview" class="right-pane"></main>
+			</section>
+		</section>
 	</div>
 	<script nonce="${nonce}">
 		const vscode = acquireVsCodeApi();
 		const labels = ${labels};
 		let chainPayload = ${serializeAgentsChain({ entries: [], summary: { currentCount: 0, ignoredCount: 0, problemCount: 0, hiddenCount: 0 } })};
+		let hooksPayload = { sources: [], entries: [], emptyStateMessage: labels.noResult };
 		let showDetailedChainCandidates = false;
 		let selectedChainId = chainPayload.entries[0]?.id;
+		let selectedHookSourceId = undefined;
 		let state = { appliedQuery: '', items: [], selectedTurn: undefined };
 		const loadedTabs = new Set();
 		const searchInput = document.getElementById('searchInput');
@@ -562,6 +594,8 @@ function buildHistoryWebviewHtml(
 		const chainContext = document.getElementById('chainContext');
 		const chainSummary = document.getElementById('chainSummary');
 		const chainDetailsToggle = document.getElementById('chainDetailsToggle');
+		const hooksList = document.getElementById('hooksList');
+		const hooksPreview = document.getElementById('hooksPreview');
 		const escapeHtml = (value) => String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll(\"'\", '&#39;');
 		const escapeRegExp = (value) => value.replace(/[.*+?^$()|[\\]{}\\\\]/g, '\\\\$&');
 		const renderInlineMarkdown = (text) => escapeHtml(text || '')
@@ -685,6 +719,11 @@ function buildHistoryWebviewHtml(
 				vscode.postMessage({ type: 'addTrustedDirectory' });
 				return;
 			}
+			const addHooksFileButton = target?.closest('#addHooksFile');
+			if (addHooksFileButton) {
+				vscode.postMessage({ type: 'addHooksFile' });
+				return;
+			}
 			const removeTrustedButton = target?.closest('[data-remove-trusted]');
 			if (removeTrustedButton?.dataset?.removeTrusted && removeTrustedButton?.dataset?.removeTrustedSource) {
 				vscode.postMessage({ type: 'removeTrustedDirectory', targetPath: removeTrustedButton.dataset.removeTrusted, sourcePath: removeTrustedButton.dataset.removeTrustedSource });
@@ -695,14 +734,10 @@ function buildHistoryWebviewHtml(
 				vscode.postMessage({ type: 'openPath', targetPath: openPathButton.dataset.openPath });
 				return;
 			}
-			const createHooksFileButton = target?.closest('[data-create-hooks-file]');
-			if (createHooksFileButton?.dataset?.createHooksFile) {
-				vscode.postMessage({ type: 'createHooksFile', targetPath: createHooksFileButton.dataset.createHooksFile });
-				return;
-			}
-			const createEmptyFileButton = target?.closest('[data-create-empty-file]');
-			if (createEmptyFileButton?.dataset?.createEmptyFile) {
-				vscode.postMessage({ type: 'createEmptyFile', targetPath: createEmptyFileButton.dataset.createEmptyFile });
+			const hookSourceRow = target?.closest('[data-hook-source-id]');
+			if (hookSourceRow?.dataset?.hookSourceId) {
+				selectedHookSourceId = hookSourceRow.dataset.hookSourceId;
+				renderHooks();
 				return;
 			}
 		});
@@ -791,11 +826,42 @@ function buildHistoryWebviewHtml(
 			chainPreview.innerHTML = '<section class="chain-detail-card">' + renderChainStatusBadge(selected) + '<div class="chain-main"><div class="chain-title">' + escapeHtml(selected.title) + '</div><div class="chain-status-meta">' + escapeHtml(selected.subtitle) + '</div></div><div class="chain-detail-grid"><div class="chain-detail-label">' + escapeHtml(labels.chainDetailClassification) + '</div><div>' + escapeHtml(selected.subtitle) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailPath) + '</div><div class="chain-path">' + escapeHtml(selected.path) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailExplanation) + '</div><div>' + escapeHtml(selected.explanation) + '</div></div>' + (selected.contentPreview ? '<div class="chain-preview-block"><div class="markdown-content">' + renderMarkdown(selected.contentPreview) + '</div></div>' : '') + '</section>';
 		};
 
+		const renderHooks = () => {
+			const sources = hooksPayload.sources || [];
+			const entries = hooksPayload.entries || [];
+			if (sources.length === 0) {
+				hooksList.innerHTML = '<div class="preview-empty">' + escapeHtml(hooksPayload.emptyStateMessage || labels.noResult) + '</div>';
+				hooksPreview.innerHTML = '<div class="preview-empty">' + escapeHtml(hooksPayload.emptyStateMessage || labels.noResult) + '</div>';
+				return;
+			}
+			if (!sources.some((source) => source.id === selectedHookSourceId)) {
+				selectedHookSourceId = sources[0].id;
+			}
+			hooksList.innerHTML = '';
+			for (const source of sources) {
+				const card = document.createElement('article');
+				card.className = 'hook-source-row' + (source.id === selectedHookSourceId ? ' active' : '');
+				card.dataset.hookSourceId = source.id;
+				card.innerHTML = '<span class="codicon codicon-symbol-event row-icon" aria-hidden="true"></span><div class="hook-source-main"><div class="hook-source-title">' + escapeHtml(source.label) + '</div><div class="hook-source-path">' + escapeHtml(source.path) + '</div><div class="hook-source-meta">' + escapeHtml(source.entryCount + ' entries') + '</div></div><div class="hook-source-actions"><button class="icon-button" type="button" data-open-path="' + escapeHtml(source.path) + '" title="' + escapeHtml(labels.hooksOpenSource) + '" aria-label="' + escapeHtml(labels.hooksOpenSource) + '"><span class="codicon codicon-file-text" aria-hidden="true"></span></button></div>';
+				hooksList.appendChild(card);
+			}
+			const selectedSource = sources.find((source) => source.id === selectedHookSourceId) || sources[0];
+			const selectedEntries = entries.filter((entry) => entry.sourceId === selectedSource.id);
+			if (selectedEntries.length === 0) {
+				hooksPreview.innerHTML = '<div class="preview-empty">' + escapeHtml(labels.hooksNoEntries) + '</div>';
+				return;
+			}
+			hooksPreview.innerHTML = '<div class="hook-entry-list">' + selectedEntries.map((entry) =>
+				'<article class="hook-entry-card"><div class="hook-entry-heading"><span class="codicon codicon-symbol-event" aria-hidden="true"></span><span>' + escapeHtml(entry.event) + '</span></div><div class="hook-entry-detail-grid"><div class="hook-entry-detail-label">Command</div><div>' + escapeHtml(entry.command || labels.hooksNoCommand) + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksMatcherLabel) + '</div><div>' + escapeHtml(entry.matcher || labels.hooksMatcherNotUsed) + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksTypeLabel) + '</div><div>' + escapeHtml(entry.handlerType) + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksTimeoutLabel) + '</div><div>' + escapeHtml(entry.timeout ?? '') + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksStatusMessageLabel) + '</div><div>' + escapeHtml(entry.statusMessage ?? '') + '</div></div></article>'
+			).join('') + '</div>';
+		};
+
 		const render = () => {
 			searchInput.value = state.appliedQuery;
 			renderList();
 			renderPreview();
 			renderChain();
+			renderHooks();
 		};
 
 		searchInput.addEventListener('input', () => vscode.postMessage({ type: 'search', query: searchInput.value }));
@@ -819,7 +885,9 @@ function buildHistoryWebviewHtml(
 				}
 				if (message.tab === 'hooks') {
 					loadedTabs.add('hooks');
-					document.getElementById('hooksContent').innerHTML = message.html;
+					hooksPayload = message.payload || { sources: [], entries: [], emptyStateMessage: labels.noResult };
+					selectedHookSourceId = hooksPayload.sources[0]?.id;
+					renderHooks();
 				}
 				return;
 			}
@@ -941,6 +1009,10 @@ export class HistoryPanelManager implements vscode.Disposable {
 			void this.addTrustedDirectory();
 			return;
 		}
+		if (incoming.type === 'addHooksFile') {
+			void this.addHooksFile();
+			return;
+		}
 		if (
 			incoming.type === 'removeTrustedDirectory' &&
 			typeof incoming.targetPath === 'string' &&
@@ -952,19 +1024,6 @@ export class HistoryPanelManager implements vscode.Disposable {
 		if (incoming.type === 'openPath' && typeof incoming.targetPath === 'string') {
 			void this.openPath(incoming.targetPath);
 			return;
-		}
-		if (
-			incoming.type === 'createHooksFile' &&
-			typeof incoming.targetPath === 'string'
-		) {
-			void this.createHooksFile(incoming.targetPath);
-			return;
-		}
-		if (
-			incoming.type === 'createEmptyFile' &&
-			typeof incoming.targetPath === 'string'
-		) {
-			void this.createEmptyFile(incoming.targetPath);
 		}
 	}
 
@@ -981,6 +1040,37 @@ export class HistoryPanelManager implements vscode.Disposable {
 		addTrustedDirectory(path.join(resolveCopilotPaths().copilotDir, 'settings.json'), targetPath);
 		vscode.window.showInformationMessage(messages.mcpToggleUpdated);
 		this.refreshTab('trusted');
+	}
+
+	private async addHooksFile(): Promise<void> {
+		const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+		if (!workspaceRoot) {
+			vscode.window.showInformationMessage(messages.chainNoWorkspace);
+			return;
+		}
+		const fileName = await this.promptHookFileName();
+		if (!fileName) {
+			return;
+		}
+		const hooksDir = path.join(workspaceRoot, '.github', 'hooks');
+		const targetPath = path.join(hooksDir, `${fileName}.json`);
+		if (await fileExists(targetPath)) {
+			vscode.window.showErrorMessage(messages.hooksDuplicateFileError);
+			return;
+		}
+		try {
+			await vscode.workspace.fs.createDirectory(vscode.Uri.file(hooksDir));
+			await vscode.workspace.fs.writeFile(
+				vscode.Uri.file(targetPath),
+				Buffer.from('{\n  "hooks": {\n  }\n}\n', 'utf8'),
+			);
+			await this.openPath(targetPath);
+			this.refreshTab('hooks');
+		} catch (error) {
+			vscode.window.showErrorMessage(
+				error instanceof Error ? error.message : String(error),
+			);
+		}
 	}
 
 	private async removeTrustedDirectory(sourcePath: string, targetPath: string): Promise<void> {
@@ -1001,19 +1091,60 @@ export class HistoryPanelManager implements vscode.Disposable {
 		await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(targetPath));
 	}
 
-	private async createHooksFile(targetPath: string): Promise<void> {
-		createHooksJsonFile(targetPath);
-		await this.openPath(targetPath);
-		this.refreshTab('hooks');
-	}
+	private async promptHookFileName(): Promise<string | undefined> {
+		return new Promise((resolve) => {
+			const quickPick = vscode.window.createQuickPick();
+			quickPick.title = messages.hooksAddFile;
+			quickPick.placeholder = messages.hooksFileNamePlaceholder;
+			quickPick.ignoreFocusOut = true;
+			let settled = false;
 
-	private async createEmptyFile(targetPath: string): Promise<void> {
-		fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-		if (!fs.existsSync(targetPath)) {
-			fs.writeFileSync(targetPath, '', 'utf8');
-		}
-		await this.openPath(targetPath);
-		this.refreshTab('hooks');
+			const updateItems = (): HookFileQuickPickItem[] => {
+				const value = sanitizeHookFileName(quickPick.value);
+				const items: HookFileQuickPickItem[] = value
+					? [
+						{
+							label: `$(add) ${value}.json`,
+							description: '.github/hooks',
+							fileName: value,
+						},
+					]
+					: [];
+				quickPick.items = items;
+				return items;
+			};
+
+			const finish = (value: string | undefined): void => {
+				if (settled) {
+					return;
+				}
+				settled = true;
+				quickPick.hide();
+				quickPick.dispose();
+				resolve(value);
+			};
+
+			quickPick.onDidAccept(() => {
+				const activeItem = quickPick.activeItems[0] as HookFileQuickPickItem | undefined;
+				const selectedItem = quickPick.selectedItems[0] as HookFileQuickPickItem | undefined;
+				const value = activeItem?.fileName
+					?? selectedItem?.fileName
+					?? sanitizeHookFileName(quickPick.value);
+				finish(value || undefined);
+			});
+			quickPick.onDidChangeValue(() => {
+				const items = updateItems();
+				if (items.length > 0) {
+					quickPick.activeItems = [items[0]];
+				}
+			});
+			quickPick.onDidHide(() => finish(undefined));
+			const items = updateItems();
+			if (items.length > 0) {
+				quickPick.activeItems = [items[0]];
+			}
+			quickPick.show();
+		});
 	}
 
 	private refreshTab(tab: CoreViewTab): void {
@@ -1040,7 +1171,7 @@ export class HistoryPanelManager implements vscode.Disposable {
 			void this.panel.webview.postMessage({
 				type: 'tabContent',
 				tab,
-				html: buildHooksHtml(),
+				payload: buildHooksPayload(),
 			});
 			return;
 		}

@@ -452,6 +452,15 @@ export const messages = {
 	hooksEntryCount: (count: number) =>
 		localize('message.hooksEntryCount', '{0} entries', count.toString()),
 	hooksOpenSource: localize('message.hooksOpenSource', 'Open source'),
+	hooksAddFile: localize('message.hooksAddFile', 'Add hooks file'),
+	hooksFileNamePlaceholder: localize(
+		'message.hooksFileNamePlaceholder',
+		'Enter hook file name',
+	),
+	hooksDuplicateFileError: localize(
+		'message.hooksDuplicateFileError',
+		'A file with the same name already exists.',
+	),
 	hooksCreateFile: localize('message.hooksCreateFile', 'Create hooks.json'),
 	hooksCreateConfigFile: localize(
 		'message.hooksCreateConfigFile',

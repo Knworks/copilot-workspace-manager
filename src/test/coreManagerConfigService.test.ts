@@ -2,9 +2,7 @@ import * as assert from 'assert';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import {
-	listHookDiagnostics,
-} from '../services/coreManagerConfigService';
+import { listHookDiagnostics } from '../services/coreManagerConfigService';
 
 function withTempDir(run: (root: string) => void): void {
 	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'core-manager-'));
@@ -16,42 +14,20 @@ function withTempDir(run: (root: string) => void): void {
 }
 
 suite('Core manager config service', () => {
-	test('listHookDiagnostics reads hooks.json and inline hooks with merge warning', () => {
+	test('listHookDiagnostics reads workspace hooks and plugin hooks', () => {
 		withTempDir((root) => {
 			const homeDir = path.join(root, 'home');
 			const workspaceRoot = path.join(root, 'workspace');
 			const userCopilotDir = path.join(homeDir, '.copilot');
-			const configPath = path.join(userCopilotDir, 'config.json');
-			const userSettingsPath = path.join(userCopilotDir, 'settings.json');
-			const workspaceSettingsPath = path.join(workspaceRoot, '.github', 'copilot', 'settings.json');
-			fs.mkdirSync(userCopilotDir, { recursive: true });
-			fs.mkdirSync(path.dirname(workspaceSettingsPath), { recursive: true });
+			const installedPluginsDir = path.join(userCopilotDir, 'installed-plugins');
+			const workspaceHooksDir = path.join(workspaceRoot, '.github', 'hooks');
+			const pluginHooksPath = path.join(installedPluginsDir, 'sample-plugin', 'hooks.json');
+			const workspaceHooksPath = path.join(workspaceHooksDir, 'workspace.json');
+
+			fs.mkdirSync(path.dirname(pluginHooksPath), { recursive: true });
+			fs.mkdirSync(workspaceHooksDir, { recursive: true });
 			fs.writeFileSync(
-				configPath,
-				JSON.stringify(
-					{
-						features: { codex_hooks: true },
-						hooks: {
-							PreToolUse: [
-								{
-									matcher: '^Bash$',
-									hooks: [{ type: 'command', command: 'echo user-inline' }],
-								},
-							],
-						},
-					},
-					null,
-					2,
-				),
-				'utf8',
-			);
-			fs.writeFileSync(
-				userSettingsPath,
-				JSON.stringify({ trustedFolders: [workspaceRoot] }, null, 2),
-				'utf8',
-			);
-			fs.writeFileSync(
-				path.join(userCopilotDir, 'hooks.json'),
+				workspaceHooksPath,
 				JSON.stringify(
 					{
 						hooks: {
@@ -61,7 +37,9 @@ suite('Core manager config service', () => {
 									hooks: [
 										{
 											type: 'command',
-											command: 'echo user-json',
+											command: 'python3 ~/.codex/hooks/session_start.py',
+											timeout: 600,
+											statusMessage: 'Loading session notes',
 										},
 									],
 								},
@@ -74,14 +52,18 @@ suite('Core manager config service', () => {
 				'utf8',
 			);
 			fs.writeFileSync(
-				path.join(workspaceRoot, '.github', 'hooks.json'),
+				pluginHooksPath,
 				JSON.stringify(
 					{
 						hooks: {
-							PostToolUse: [
+							Stop: [
 								{
-									matcher: '^Bash$',
-									hooks: [{ type: 'command', command: 'echo project-inline', timeout: 30 }],
+									hooks: [
+										{
+											type: 'command',
+											command: 'echo plugin-stop',
+										},
+									],
 								},
 							],
 						},
@@ -92,52 +74,53 @@ suite('Core manager config service', () => {
 				'utf8',
 			);
 
-			const diagnostics = listHookDiagnostics(configPath, homeDir, workspaceRoot);
+			const diagnostics = listHookDiagnostics(undefined, homeDir, workspaceRoot);
 
-			assert.strictEqual(diagnostics.hooksEnabled, true);
-			assert.strictEqual(diagnostics.projectTrusted, true);
-			assert.ok(Array.isArray(diagnostics.warnings));
-			assert.ok(Array.isArray(diagnostics.entries));
+			assert.deepStrictEqual(
+				diagnostics.sources.map((source) => ({
+					label: source.label,
+					path: source.path,
+					entryCount: source.entryCount,
+				})),
+				[
+					{
+						label: 'Workspace Hooks',
+						path: workspaceHooksPath,
+						entryCount: 1,
+					},
+					{
+						label: 'Plugin Hooks',
+						path: pluginHooksPath,
+						entryCount: 1,
+					},
+				],
+			);
+			assert.strictEqual(diagnostics.entries.length, 2);
+			assert.deepStrictEqual(diagnostics.entries[0], {
+				id: `workspace:${workspaceHooksPath}:SessionStart:0:0`,
+				sourceId: `workspace:${workspaceHooksPath}`,
+				sourceLabel: 'Workspace Hooks',
+				sourcePath: workspaceHooksPath,
+				event: 'SessionStart',
+				matcher: 'startup|resume',
+				handlerType: 'command',
+				command: 'python3 ~/.codex/hooks/session_start.py',
+				timeout: 600,
+				statusMessage: 'Loading session notes',
+			});
 		});
 	});
 
-	test('listHookDiagnostics keeps project hooks inactive until the workspace is trusted', () => {
+	test('listHookDiagnostics ignores missing hook roots', () => {
 		withTempDir((root) => {
 			const homeDir = path.join(root, 'home');
 			const workspaceRoot = path.join(root, 'workspace');
-			const userCopilotDir = path.join(homeDir, '.copilot');
-			const configPath = path.join(userCopilotDir, 'config.json');
-			const workspaceSettingsPath = path.join(workspaceRoot, '.github', 'copilot', 'settings.json');
-			fs.mkdirSync(userCopilotDir, { recursive: true });
-			fs.mkdirSync(path.dirname(workspaceSettingsPath), { recursive: true });
-			fs.writeFileSync(
-				configPath,
-				JSON.stringify({ features: { codex_hooks: true } }, null, 2),
-				'utf8',
-			);
-			fs.writeFileSync(
-				path.join(workspaceRoot, '.github', 'hooks.json'),
-				JSON.stringify(
-					{
-						hooks: {
-							Stop: [{ hooks: [{ type: 'command', command: 'echo stop' }] }],
-						},
-					},
-					null,
-					2,
-				),
-				'utf8',
-			);
+			fs.mkdirSync(workspaceRoot, { recursive: true });
 
-			const diagnostics = listHookDiagnostics(configPath, homeDir, workspaceRoot);
+			const diagnostics = listHookDiagnostics(undefined, homeDir, workspaceRoot);
 
-			assert.strictEqual(diagnostics.projectTrusted, false);
-			assert.ok(
-				diagnostics.warnings.some((warning) =>
-					warning.includes('inactive until this workspace is trusted'),
-				),
-			);
-			assert.ok(Array.isArray(diagnostics.entries));
+			assert.deepStrictEqual(diagnostics.sources, []);
+			assert.deepStrictEqual(diagnostics.entries, []);
 		});
 	});
 });
