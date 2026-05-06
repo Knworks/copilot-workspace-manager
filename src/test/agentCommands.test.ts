@@ -114,6 +114,47 @@ suite('Agent commands', () => {
 		});
 	});
 
+	test('addAgent quick pick excludes plugin agents and can target .claude agents', async () => {
+		await withTempHome(async (homeDir, workspaceRoot) => {
+			createWorkspace(homeDir);
+			await activateExtension();
+
+			let inputCount = 0;
+			const pickedLabels: string[] = [];
+			const originalInput = vscode.window.showInputBox;
+			const originalPick = vscode.window.showQuickPick;
+			(vscode.window as unknown as { showInputBox: typeof originalInput }).showInputBox =
+				async () => {
+					inputCount += 1;
+					return inputCount === 1 ? 'reviewer' : 'Security reviewer';
+				};
+			(vscode.window as unknown as { showQuickPick: typeof originalPick }).showQuickPick =
+				async (items: any) => {
+					pickedLabels.push(...items.map((item: { label?: string }) => item.label ?? ''));
+					return items.find(
+						(item: { description?: string }) =>
+							item.description === path.join(workspaceRoot, '.claude', 'agents'),
+					) ?? items[0];
+				};
+
+			try {
+				await vscode.commands.executeCommand('copilot-workspace-manager.addAgent');
+			} finally {
+				(vscode.window as unknown as { showInputBox: typeof originalInput }).showInputBox =
+					originalInput;
+				(vscode.window as unknown as { showQuickPick: typeof originalPick }).showQuickPick =
+					originalPick;
+			}
+
+			assert.ok(
+				fs.existsSync(path.join(workspaceRoot, '.claude', 'agents', 'reviewer.agent.md')),
+			);
+			assert.ok(pickedLabels.includes('Workspace Agents'));
+			assert.ok(pickedLabels.includes('User Agents'));
+			assert.ok(!pickedLabels.includes('Plugin Agents'));
+		});
+	});
+
 	test('editAgent renames .agent.md and updates frontmatter', async () => {
 		await withTempHome(async (homeDir, workspaceRoot) => {
 			createWorkspace(homeDir);

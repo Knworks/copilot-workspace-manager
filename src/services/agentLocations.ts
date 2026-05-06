@@ -25,14 +25,18 @@ export function getAgentLocations(
 	const { copilotDir } = resolveCopilotPaths(homeDir);
 	const locations: AgentLocation[] = [];
 	if (projectRoot) {
-		const preferredProjectRoot = path.join(projectRoot, '.github', 'agents');
-		locations.push({
-			kind: 'project',
-			label: 'Workspace Agents',
-			rootPath: preferredProjectRoot,
-			createPath: preferredProjectRoot,
-			priority: 1,
-		});
+		for (const rootPath of [
+			path.join(projectRoot, '.github', 'agents'),
+			path.join(projectRoot, '.claude', 'agents'),
+		]) {
+			locations.push({
+				kind: 'project',
+				label: 'Workspace Agents',
+				rootPath,
+				createPath: rootPath,
+				priority: 1,
+			});
+		}
 	}
 	locations.push({
 		kind: 'user',
@@ -41,7 +45,7 @@ export function getAgentLocations(
 		createPath: path.join(copilotDir, 'agents'),
 		priority: 2,
 	});
-	for (const rootPath of collectPluginRoots(path.join(copilotDir, 'installed-plugins'), 'agents')) {
+	for (const rootPath of collectPluginAgentRoots(path.join(copilotDir, 'installed-plugins'))) {
 		locations.push({
 			kind: 'plugin',
 			label: 'Plugin Agents',
@@ -72,24 +76,63 @@ export function findAgentLocationForPath(
 	});
 }
 
-function collectPluginRoots(pluginsRoot: string, targetDirName: string): string[] {
+function collectPluginAgentRoots(pluginsRoot: string): string[] {
 	if (!fs.existsSync(pluginsRoot)) {
 		return [];
 	}
+	const manifestPaths = findPluginManifests(pluginsRoot);
+	return manifestPaths.flatMap((manifestPath) =>
+		resolvePluginAgentRoots(path.dirname(manifestPath)),
+	);
+}
+
+function resolvePluginAgentRoots(pluginRoot: string): string[] {
+	const defaultRoot = path.join(pluginRoot, 'agents');
+	try {
+		const parsed = JSON.parse(
+			fs.readFileSync(path.join(pluginRoot, 'plugin.json'), 'utf8'),
+		) as { agents?: unknown };
+		const configuredRoots = normalizePluginAgentPaths(parsed.agents).map((agentPath) =>
+			path.resolve(pluginRoot, agentPath),
+		);
+		const candidateRoots = configuredRoots.length > 0 ? configuredRoots : [defaultRoot];
+		return candidateRoots
+			.filter((candidatePath) => isDirectory(candidatePath))
+			.filter((candidatePath, index, paths) => paths.indexOf(candidatePath) === index);
+	} catch {
+		return [];
+	}
+}
+
+function findPluginManifests(currentPath: string): string[] {
 	const results: string[] = [];
-	const visit = (currentPath: string): void => {
-		for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
-			if (!entry.isDirectory()) {
-				continue;
-			}
-			const fullPath = path.join(currentPath, entry.name);
-			if (entry.name === targetDirName) {
-				results.push(fullPath);
-				continue;
-			}
-			visit(fullPath);
+	for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
+		const fullPath = path.join(currentPath, entry.name);
+		if (entry.isFile() && entry.name === 'plugin.json') {
+			results.push(fullPath);
+			continue;
 		}
-	};
-	visit(pluginsRoot);
+		if (!entry.isDirectory()) {
+			continue;
+		}
+		results.push(...findPluginManifests(fullPath));
+	}
 	return results;
+}
+
+function normalizePluginAgentPaths(value: unknown): string[] {
+	if (typeof value === 'string' && value.trim()) {
+		return [value.trim()];
+	}
+	if (Array.isArray(value)) {
+		return value
+			.filter((entry): entry is string => typeof entry === 'string')
+			.map((entry) => entry.trim())
+			.filter(Boolean);
+	}
+	return [];
+}
+
+function isDirectory(targetPath: string): boolean {
+	return fs.existsSync(targetPath) && fs.statSync(targetPath).isDirectory();
 }
