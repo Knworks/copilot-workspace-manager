@@ -208,9 +208,18 @@ export function activate(context: vscode.ExtensionContext) {
 				if (!getWorkspaceStatus().isAvailable) {
 					return;
 				}
+				const selection = promptsView.selection[0];
+				if (selection?.fsPath) {
+					const targetDir =
+						selection.nodeType === 'file'
+							? path.dirname(selection.fsPath)
+							: selection.fsPath;
+					await revealFolder(targetDir);
+					return;
+				}
 				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 				if (workspaceRoot) {
-					await revealFolder(path.join(workspaceRoot, '.github', 'prompts'));
+					await revealFolder(path.join(workspaceRoot, '.claude', 'commands'));
 				}
 			}),
 	);
