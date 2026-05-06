@@ -55,7 +55,7 @@ export function getSkillLocations(
 			priority: 2,
 		});
 	}
-	for (const rootPath of collectPluginRoots(path.join(copilotDir, 'installed-plugins'), 'skills')) {
+	for (const rootPath of collectPluginSkillRoots(path.join(copilotDir, 'installed-plugins'))) {
 		locations.push({
 			kind: 'plugin',
 			label: 'Plugin Skills',
@@ -86,24 +86,59 @@ export function findSkillLocationForPath(
 	});
 }
 
-function collectPluginRoots(pluginsRoot: string, targetDirName: string): string[] {
+function collectPluginSkillRoots(pluginsRoot: string): string[] {
 	if (!fs.existsSync(pluginsRoot)) {
 		return [];
 	}
+	const manifestPaths = findPluginManifests(pluginsRoot);
+	return manifestPaths.flatMap((manifestPath) => resolvePluginSkillRoots(path.dirname(manifestPath)));
+}
+
+function resolvePluginSkillRoots(pluginRoot: string): string[] {
+	const defaultRoot = path.join(pluginRoot, 'skills');
+	try {
+		const parsed = JSON.parse(fs.readFileSync(path.join(pluginRoot, 'plugin.json'), 'utf8')) as { skills?: unknown };
+		const configuredRoots = normalizePluginSkillPaths(parsed.skills).map((skillPath) =>
+			path.resolve(pluginRoot, skillPath),
+		);
+		const candidateRoots = configuredRoots.length > 0 ? configuredRoots : [defaultRoot];
+		return candidateRoots
+			.filter((candidatePath) => isDirectory(candidatePath))
+			.filter((candidatePath, index, paths) => paths.indexOf(candidatePath) === index);
+	} catch {
+		return [];
+	}
+}
+
+function findPluginManifests(currentPath: string): string[] {
 	const results: string[] = [];
-	const visit = (currentPath: string): void => {
-		for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
-			if (!entry.isDirectory()) {
-				continue;
-			}
-			const fullPath = path.join(currentPath, entry.name);
-			if (entry.name === targetDirName) {
-				results.push(fullPath);
-				continue;
-			}
-			visit(fullPath);
+	for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
+		const fullPath = path.join(currentPath, entry.name);
+		if (entry.isFile() && entry.name === 'plugin.json') {
+			results.push(fullPath);
+			continue;
 		}
-	};
-	visit(pluginsRoot);
+		if (!entry.isDirectory()) {
+			continue;
+		}
+		results.push(...findPluginManifests(fullPath));
+	}
 	return results;
+}
+
+function normalizePluginSkillPaths(value: unknown): string[] {
+	if (typeof value === 'string' && value.trim()) {
+		return [value.trim()];
+	}
+	if (Array.isArray(value)) {
+		return value
+			.filter((entry): entry is string => typeof entry === 'string')
+			.map((entry) => entry.trim())
+			.filter(Boolean);
+	}
+	return [];
+}
+
+function isDirectory(targetPath: string): boolean {
+	return fs.existsSync(targetPath) && fs.statSync(targetPath).isDirectory();
 }
