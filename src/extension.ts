@@ -129,6 +129,9 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.window.onDidChangeActiveTextEditor(() => {
 			viewFocusState.clear();
 		}),
+		vscode.window.onDidChangeActiveTerminal(() => {
+			viewFocusState.clear();
+		}),
 	);
 
 	// Use the console to output diagnostic information (console.log) and errors (console.error)

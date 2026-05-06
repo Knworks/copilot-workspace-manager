@@ -213,6 +213,7 @@
   "message.historyUserLabel": "User",
   "message.historyAssistantLabel": "Assistant",
   "message.inputFileName": "Enter a file name.",
+  "message.inputSkillFileName": "Enter a file name. Leave empty to create SKILL.md.",
   "message.inputFolderName": "Enter a folder name.",
   "message.inputRenameName": "Enter a new name.",
   "message.invalidName": "Please enter a valid name.",

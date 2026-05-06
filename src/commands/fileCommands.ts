@@ -140,7 +140,7 @@ export function registerFileCommands(
 						return;
 					}
 
-					const selection = resolveSelection(item, getSelection);
+					const selection = resolveSelection(item, getSelection, viewFocusState);
 					if (!ensureSelection(selection)) {
 						return;
 					}
@@ -186,7 +186,7 @@ export function registerFileCommands(
 						return;
 					}
 
-					const selection = resolveSelection(item, getSelection);
+					const selection = resolveSelection(item, getSelection, viewFocusState);
 					if (!ensureSelection(selection)) {
 						return;
 					}
@@ -213,7 +213,7 @@ export function registerFileCommands(
 			'copilot-workspace-manager.rename',
 			(item?: WorkspaceTreeItem) =>
 				runSafely(async () => {
-					const selection = resolveSelection(item, getSelection);
+					const selection = resolveSelection(item, getSelection, viewFocusState);
 					if (
 						!ensureAvailable() ||
 						!ensureSelection(selection) ||
@@ -297,7 +297,7 @@ export function registerFileCommands(
 			'copilot-workspace-manager.delete',
 			(item?: WorkspaceTreeItem) =>
 				runSafely(async () => {
-					const selection = resolveSelection(item, getSelection);
+					const selection = resolveSelection(item, getSelection, viewFocusState);
 					if (
 						!ensureAvailable() ||
 						!ensureSelection(selection) ||
@@ -354,7 +354,11 @@ const FILE_VIEW_KINDS: FileViewKind[] = ['prompts', 'skills', 'templates'];
 function resolveSelection(
 	item: WorkspaceTreeItem | undefined,
 	getSelection: () => WorkspaceTreeItem | undefined,
+	viewFocusState?: ViewFocusState,
 ): WorkspaceTreeItem | undefined {
+	if (!item && viewFocusState && !viewFocusState.getActiveKind()) {
+		return undefined;
+	}
 	return item ?? getSelection();
 }
 
@@ -511,13 +515,20 @@ async function addFileWithSelection(
 	}
 
 	const fileNameInput = await vscode.window.showInputBox({
-		prompt: messages.file.inputFileName,
+		prompt:
+			selection.kind === 'skills'
+				? messages.file.inputSkillFileName
+				: messages.file.inputFileName,
 	});
-	if (!fileNameInput) {
+	if (fileNameInput === undefined) {
 		return;
 	}
 
-	const normalizedName = sanitizeName(fileNameInput);
+	const normalizedName = sanitizeName(
+		selection.kind === 'skills' && !fileNameInput.trim()
+			? 'SKILL.md'
+			: fileNameInput,
+	);
 	if (!normalizedName) {
 		vscode.window.showErrorMessage(messages.file.invalidName);
 		return;

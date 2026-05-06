@@ -613,6 +613,10 @@ export const messages = {
 	dialogOk: localize('message.dialogOk', 'OK'),
 	file: {
 		inputFileName: localize('message.inputFileName', 'Enter a file name.'),
+		inputSkillFileName: localize(
+			'message.inputSkillFileName',
+			'Enter a file name. Leave empty to create SKILL.md.',
+		),
 		inputFolderName: localize(
 			'message.inputFolderName',
 			'Enter a folder name.',

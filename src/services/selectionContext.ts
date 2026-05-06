@@ -7,6 +7,10 @@ export class SelectionContext {
 		this.current = item;
 	}
 
+	clear(): void {
+		this.current = undefined;
+	}
+
 	getSelection(): WorkspaceTreeItem | undefined {
 		return this.current;
 	}

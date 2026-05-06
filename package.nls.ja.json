@@ -213,6 +213,7 @@
   "message.historyUserLabel": "ユーザー",
   "message.historyAssistantLabel": "AI",
   "message.inputFileName": "ファイル名を入力してください。",
+  "message.inputSkillFileName": "ファイル名を入力してください。空で確定すると SKILL.md を作成します。",
   "message.inputFolderName": "フォルダ名を入力してください。",
   "message.inputRenameName": "新しい名前を入力してください。",
   "message.invalidName": "有効な名前を入力してください。",
