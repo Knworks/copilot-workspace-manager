@@ -151,6 +151,7 @@ suite('Localization keys', () => {
 			'message.historyRawEventsLabel',
 			'message.historyRawEventsHelp',
 			'message.inputFileName',
+			'message.inputCommandFileName',
 			'message.inputSkillFileName',
 			'message.inputFolderName',
 			'message.inputSkillFolderName',

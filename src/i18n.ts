@@ -613,6 +613,10 @@ export const messages = {
 	dialogOk: localize('message.dialogOk', 'OK'),
 	file: {
 		inputFileName: localize('message.inputFileName', 'Enter a file name.'),
+		inputCommandFileName: localize(
+			'message.inputCommandFileName',
+			'Enter a Command name.',
+		),
 		inputSkillFileName: localize(
 			'message.inputSkillFileName',
 			'Enter a file name. Leave empty to create SKILL.md.',
@@ -703,7 +707,7 @@ export const messages = {
 	agent: {
 		inputName: localize(
 			'message.agent.inputName',
-			'Enter an agent name.',
+			'Enter a Sub Agent name.',
 		),
 		inputDescription: localize(
 			'message.agent.inputDescription',

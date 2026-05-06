@@ -527,7 +527,9 @@ async function addFileWithSelection(
 
 	const fileNameInput = await vscode.window.showInputBox({
 		prompt:
-			selection.kind === 'skills'
+			selection.kind === 'prompts'
+				? messages.file.inputCommandFileName
+				: selection.kind === 'skills'
 				? messages.file.inputSkillFileName
 				: messages.file.inputFileName,
 	});

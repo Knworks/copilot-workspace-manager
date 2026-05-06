@@ -302,7 +302,7 @@
         {
           "command": "copilot-workspace-manager.refreshAll",
           "when": "view == 'copilot-workspace-manager.core' || view == 'copilot-workspace-manager.prompts' || view == 'copilot-workspace-manager.skills' || view == 'copilot-workspace-manager.templates' || view == 'copilot-workspace-manager.mcp' || view == 'copilot-workspace-manager.agents'",
-          "group": "navigation@5"
+          "group": "navigation@99"
         },
         {
           "command": "copilot-workspace-manager.openMcpManager",
@@ -355,13 +355,13 @@
           "group": "navigation@6"
         },
         {
-          "command": "copilot-workspace-manager.openCoreManager",
-          "when": "view == 'copilot-workspace-manager.core'",
+          "command": "copilot-workspace-manager.syncCore",
+          "when": "view == 'copilot-workspace-manager.core' && config.copilot-workspace-manager.copilotFolder",
           "group": "navigation@7"
         },
         {
-          "command": "copilot-workspace-manager.syncCore",
-          "when": "view == 'copilot-workspace-manager.core' && config.copilot-workspace-manager.copilotFolder",
+          "command": "copilot-workspace-manager.openCoreManager",
+          "when": "view == 'copilot-workspace-manager.core'",
           "group": "navigation@8"
         },
         {

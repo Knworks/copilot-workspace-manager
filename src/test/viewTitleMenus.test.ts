@@ -204,6 +204,33 @@ suite('View title menus', () => {
 			);
 		}
 
+		const extractGroupOrder = (group: string | undefined): number => {
+			const match = group?.match(/@(\d+)/);
+			return match ? Number(match[1]) : 0;
+		};
+		const refreshEntry = viewTitle.find(
+			(item: { command?: string }) =>
+				item.command === 'copilot-workspace-manager.refreshAll',
+		);
+		assert.ok(refreshEntry, 'Missing view/title menu for refreshAll');
+		const refreshOrder = extractGroupOrder(refreshEntry.group);
+		for (const command of [
+			...perViewCommands.map((item) => item.command),
+			...syncCommands.map((item) => item.command),
+			...managerCommands,
+		]) {
+			const entry = viewTitle.find(
+				(item: { command?: string }) => item.command === command,
+			);
+			if (!entry) {
+				continue;
+			}
+			assert.ok(
+				refreshOrder > extractGroupOrder(entry.group),
+				`refreshAll should be rightmost after ${command}`,
+			);
+		}
+
 		const itemContext = menus['view/item/context'];
 		assert.ok(Array.isArray(itemContext));
 		for (const command of [
