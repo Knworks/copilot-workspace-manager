@@ -61,14 +61,56 @@ suite('Skill config service', () => {
 		});
 	});
 
-	test('skill enable state persistence is not managed', () => {
+	test('skill enable state is driven by settings.json disabledSkills', () => {
 		withTempDir((root) => {
 			const configPath = path.join(root, 'config.json');
+			const settingsPath = path.join(root, 'settings.json');
+			fs.writeFileSync(
+				settingsPath,
+				JSON.stringify({ disabledSkills: ['reviewer'] }, null, 2),
+				'utf8',
+			);
+			const skillDir = path.join(root, 'skills', 'reviewer');
+			fs.mkdirSync(skillDir, { recursive: true });
+			fs.writeFileSync(
+				path.join(skillDir, 'SKILL.md'),
+				'---\nname: reviewer\ndescription: Reviews code\n---\n',
+				'utf8',
+			);
+			const location: SkillLocation = {
+				kind: 'project',
+				label: 'Workspace Skills',
+				rootPath: path.join(root, 'skills'),
+				priority: 1,
+			};
 
-			setSkillEnabled(configPath, path.join(root, 'skills', 'reviewer', 'SKILL.md'), false);
+			const records = listSkillRecords(configPath, [location]);
 
-			assert.deepStrictEqual([...readSkillEnabledByPath(configPath).entries()], []);
-			assert.strictEqual(fs.existsSync(configPath), false);
+			assert.strictEqual(records[0].enabled, false);
+			assert.deepStrictEqual([...readSkillEnabledByPath(configPath).entries()], [['reviewer', false]]);
+		});
+	});
+
+	test('setSkillEnabled adds and removes disabledSkills entries in settings.json', () => {
+		withTempDir((root) => {
+			const configPath = path.join(root, 'config.json');
+			const settingsPath = path.join(root, 'settings.json');
+			const skillDir = path.join(root, 'skills', 'reviewer');
+			fs.mkdirSync(skillDir, { recursive: true });
+			const skillPath = path.join(skillDir, 'SKILL.md');
+			fs.writeFileSync(
+				skillPath,
+				'---\nname: reviewer\ndescription: Reviews code\n---\n',
+				'utf8',
+			);
+
+			setSkillEnabled(configPath, skillPath, false);
+			let saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { disabledSkills: string[] };
+			assert.deepStrictEqual(saved.disabledSkills, ['reviewer']);
+
+			setSkillEnabled(configPath, skillPath, true);
+			saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { disabledSkills: string[] };
+			assert.deepStrictEqual(saved.disabledSkills, []);
 		});
 	});
 });

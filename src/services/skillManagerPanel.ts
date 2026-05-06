@@ -224,9 +224,7 @@ export class SkillManagerPanelManager implements vscode.Disposable {
 		if (message.type === 'toggleSkill') {
 			const { configPath } = resolveCopilotPaths();
 			setSkillEnabled(configPath, message.skillPath, message.enabled);
-			vscode.window.showInformationMessage(
-				'Skill enable/disable persistence is not managed by Copilot Workspace Manager.',
-			);
+			vscode.window.showInformationMessage(messages.mcpToggleUpdated);
 			this.onDidChangeSkills();
 			this.refresh();
 			return;

@@ -15,17 +15,18 @@ export function listSkillRecords(
 	configPath: string,
 	locations: SkillLocation[] = getSkillLocations(),
 ): SkillRecord[] {
-	void configPath;
+	const disabledSkills = readDisabledSkills(configPath);
 	return locations.flatMap((location) =>
 		findSkillMarkdownFiles(location.rootPath).map((skillPath) => {
 			const metadata = readSkillMetadata(skillPath);
+			const skillId = resolveSkillIdentifier(skillPath, metadata);
 			return {
 				id: `${location.kind}:${skillPath}`,
-				name: metadata.name || path.basename(path.dirname(skillPath)),
+				name: skillId,
 				description: metadata.description,
 				skillPath,
 				location,
-				enabled: true,
+				enabled: !disabledSkills.has(skillId),
 			};
 		}),
 	);
@@ -49,14 +50,29 @@ export function setSkillEnabled(
 	skillPath: string,
 	enabled: boolean,
 ): void {
-	void configPath;
-	void skillPath;
-	void enabled;
+	const settingsPath = resolveSettingsPath(configPath);
+	const metadata = readSkillMetadata(skillPath);
+	const skillId = resolveSkillIdentifier(skillPath, metadata);
+	const parsed = readSettingsJson(settingsPath);
+	const disabledSkills = new Set(readDisabledSkills(configPath));
+	if (enabled) {
+		disabledSkills.delete(skillId);
+	} else {
+		disabledSkills.add(skillId);
+	}
+	parsed.disabledSkills = [...disabledSkills].sort((left, right) =>
+		left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }),
+	);
+	writeSettingsJson(settingsPath, parsed);
 }
 
 export function readSkillEnabledByPath(configPath: string): Map<string, boolean> {
-	void configPath;
-	return new Map<string, boolean>();
+	const settingsPath = resolveSettingsPath(configPath);
+	if (!fs.existsSync(settingsPath)) {
+		return new Map<string, boolean>();
+	}
+	const disabledSkills = readDisabledSkills(configPath);
+	return new Map([...disabledSkills].map((skillId) => [skillId, false]));
 }
 
 function readFrontmatterString(frontmatter: string, key: string): string {
@@ -90,4 +106,40 @@ function findSkillMarkdownFiles(rootPath: string): string[] {
 	return results.sort((left, right) =>
 		left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }),
 	);
+}
+
+function resolveSkillIdentifier(
+	skillPath: string,
+	metadata: { name: string; description: string },
+): string {
+	return metadata.name || path.basename(path.dirname(skillPath));
+}
+
+function resolveSettingsPath(configPath: string): string {
+	return path.basename(configPath).toLowerCase() === 'config.json'
+		? path.join(path.dirname(configPath), 'settings.json')
+		: configPath;
+}
+
+function readSettingsJson(settingsPath: string): Record<string, unknown> {
+	if (!fs.existsSync(settingsPath)) {
+		return {};
+	}
+	try {
+		return JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as Record<string, unknown>;
+	} catch {
+		return {};
+	}
+}
+
+function writeSettingsJson(settingsPath: string, settings: Record<string, unknown>): void {
+	fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+	fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+}
+
+function readDisabledSkills(configPath: string): Set<string> {
+	const settingsPath = resolveSettingsPath(configPath);
+	const parsed = readSettingsJson(settingsPath);
+	const values = Array.isArray(parsed.disabledSkills) ? parsed.disabledSkills : [];
+	return new Set(values.filter((value): value is string => typeof value === 'string'));
 }
