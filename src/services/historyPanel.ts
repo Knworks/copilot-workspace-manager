@@ -479,7 +479,7 @@ function buildHistoryWebviewHtml(
 		.raw-events summary { margin-bottom: 6px; }
 		.answer-block > section, .answer-block > details { margin: 0; }
 		.answer-block ul { margin: 0; padding-left: 20px; }
-		.chain-toolbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+		.chain-toolbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; width: 100%; }
 		.chain-toolbar-main { display: grid; gap: 4px; min-width: 0; }
 		.chain-summary-line { color: var(--vscode-descriptionForeground); font-size: 12px; }
 		.chain-group { display: grid; gap: 2px; }
@@ -816,7 +816,7 @@ function buildHistoryWebviewHtml(
 					const card = document.createElement('button');
 					card.type = 'button';
 					card.className = 'chain-row' + (entry.id === selectedChainId ? ' active' : '');
-					card.innerHTML = '<span class="codicon codicon-file row-icon" aria-hidden="true"></span><div class="chain-main"><div class="chain-title">' + escapeHtml(entry.title) + '</div><div class="chain-subtitle">' + escapeHtml(entry.summary) + '</div></div>' + renderChainStatusBadge(entry);
+					card.innerHTML = '<span class="codicon codicon-copilot row-icon" aria-hidden="true"></span><div class="chain-main"><div class="chain-title">' + escapeHtml(entry.title) + '</div><div class="chain-subtitle">' + escapeHtml(entry.summary) + '</div></div>' + renderChainStatusBadge(entry);
 					card.addEventListener('click', () => { selectedChainId = entry.id; renderChain(); });
 					section.appendChild(card);
 				}
