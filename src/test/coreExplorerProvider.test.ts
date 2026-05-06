@@ -101,6 +101,72 @@ suite('Core explorer provider', () => {
 		}
 	});
 
+	test('uses requested icons for core entries', () => {
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'core-icons-'));
+		const originalCopilotHome = process.env.COPILOT_HOME;
+		const originalWorkspaceFolders = vscode.workspace.workspaceFolders;
+		try {
+			const copilotHome = path.join(tempDir, '.copilot');
+			const workspaceRoot = path.join(tempDir, 'workspace');
+			process.env.COPILOT_HOME = copilotHome;
+			fs.mkdirSync(path.join(workspaceRoot, '.github', 'copilot'), { recursive: true });
+			fs.mkdirSync(copilotHome, { recursive: true });
+			fs.writeFileSync(path.join(copilotHome, 'config.json'), '{}', 'utf8');
+			fs.writeFileSync(path.join(copilotHome, 'settings.json'), '{}', 'utf8');
+			fs.writeFileSync(path.join(copilotHome, 'mcp-config.json'), '{}', 'utf8');
+			fs.writeFileSync(path.join(copilotHome, 'copilot-instructions.md'), 'user', 'utf8');
+			fs.writeFileSync(path.join(workspaceRoot, 'AGENTS.md'), 'primary', 'utf8');
+			Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+				configurable: true,
+				value: [{ uri: vscode.Uri.file(workspaceRoot) }],
+			});
+
+			const provider = new CoreExplorerProvider(
+				contextStub,
+				() => ({ isAvailable: true }),
+				() => ({ isAvailable: true }),
+			);
+			const items = provider.getChildren() as vscode.TreeItem[];
+			const configItem = items.find((item) => item.label === 'config.json');
+			const settingsItem = items.find(
+				(item) => item.label === 'settings.json' && item.description === 'User Settings',
+			);
+			const mcpItem = items.find((item) => item.label === 'mcp-config.json');
+			const instructionsItem = items.find(
+				(item) =>
+					item.label === 'copilot-instructions.md' &&
+					item.description === 'User Instructions',
+			);
+			const agentsItem = items.find(
+				(item) => item.label === 'AGENTS.md' && item.description === 'Primary Instructions',
+			);
+
+			assert.ok(configItem?.iconPath instanceof vscode.ThemeIcon);
+			assert.strictEqual((configItem?.iconPath as vscode.ThemeIcon).id, 'settings-gear');
+			assert.ok(settingsItem?.iconPath instanceof vscode.ThemeIcon);
+			assert.strictEqual((settingsItem?.iconPath as vscode.ThemeIcon).id, 'settings-gear');
+			assert.ok(mcpItem?.iconPath instanceof vscode.ThemeIcon);
+			assert.strictEqual((mcpItem?.iconPath as vscode.ThemeIcon).id, 'mcp');
+			assert.ok(instructionsItem?.iconPath instanceof vscode.ThemeIcon);
+			assert.strictEqual((instructionsItem?.iconPath as vscode.ThemeIcon).id, 'copilot');
+			assert.deepStrictEqual(agentsItem?.iconPath, {
+				light: vscode.Uri.file(path.join('root', 'images', 'agents_light.png')),
+				dark: vscode.Uri.file(path.join('root', 'images', 'agents_dark.png')),
+			});
+		} finally {
+			Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+				configurable: true,
+				value: originalWorkspaceFolders,
+			});
+			if (originalCopilotHome === undefined) {
+				delete process.env.COPILOT_HOME;
+			} else {
+				process.env.COPILOT_HOME = originalCopilotHome;
+			}
+			fs.rmSync(tempDir, { recursive: true, force: true });
+		}
+	});
+
 	test('marks config item with warning when config is invalid but core is available', () => {
 		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'core-warning-'));
 		const originalCopilotHome = process.env.COPILOT_HOME;

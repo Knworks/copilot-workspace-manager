@@ -12,7 +12,7 @@ import {
 type CoreEntry = {
 	label: string;
 	fsPath: string;
-	iconFileName: string;
+	icon?: string | { light: string; dark: string };
 	description?: string;
 	warnOnInvalidConfig?: boolean;
 };
@@ -39,14 +39,14 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 			{
 				label: 'config.json',
 				fsPath: paths.configPath,
-				iconFileName: 'settingsfile32.png',
+				icon: 'settings-gear',
 				description: 'Internal Config',
 				warnOnInvalidConfig: true,
 			},
 			{
 				label: 'settings.json',
 				fsPath: path.join(paths.copilotDir, 'settings.json'),
-				iconFileName: 'settingsfile32.png',
+				icon: 'settings-gear',
 				description: 'User Settings',
 			},
 			...(workspaceRoot
@@ -54,13 +54,13 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 					{
 						label: 'settings.json',
 						fsPath: path.join(workspaceRoot, '.github', 'copilot', 'settings.json'),
-						iconFileName: 'settingsfile32.png',
+						icon: 'settings-gear',
 						description: 'Workspace Settings',
 					},
 					{
 						label: 'settings.local.json',
 						fsPath: path.join(workspaceRoot, '.github', 'copilot', 'settings.local.json'),
-						iconFileName: 'settingsfile32.png',
+						icon: 'settingsfile32.png',
 						description: 'Workspace Local Settings',
 					},
 				]
@@ -68,12 +68,12 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 			{
 				label: 'mcp-config.json',
 				fsPath: paths.mcpConfigPath,
-				iconFileName: 'settingsfile32.png',
+				icon: 'mcp',
 			},
 			{
 				label: 'copilot-instructions.md',
 				fsPath: path.join(paths.copilotDir, 'copilot-instructions.md'),
-				iconFileName: 'markdown32.png',
+				icon: 'copilot',
 				description: 'User Instructions',
 			},
 			...(workspaceRoot
@@ -81,7 +81,7 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 					{
 						label: 'copilot-instructions.md',
 						fsPath: path.join(workspaceRoot, '.github', 'copilot-instructions.md'),
-						iconFileName: 'markdown32.png',
+						icon: 'copilot',
 						description: 'Workspace Instructions',
 					},
 				]
@@ -105,13 +105,13 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 			{
 				label: 'AGENTS.md',
 				fsPath: primaryAgentsPath,
-				iconFileName: 'markdown32.png',
+				icon: { light: 'agents_light.png', dark: 'agents_dark.png' },
 				description: 'Primary Instructions',
 			},
 			...additionalAgentsPaths.map((agentsPath) => ({
 				label: 'AGENTS.md',
 				fsPath: agentsPath,
-				iconFileName: 'markdown32.png',
+				icon: { light: 'agents_light.png', dark: 'agents_dark.png' },
 				description: 'Additional Instructions',
 			})),
 		];
@@ -166,18 +166,23 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 			item.iconPath = new vscode.ThemeIcon('warning');
 			return item;
 		}
-		item.iconPath = this.getIcon(entry.iconFileName);
+		item.iconPath = this.getIcon(entry.icon);
 		return item;
 	}
 
 	private getIcon(
-		lightFileName: string,
-		darkFileName?: string,
-	): { light: vscode.Uri; dark: vscode.Uri } {
+		icon: string | { light: string; dark: string } | undefined,
+	): vscode.ThemeIcon | { light: vscode.Uri; dark: vscode.Uri } {
+		if (!icon) {
+			return new vscode.ThemeIcon('file');
+		}
+		if (typeof icon === 'string' && !icon.endsWith('.png')) {
+			return new vscode.ThemeIcon(icon);
+		}
+		const lightFileName = typeof icon === 'string' ? icon : icon.light;
+		const darkFileName = typeof icon === 'string' ? icon : icon.dark;
 		const lightPath = this.context.asAbsolutePath(path.join('images', lightFileName));
-		const darkPath = this.context.asAbsolutePath(
-			path.join('images', darkFileName ?? lightFileName),
-		);
+		const darkPath = this.context.asAbsolutePath(path.join('images', darkFileName));
 		return {
 			light: vscode.Uri.file(lightPath),
 			dark: vscode.Uri.file(darkPath),
