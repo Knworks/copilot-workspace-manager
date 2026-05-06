@@ -154,6 +154,7 @@ suite('Localization keys', () => {
 			'message.inputSkillFileName',
 			'message.inputFolderName',
 			'message.inputSkillFolderName',
+			'message.inputSkillDescription',
 			'message.inputRenameName',
 			'message.invalidName',
 			'message.renameRootNotAllowed',

@@ -492,10 +492,16 @@ function createRootItem(viewKind: FileViewKind, rootPath: string): WorkspaceTree
 	return rootItem;
 }
 
-export function buildSkillMarkdownTemplate(skillName: string): string {
+export function buildSkillMarkdownTemplate(
+	skillName: string,
+	description = '',
+): string {
+	const escapedDescription = description
+		.replace(/\\/g, '\\\\')
+		.replace(/"/g, '\\"');
 	return `---
 name: ${skillName}
-description: ""
+description: "${escapedDescription}"
 ---
 `;
 }
@@ -557,7 +563,7 @@ async function addFileWithSelection(
 	}
 
 	const templateContent = shouldCreateSkillMarkdownTemplate(selection, resolvedName)
-		? buildSkillMarkdownTemplate(path.basename(targetDir))
+		? await buildSkillMarkdownTemplateForSelection(targetDir)
 		: await pickTemplateContents();
 	if (templateContent === null) {
 		return;
@@ -631,6 +637,18 @@ function shouldCreateSkillMarkdownTemplate(
 		selection.nodeType === 'folder' &&
 		fileName === SKILL_MARKDOWN_FILE_NAME
 	);
+}
+
+async function buildSkillMarkdownTemplateForSelection(
+	targetDir: string,
+): Promise<string | null> {
+	const description = await vscode.window.showInputBox({
+		prompt: messages.file.inputSkillDescription,
+	});
+	if (description === undefined) {
+		return null;
+	}
+	return buildSkillMarkdownTemplate(path.basename(targetDir), description);
 }
 
 async function pickSkillSubfolderName(

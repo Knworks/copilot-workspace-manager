@@ -217,6 +217,7 @@
   "message.inputSkillFileName": "ファイル名を入力してください。空で確定すると SKILL.md を作成します。",
   "message.inputFolderName": "フォルダ名を入力してください。",
   "message.inputSkillFolderName": "Skill名を入力してください。",
+  "message.inputSkillDescription": "説明を入力してください。",
   "message.inputRenameName": "新しい名前を入力してください。",
   "message.invalidName": "有効な名前を入力してください。",
   "message.renameRootNotAllowed": "ルートフォルダはリネームできません。",

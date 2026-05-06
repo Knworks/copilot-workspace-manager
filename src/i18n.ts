@@ -625,6 +625,10 @@ export const messages = {
 			'message.inputSkillFolderName',
 			'Enter a Skill name.',
 		),
+		inputSkillDescription: localize(
+			'message.inputSkillDescription',
+			'Enter a description.',
+		),
 		inputRenameName: localize(
 			'message.inputRenameName',
 			'Enter a new name.',

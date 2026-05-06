@@ -247,4 +247,26 @@ description: ""
 `,
 		);
 	});
+
+	test('buildSkillMarkdownTemplate writes the provided description', () => {
+		assert.strictEqual(
+			buildSkillMarkdownTemplate('sample-skill', 'sample description'),
+			`---
+name: sample-skill
+description: "sample description"
+---
+`,
+		);
+	});
+
+	test('buildSkillMarkdownTemplate escapes quotes in the description', () => {
+		assert.strictEqual(
+			buildSkillMarkdownTemplate('sample-skill', 'say "hello"'),
+			`---
+name: sample-skill
+description: "say \\"hello\\""
+---
+`,
+		);
+	});
 });
