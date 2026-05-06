@@ -163,6 +163,28 @@ export const messages = {
 		'message.agentManagerNoResult',
 		'No agents found.',
 	),
+	agentManagerModelLabel: localize('message.agentManagerModelLabel', 'model:'),
+	agentManagerToolsLabel: localize('message.agentManagerToolsLabel', 'tools:'),
+	agentManagerMcpServersLabel: localize(
+		'message.agentManagerMcpServersLabel',
+		'mcpServers:',
+	),
+	agentManagerUserInvocableLabel: localize(
+		'message.agentManagerUserInvocableLabel',
+		'Whether users can select this agent manually',
+	),
+	agentManagerDisableModelInvocationLabel: localize(
+		'message.agentManagerDisableModelInvocationLabel',
+		'Prevent the model from invoking this agent automatically',
+	),
+	agentManagerPreviewLabel: localize(
+		'message.agentManagerPreviewLabel',
+		'File preview',
+	),
+	agentManagerPreviewEmpty: localize(
+		'message.agentManagerPreviewEmpty',
+		'No preview is available.',
+	),
 	agentManagerOverwritten: (agentName: string) =>
 		localize(
 			'message.agentManagerOverwritten',
