@@ -30,7 +30,16 @@ suite('Core manager config service', () => {
 				workspaceHooksPath,
 				JSON.stringify(
 					{
+						version: 1,
 						hooks: {
+							sessionStart: [
+								{
+									type: 'command',
+									bash: 'echo test-basic-plugin sessionStart',
+									powershell: "Write-Output 'test-basic-plugin sessionStart'",
+									timeoutSec: 5,
+								},
+							],
 							SessionStart: [
 								{
 									matcher: 'startup|resume',
@@ -82,11 +91,11 @@ suite('Core manager config service', () => {
 					path: source.path,
 					entryCount: source.entryCount,
 				})),
-				[
+				[	
 					{
 						label: 'Workspace Hooks',
 						path: workspaceHooksPath,
-						entryCount: 1,
+						entryCount: 2,
 					},
 					{
 						label: 'Plugin Hooks',
@@ -95,16 +104,36 @@ suite('Core manager config service', () => {
 					},
 				],
 			);
-			assert.strictEqual(diagnostics.entries.length, 2);
+			assert.strictEqual(diagnostics.entries.length, 3);
 			assert.deepStrictEqual(diagnostics.entries[0], {
-				id: `workspace:${workspaceHooksPath}:SessionStart:0:0`,
+				id: `workspace:${workspaceHooksPath}:sessionStart:0:0`,
+				sourceId: `workspace:${workspaceHooksPath}`,
+				sourceLabel: 'Workspace Hooks',
+				sourcePath: workspaceHooksPath,
+				event: 'sessionStart',
+				matcher: undefined,
+				handlerType: 'command',
+				schemaKind: 'copilot-cli',
+				command: "Write-Output 'test-basic-plugin sessionStart'",
+				bash: 'echo test-basic-plugin sessionStart',
+				powershell: "Write-Output 'test-basic-plugin sessionStart'",
+				prompt: undefined,
+				timeout: 5,
+				statusMessage: undefined,
+			});
+			assert.deepStrictEqual(diagnostics.entries[1], {
+				id: `workspace:${workspaceHooksPath}:SessionStart:1:0`,
 				sourceId: `workspace:${workspaceHooksPath}`,
 				sourceLabel: 'Workspace Hooks',
 				sourcePath: workspaceHooksPath,
 				event: 'SessionStart',
 				matcher: 'startup|resume',
 				handlerType: 'command',
+				schemaKind: 'nested',
 				command: 'python3 ~/.codex/hooks/session_start.py',
+				bash: undefined,
+				powershell: undefined,
+				prompt: undefined,
 				timeout: 600,
 				statusMessage: 'Loading session notes',
 			});

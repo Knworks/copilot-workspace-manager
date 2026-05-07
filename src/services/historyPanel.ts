@@ -411,7 +411,11 @@ function buildHistoryWebviewHtml(
 		hooksNoCommand: messages.hooksNoCommand,
 		hooksMatcherLabel: messages.hooksMatcherLabel,
 		hooksMatcherNotUsed: messages.hooksMatcherNotUsed,
+		hooksSchemaLabel: messages.hooksSchemaLabel,
 		hooksTypeLabel: messages.hooksTypeLabel,
+		hooksBashLabel: messages.hooksBashLabel,
+		hooksPowershellLabel: messages.hooksPowershellLabel,
+		hooksPromptLabel: messages.hooksPromptLabel,
 		hooksTimeoutLabel: messages.hooksTimeoutLabel,
 		hooksStatusMessageLabel: messages.hooksStatusMessageLabel,
 	});
@@ -821,7 +825,7 @@ function buildHistoryWebviewHtml(
 				return;
 			}
 			hooksPreview.innerHTML = '<div class="hook-entry-list">' + selectedEntries.map((entry) =>
-				'<article class="hook-entry-card"><div class="hook-entry-heading"><span class="codicon codicon-symbol-event" aria-hidden="true"></span><span>' + escapeHtml(entry.event) + '</span></div><div class="hook-entry-detail-grid"><div class="hook-entry-detail-label">Command</div><div>' + escapeHtml(entry.command || labels.hooksNoCommand) + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksMatcherLabel) + '</div><div>' + escapeHtml(entry.matcher || labels.hooksMatcherNotUsed) + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksTypeLabel) + '</div><div>' + escapeHtml(entry.handlerType) + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksTimeoutLabel) + '</div><div>' + escapeHtml(entry.timeout ?? '') + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksStatusMessageLabel) + '</div><div>' + escapeHtml(entry.statusMessage ?? '') + '</div></div></article>'
+				'<article class="hook-entry-card"><div class="hook-entry-heading"><span class="codicon codicon-symbol-event" aria-hidden="true"></span><span>' + escapeHtml(entry.event) + '</span></div><div class="hook-entry-detail-grid"><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksSchemaLabel) + '</div><div>' + escapeHtml(entry.schemaKind) + '</div><div class="hook-entry-detail-label">Command</div><div>' + escapeHtml(entry.command || labels.hooksNoCommand) + '</div>' + (entry.bash ? '<div class="hook-entry-detail-label">' + escapeHtml(labels.hooksBashLabel) + '</div><div>' + escapeHtml(entry.bash) + '</div>' : '') + (entry.powershell ? '<div class="hook-entry-detail-label">' + escapeHtml(labels.hooksPowershellLabel) + '</div><div>' + escapeHtml(entry.powershell) + '</div>' : '') + (entry.prompt ? '<div class="hook-entry-detail-label">' + escapeHtml(labels.hooksPromptLabel) + '</div><div>' + escapeHtml(entry.prompt) + '</div>' : '') + '<div class="hook-entry-detail-label">' + escapeHtml(labels.hooksMatcherLabel) + '</div><div>' + escapeHtml(entry.matcher || labels.hooksMatcherNotUsed) + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksTypeLabel) + '</div><div>' + escapeHtml(entry.handlerType) + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksTimeoutLabel) + '</div><div>' + escapeHtml(entry.timeout ?? '') + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksStatusMessageLabel) + '</div><div>' + escapeHtml(entry.statusMessage ?? '') + '</div></div></article>'
 			).join('') + '</div>';
 		};
 

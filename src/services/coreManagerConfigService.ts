@@ -4,13 +4,7 @@ import path from 'path';
 import * as vscode from 'vscode';
 import { resolveCopilotPaths } from './workspaceStatus';
 
-export type HookEventName =
-	| 'SessionStart'
-	| 'PreToolUse'
-	| 'PermissionRequest'
-	| 'PostToolUse'
-	| 'UserPromptSubmit'
-	| 'Stop';
+export type HookEventName = string;
 
 export type HookSourceKind = 'workspace' | 'plugin';
 
@@ -31,7 +25,11 @@ export type HookEntryRecord = {
 	event: HookEventName;
 	matcher?: string;
 	handlerType: string;
+	schemaKind: 'copilot-cli' | 'flat' | 'nested';
 	command?: string;
+	bash?: string;
+	powershell?: string;
+	prompt?: string;
 	timeout?: number;
 	statusMessage?: string;
 };
@@ -44,22 +42,17 @@ export type HookDiagnosticsSnapshot = {
 type ParsedHookGroup = {
 	event: HookEventName;
 	matcher?: string;
+	schemaKind: HookEntryRecord['schemaKind'];
 	handlers: Array<{
 		type: string;
 		command?: string;
+		bash?: string;
+		powershell?: string;
+		prompt?: string;
 		timeout?: number;
 		statusMessage?: string;
 	}>;
 };
-
-const HOOK_EVENTS: HookEventName[] = [
-	'SessionStart',
-	'PreToolUse',
-	'PermissionRequest',
-	'PostToolUse',
-	'UserPromptSubmit',
-	'Stop',
-];
 
 function getWorkspaceRoot(): string | undefined {
 	return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -170,7 +163,11 @@ function toHookEntries(
 			event: group.event,
 			matcher: group.matcher,
 			handlerType: handler.type,
+			schemaKind: group.schemaKind,
 			command: handler.command,
+			bash: handler.bash,
+			powershell: handler.powershell,
+			prompt: handler.prompt,
 			timeout: handler.timeout,
 			statusMessage: handler.statusMessage,
 		})),
@@ -186,29 +183,17 @@ function parseHooksJson(filePath: string): {
 	}
 	try {
 		const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as {
-			hooks?: Partial<Record<HookEventName, Array<{ matcher?: string; hooks?: Array<Record<string, unknown>> }>>>;
+			version?: number;
+			hooks?: Record<string, unknown>;
 		};
 		const groups: ParsedHookGroup[] = [];
-		for (const event of HOOK_EVENTS) {
-			for (const group of parsed.hooks?.[event] ?? []) {
-				groups.push({
-					event,
-					matcher: typeof group.matcher === 'string' ? group.matcher : undefined,
-					handlers: (group.hooks ?? []).map((handler) => ({
-						type: typeof handler.type === 'string' ? handler.type : 'unknown',
-						command: typeof handler.command === 'string' ? handler.command : undefined,
-						timeout:
-							typeof handler.timeout === 'number'
-								? handler.timeout
-								: typeof handler.timeout === 'string'
-									? Number(handler.timeout)
-									: undefined,
-						statusMessage:
-							typeof handler.statusMessage === 'string'
-								? handler.statusMessage
-								: undefined,
-					})),
-				});
+		for (const [event, rawEntries] of Object.entries(parsed.hooks ?? {})) {
+			if (!Array.isArray(rawEntries)) {
+				continue;
+			}
+			for (const rawEntry of rawEntries) {
+				const groupsForEntry = parseHookEntry(event, rawEntry, parsed.version);
+				groups.push(...groupsForEntry);
 			}
 		}
 		return { groups };
@@ -218,4 +203,86 @@ function parseHooksJson(filePath: string): {
 			error: error instanceof Error ? error.message : String(error),
 		};
 	}
+}
+
+function parseHookEntry(
+	event: HookEventName,
+	rawEntry: unknown,
+	version: number | undefined,
+): ParsedHookGroup[] {
+	if (!rawEntry || typeof rawEntry !== 'object') {
+		return [];
+	}
+	const entry = rawEntry as Record<string, unknown>;
+
+	if (typeof entry.type === 'string') {
+		return [
+			{
+				event,
+				matcher: typeof entry.matcher === 'string' ? entry.matcher : undefined,
+				schemaKind: version === 1 ? 'copilot-cli' : 'flat',
+				handlers: [normalizeDirectHandler(entry)],
+			},
+		];
+	}
+
+	if (Array.isArray(entry.hooks)) {
+		return [
+			{
+				event,
+				matcher: typeof entry.matcher === 'string' ? entry.matcher : undefined,
+				schemaKind: 'nested',
+				handlers: entry.hooks
+					.filter((handler): handler is Record<string, unknown> => !!handler && typeof handler === 'object')
+					.map((handler) => normalizeNestedHandler(handler)),
+			},
+		];
+	}
+
+	return [];
+}
+
+function normalizeDirectHandler(entry: Record<string, unknown>): ParsedHookGroup['handlers'][number] {
+	const bash = typeof entry.bash === 'string' ? entry.bash : undefined;
+	const powershell = typeof entry.powershell === 'string' ? entry.powershell : undefined;
+	const prompt = typeof entry.prompt === 'string' ? entry.prompt : undefined;
+	return {
+		type: typeof entry.type === 'string' ? entry.type : 'unknown',
+		command:
+			powershell
+			?? bash
+			?? (typeof entry.command === 'string' ? entry.command : undefined)
+			?? prompt,
+		bash,
+		powershell,
+		prompt,
+		timeout: readTimeout(entry.timeoutSec ?? entry.timeout),
+		statusMessage:
+			typeof entry.statusMessage === 'string'
+				? entry.statusMessage
+				: undefined,
+	};
+}
+
+function normalizeNestedHandler(handler: Record<string, unknown>): ParsedHookGroup['handlers'][number] {
+	return {
+		type: typeof handler.type === 'string' ? handler.type : 'unknown',
+		command: typeof handler.command === 'string' ? handler.command : undefined,
+		timeout: readTimeout(handler.timeout),
+		statusMessage:
+			typeof handler.statusMessage === 'string'
+				? handler.statusMessage
+				: undefined,
+	};
+}
+
+function readTimeout(rawValue: unknown): number | undefined {
+	if (typeof rawValue === 'number' && Number.isFinite(rawValue)) {
+		return rawValue;
+	}
+	if (typeof rawValue === 'string') {
+		const parsed = Number(rawValue);
+		return Number.isFinite(parsed) ? parsed : undefined;
+	}
+	return undefined;
 }

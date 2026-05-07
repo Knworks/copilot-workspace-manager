@@ -582,7 +582,11 @@ export const messages = {
 		'message.hooksMatcherNotUsed',
 		'Not specified',
 	),
+	hooksSchemaLabel: localize('message.hooksSchemaLabel', 'Schema'),
 	hooksTypeLabel: localize('message.hooksTypeLabel', 'Type'),
+	hooksBashLabel: localize('message.hooksBashLabel', 'Bash'),
+	hooksPowershellLabel: localize('message.hooksPowershellLabel', 'PowerShell'),
+	hooksPromptLabel: localize('message.hooksPromptLabel', 'Prompt'),
 	hooksTimeoutLabel: localize('message.hooksTimeoutLabel', 'Timeout'),
 	hooksStatusMessageLabel: localize(
 		'message.hooksStatusMessageLabel',
