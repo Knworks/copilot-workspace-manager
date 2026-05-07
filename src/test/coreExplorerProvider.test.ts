@@ -14,21 +14,39 @@ suite('Core explorer provider', () => {
 	test('returns core files in fixed order and omits missing entries', () => {
 		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'core-view-'));
 		const originalCopilotHome = process.env.COPILOT_HOME;
+		const originalCustomInstructionDirs = process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS;
 		const originalWorkspaceFolders = vscode.workspace.workspaceFolders;
 		try {
 			const copilotHome = path.join(tempDir, '.copilot');
 			const workspaceRoot = path.join(tempDir, 'workspace');
+			const customDir = path.join(tempDir, 'custom');
 			process.env.COPILOT_HOME = copilotHome;
+			process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS = customDir;
 			fs.mkdirSync(path.join(workspaceRoot, '.github', 'copilot'), { recursive: true });
+			fs.mkdirSync(path.join(workspaceRoot, '.github', 'instructions', 'typescript'), { recursive: true });
 			fs.mkdirSync(copilotHome, { recursive: true });
+			fs.mkdirSync(customDir, { recursive: true });
 			fs.writeFileSync(path.join(copilotHome, 'config.json'), '{}', 'utf8');
 			fs.writeFileSync(path.join(copilotHome, 'settings.json'), '{}', 'utf8');
 			fs.writeFileSync(path.join(workspaceRoot, '.github', 'copilot', 'settings.local.json'), '{}', 'utf8');
 			fs.writeFileSync(path.join(copilotHome, 'mcp-config.json'), '{}', 'utf8');
 			fs.writeFileSync(path.join(copilotHome, 'copilot-instructions.md'), 'user', 'utf8');
+			fs.writeFileSync(path.join(workspaceRoot, '.github', 'copilot-instructions.md'), 'workspace', 'utf8');
+			fs.writeFileSync(
+				path.join(
+					workspaceRoot,
+					'.github',
+					'instructions',
+					'typescript',
+					'typescript.instructions.md',
+				),
+				'---\napplyTo: "**/*.ts"\n---\npath',
+				'utf8',
+			);
 			fs.writeFileSync(path.join(workspaceRoot, 'AGENTS.md'), 'primary', 'utf8');
 			fs.mkdirSync(path.join(workspaceRoot, 'docs'), { recursive: true });
 			fs.writeFileSync(path.join(workspaceRoot, 'docs', 'AGENTS.md'), 'additional', 'utf8');
+			fs.writeFileSync(path.join(customDir, 'AGENTS.md'), 'custom agent', 'utf8');
 			Object.defineProperty(vscode.workspace, 'workspaceFolders', {
 				configurable: true,
 				value: [{ uri: vscode.Uri.file(workspaceRoot) }],
@@ -48,8 +66,10 @@ suite('Core explorer provider', () => {
 					'settings.local.json:Workspace Local Settings',
 					'mcp-config.json:',
 					'copilot-instructions.md:User Instructions',
-					'AGENTS.md:Primary Instructions',
-					'AGENTS.md:Additional Instructions',
+					'copilot-instructions.md:Workspace Instructions',
+					'typescript.instructions.md:Path Instructions',
+					'AGENTS.md:Agent Instructions',
+					'AGENTS.md:Custom Agent Instructions',
 				],
 			);
 		} finally {
@@ -61,6 +81,11 @@ suite('Core explorer provider', () => {
 				delete process.env.COPILOT_HOME;
 			} else {
 				process.env.COPILOT_HOME = originalCopilotHome;
+			}
+			if (originalCustomInstructionDirs === undefined) {
+				delete process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS;
+			} else {
+				process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS = originalCustomInstructionDirs;
 			}
 			fs.rmSync(tempDir, { recursive: true, force: true });
 		}
@@ -138,7 +163,7 @@ suite('Core explorer provider', () => {
 					item.description === 'User Instructions',
 			);
 			const agentsItem = items.find(
-				(item) => item.label === 'AGENTS.md' && item.description === 'Primary Instructions',
+				(item) => item.label === 'AGENTS.md' && item.description === 'Agent Instructions',
 			);
 
 			assert.ok(configItem?.iconPath instanceof vscode.ThemeIcon);

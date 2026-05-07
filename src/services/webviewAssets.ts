@@ -23,9 +23,13 @@ function resolveCodiconCssFsPath(): string | undefined {
 }
 
 const CODICON_CSS_FS_PATH = resolveCodiconCssFsPath();
+const IMAGE_ROOT_FS_PATH = resolveImagesRootFsPath();
 
 export const CODICON_RESOURCE_ROOTS = CODICON_CSS_FS_PATH
 	? [vscode.Uri.joinPath(vscode.Uri.file(CODICON_CSS_FS_PATH), '..')]
+	: [];
+export const IMAGE_RESOURCE_ROOTS = IMAGE_ROOT_FS_PATH
+	? [vscode.Uri.file(IMAGE_ROOT_FS_PATH)]
 	: [];
 
 export function getCodiconCssHref(webview: vscode.Webview): string | undefined {
@@ -43,6 +47,16 @@ export function getWebviewFontFamily(): string {
 		return 'var(--vscode-font-family)';
 	}
 	return editorFontFamily.replace(/[<>&;{}\\\r\n]/g, '');
+}
+
+export function getWebviewImageHref(
+	webview: vscode.Webview,
+	fileName: string,
+): string | undefined {
+	const imageFsPath = resolveImageFsPath(fileName);
+	return imageFsPath && typeof webview.asWebviewUri === 'function'
+		? webview.asWebviewUri(vscode.Uri.file(imageFsPath)).toString()
+		: undefined;
 }
 
 export function getCodiconIconPath(
@@ -79,4 +93,21 @@ function resolveCodiconIconFsPath(iconName: string, theme?: 'light' | 'dark'): s
 	} catch {
 		return undefined;
 	}
+}
+
+function resolveImagesRootFsPath(): string | undefined {
+	const candidates = [
+		path.join(__dirname, '..', 'images'),
+		path.join(__dirname, '..', '..', 'images'),
+	];
+	return candidates.find((candidate) => fs.existsSync(candidate));
+}
+
+function resolveImageFsPath(fileName: string): string | undefined {
+	const rootDir = IMAGE_ROOT_FS_PATH;
+	if (!rootDir) {
+		return undefined;
+	}
+	const imagePath = path.join(rootDir, fileName);
+	return fs.existsSync(imagePath) ? imagePath : undefined;
 }

@@ -11,6 +11,7 @@ import {
 	AgentsChainNode,
 	addTrustedDirectory,
 	buildAgentsLoadingChain,
+	createInstructionFile,
 	listTrustedDirectories,
 	removeTrustedDirectory,
 } from './coreDiagnosticsService';
@@ -22,10 +23,13 @@ import {
 import { getCoreWorkspaceStatus, resolveCopilotPaths } from './workspaceStatus';
 import {
 	CODICON_RESOURCE_ROOTS,
+	IMAGE_RESOURCE_ROOTS,
 	getCodiconCssHref,
 	getCodiconIconPath,
 	getWebviewFontFamily,
+	getWebviewImageHref,
 } from './webviewAssets';
+import { sanitizeName } from './fileNaming';
 
 const HISTORY_VIEW_TYPE = 'copilot-workspace-manager.coreView';
 export const HISTORY_MESSAGE_PREVIEW_MAX_CHARS = 100;
@@ -37,6 +41,7 @@ type HistoryPanelInboundMessage =
 	| { type: 'clearSearch' }
 	| { type: 'copyText'; text: string }
 	| { type: 'refreshTab'; tab: CoreViewTab }
+	| { type: 'addInstruction' }
 	| { type: 'addTrustedDirectory' }
 	| { type: 'addHooksFile' }
 	| { type: 'removeTrustedDirectory'; targetPath: string; sourcePath: string }
@@ -76,30 +81,28 @@ type HistoryPanelState = {
 	appliedQuery: string;
 };
 
-type AgentsChainDisplaySection = 'current' | 'ignored' | 'problems' | 'details';
-
 type AgentsChainDisplayEntry = {
 	id: string;
-	section: AgentsChainDisplaySection;
 	title: string;
 	subtitle: string;
-	statusLabel: string;
 	summary: string;
+	iconKind: 'copilot' | 'agent';
 	path: string;
 	explanation: string;
 	contentPreview?: string;
-	defaultVisible: boolean;
+	classification: string;
+	scope: string;
+	applyTo?: string;
 };
 
 type AgentsChainDisplayPayload = {
 	entries: AgentsChainDisplayEntry[];
 	summary: {
-		currentCount: number;
-		ignoredCount: number;
-		problemCount: number;
-		hiddenCount: number;
+		foundCount: number;
+		hasPotentialConflict: boolean;
 	};
 	workspaceRoot?: string;
+	activeFilePath?: string;
 	emptyStateMessage?: string;
 };
 
@@ -222,92 +225,96 @@ function buildRefreshButtonHtml(tab: CoreViewTab): string {
 	return `<button class="icon-button" type="button" data-refresh-tab="${tab}" title="${escapeHtml(messages.commandRefresh)}" aria-label="${escapeHtml(messages.commandRefresh)}"><span class="codicon codicon-refresh" aria-hidden="true"></span></button>`;
 }
 
-function toChainSubtitle(node: AgentsChainNode): string {
-	return `${node.kind} / ${node.type}`;
+function toClassificationLabel(node: AgentsChainNode): string {
+	switch (node.kind) {
+		case 'user':
+			return messages.chainClassificationUser;
+		case 'workspace':
+			return messages.chainClassificationWorkspace;
+		case 'path':
+			return messages.chainClassificationPath;
+		case 'agent':
+			return messages.chainClassificationAgent;
+		case 'customAgent':
+			return messages.chainClassificationCustomAgent;
+	}
 }
 
-function toDisplayEntry(node: AgentsChainNode, index: number): AgentsChainDisplayEntry {
-	if (node.status === 'Active') {
-		return {
-			id: `chain-${index}`,
-			section: 'current',
-			title: node.fileName,
-			subtitle: toChainSubtitle(node),
-			statusLabel: messages.chainStatusCurrent,
-			summary: messages.chainExplainCurrent(node.kind, node.fileName),
-			path: node.absolutePath,
-			explanation: messages.chainExplainCurrent(node.kind, node.fileName),
-			contentPreview: node.contentPreview,
-			defaultVisible: true,
-		};
+function toScopeLabel(node: AgentsChainNode): string {
+	switch (node.kind) {
+		case 'user':
+			return messages.chainScopeUser;
+		case 'workspace':
+			return messages.chainScopeWorkspace;
+		case 'path':
+			return messages.chainScopePath;
+		case 'agent':
+			return messages.chainScopeAgent;
+		case 'customAgent':
+			return messages.chainScopeCustomAgent;
 	}
-	if (node.status === 'Skipped') {
-		return {
-			id: `chain-${index}`,
-			section: 'ignored',
-			title: node.fileName,
-			subtitle: toChainSubtitle(node),
-			statusLabel: messages.chainStatusIgnored,
-			summary: messages.chainExplainIgnoredGeneric,
-			path: node.absolutePath,
-			explanation: messages.chainExplainIgnoredGeneric,
-			contentPreview: node.contentPreview,
-			defaultVisible: true,
-		};
+}
+
+function toExplanation(node: AgentsChainNode): string {
+	switch (node.kind) {
+		case 'user':
+			return messages.chainExplainUser;
+		case 'workspace':
+			return messages.chainExplainWorkspace;
+		case 'path':
+			if (node.status === 'invalidApplyTo') {
+				return messages.chainExplainInvalidApplyTo;
+			}
+			return messages.chainExplainPath;
+		case 'agent':
+			return messages.chainExplainAgent;
+		case 'customAgent':
+			return messages.chainExplainCustomAgent;
 	}
-	if (node.status === 'Error') {
-		return {
-			id: `chain-${index}`,
-			section: 'problems',
-			title: node.fileName,
-			subtitle: toChainSubtitle(node),
-			statusLabel: messages.chainStatusProblem,
-			summary: messages.chainExplainProblem(node.reason),
-			path: node.absolutePath,
-			explanation: messages.chainExplainProblem(node.reason),
-			contentPreview: node.contentPreview,
-			defaultVisible: true,
-		};
-	}
+}
+
+function toDisplayEntry(
+	node: AgentsChainNode,
+	index: number,
+): AgentsChainDisplayEntry {
+	const classification = toClassificationLabel(node);
+	const scope = toScopeLabel(node);
 	return {
 		id: `chain-${index}`,
-		section: 'details',
 		title: node.fileName,
-		subtitle: toChainSubtitle(node),
-		statusLabel: messages.chainStatusMissing,
-		summary: messages.chainExplainMissingGeneric,
+		subtitle: classification,
+		summary: classification,
+		iconKind: node.kind === 'agent' || node.kind === 'customAgent' ? 'agent' : 'copilot',
 		path: node.absolutePath,
-		explanation: messages.chainExplainMissingGeneric,
+		explanation: toExplanation(node),
 		contentPreview: node.contentPreview,
-		defaultVisible: false,
+		classification,
+		scope,
+		applyTo: node.applyTo,
 	};
 }
 
 function buildAgentsChainPayload(
 	workspaceRoot: string | undefined = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
 ): AgentsChainDisplayPayload {
-	if (!workspaceRoot) {
-		return {
-			entries: [],
-			summary: {
-				currentCount: 0,
-				ignoredCount: 0,
-				problemCount: 0,
-				hiddenCount: 0,
-			},
-			emptyStateMessage: messages.chainNoWorkspace,
-		};
-	}
-	const entries = buildAgentsLoadingChain(workspaceRoot).map(toDisplayEntry);
+	const activeFilePath = vscode.window.activeTextEditor?.document.uri.fsPath;
+	const nodes = buildAgentsLoadingChain(
+		workspaceRoot,
+		undefined,
+		process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS,
+		activeFilePath,
+	);
+	const hasMultipleEntries = nodes.length > 1;
+	const entries = nodes.map((node, index) => toDisplayEntry(node, index));
 	return {
 		entries,
 		summary: {
-			currentCount: entries.filter((entry) => entry.section === 'current').length,
-			ignoredCount: entries.filter((entry) => entry.section === 'ignored').length,
-			problemCount: entries.filter((entry) => entry.section === 'problems').length,
-			hiddenCount: entries.filter((entry) => !entry.defaultVisible).length,
+			foundCount: entries.length,
+			hasPotentialConflict: hasMultipleEntries,
 		},
 		workspaceRoot,
+		activeFilePath,
+		emptyStateMessage: entries.length > 0 ? undefined : messages.chainEmpty,
 	};
 }
 
@@ -369,6 +376,8 @@ function buildHistoryWebviewHtml(
 ): string {
 	const nonce = createNonce();
 	const fontFamily = getWebviewFontFamily();
+	const agentLightIconHref = getWebviewImageHref(webview, 'agents_light.png');
+	const agentDarkIconHref = getWebviewImageHref(webview, 'agents_dark.png');
 	const labels = JSON.stringify({
 		searchPlaceholder: messages.historySearchPlaceholder,
 		clear: messages.historyClear,
@@ -386,18 +395,16 @@ function buildHistoryWebviewHtml(
 		issues: messages.historyIssuesLabel,
 		rawEvents: messages.historyRawEventsLabel,
 		rawEventsHelp: messages.historyRawEventsHelp,
-		chainCurrentSection: messages.chainCurrentSection,
-		chainIgnoredSection: messages.chainIgnoredSection,
-		chainProblemsSection: messages.chainProblemsSection,
-		chainDetailsSection: messages.chainDetailsSection,
-		chainSummaryCurrent: messages.chainSummaryCurrent,
-		chainSummaryIgnored: messages.chainSummaryIgnored,
-		chainSummaryProblems: messages.chainSummaryProblems,
+		chainSummaryFound: messages.chainSummaryFound,
+		chainSummaryPotentialConflict: messages.chainSummaryPotentialConflict,
+		chainAddInstruction: messages.chainAddInstruction,
 		chainWorkspaceRootLabel: messages.chainWorkspaceRootLabel,
 		chainNoWorkspace: messages.chainNoWorkspace,
-		chainDetailStatus: messages.chainDetailStatus,
+		chainPreviewEmpty: messages.chainPreviewEmpty,
+		chainDetailScope: messages.chainDetailScope,
 		chainDetailClassification: messages.chainDetailClassification,
 		chainDetailPath: messages.chainDetailPath,
+		chainDetailApplyTo: messages.chainDetailApplyTo,
 		chainDetailExplanation: messages.chainDetailExplanation,
 		hooksOpenSource: messages.hooksOpenSource,
 		hooksNoEntries: messages.hooksNoEntries,
@@ -486,8 +493,14 @@ function buildHistoryWebviewHtml(
 		.chain-group-details { margin-top: 2px; }
 		.chain-row { position: relative; display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; width: 100%; padding: 8px 10px 8px 8px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); color: var(--vscode-foreground); text-align: left; cursor: pointer; }
 		.chain-row.active { border-color: var(--vscode-focusBorder); background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
-		.chain-main { display: grid; gap: 4px; min-width: 0; padding-right: 90px; }
-		.chain-title { font-weight: 600; word-break: break-word; }
+		.chain-icon-image { width: 16px; height: 16px; display: inline-block; }
+		.chain-icon-image.dark { display: none; }
+		body.vscode-dark .chain-icon-image.light, body.vscode-high-contrast:not(.vscode-high-contrast-light) .chain-icon-image.light { display: none; }
+		body.vscode-dark .chain-icon-image.dark, body.vscode-high-contrast:not(.vscode-high-contrast-light) .chain-icon-image.dark { display: inline-block; }
+		.chain-row-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+		.chain-list-badge { display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 999px; background: var(--vscode-textBlockQuote-background); color: var(--vscode-textLink-foreground); border: 1px solid color-mix(in srgb, var(--vscode-textLink-foreground) 28%, var(--vscode-panel-border)); font-size: 11px; line-height: 1.4; white-space: nowrap; }
+		.chain-main { display: grid; gap: 4px; min-width: 0; }
+		.chain-title { flex: 1; min-width: 0; font-weight: 600; word-break: break-word; }
 		.chain-subtitle, .chain-status-meta, .chain-path { color: var(--vscode-descriptionForeground); font-size: 12px; }
 		.trusted-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); }
 		.trusted-main { display: grid; gap: 4px; min-width: 0; }
@@ -505,22 +518,9 @@ function buildHistoryWebviewHtml(
 		.hook-entry-card { display: grid; gap: 8px; }
 		.hook-entry-heading { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
 		.hook-entry-detail-grid { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; }
-		.chain-status-badge { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border: 1px solid color-mix(in srgb, currentColor 24%, var(--vscode-panel-border)); border-radius: 999px; background: color-mix(in srgb, currentColor 16%, var(--vscode-editorWidget-background)); color: var(--vscode-descriptionForeground); box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 8%, transparent); font-size: 11px; line-height: 1; white-space: nowrap; }
-		.chain-status-badge .codicon { font-size: 12px; }
-		.chain-status-current { color: var(--vscode-testing-iconPassed); }
-		.chain-status-ignored { color: var(--vscode-descriptionForeground); }
-		.chain-status-problems { color: var(--vscode-editorWarning-foreground); }
-		.chain-status-details { color: #f8afcf; }
 		.chain-detail-card { position: relative; display: grid; gap: 8px; padding: 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); }
 		.chain-preview-block { padding: 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editor-background); }
-		.required-switch { display: inline-flex; align-items: center; cursor: pointer; user-select: none; gap: 8px; }
-		.required-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
-		.required-switch span.switch-track { display: inline-block; width: 34px; height: 18px; border-radius: 999px; background: var(--vscode-checkbox-background, var(--vscode-input-background)); border: 1px solid var(--vscode-checkbox-border, var(--vscode-panel-border)); position: relative; vertical-align: middle; box-sizing: border-box; transition: background 0.15s ease, border-color 0.15s ease; }
-		.required-switch span.switch-track::after { content: ""; position: absolute; top: 50%; left: 1px; width: 14px; height: 14px; border-radius: 50%; background: var(--vscode-button-secondaryForeground); transform: translateY(-50%); transition: transform 0.15s ease; }
-		.required-switch input:checked + span.switch-track { background: var(--vscode-button-background); border-color: var(--vscode-button-background); }
-		.required-switch input:checked + span.switch-track::after { transform: translate(16px, -50%); background: var(--vscode-button-foreground); }
-		.required-switch input:focus-visible + span.switch-track { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
-		.chain-toggle-label { color: var(--vscode-descriptionForeground); font-size: 12px; }
+		.chain-summary-warning { color: var(--vscode-editorWarning-foreground); }
 	</style>
 </head>
 <body>
@@ -551,14 +551,7 @@ function buildHistoryWebviewHtml(
 						<div id="chainContext" class="muted"></div>
 						<div id="chainSummary" class="chain-summary-line"></div>
 					</div>
-					<div class="toolbar">
-						<label class="required-switch" title="${escapeHtml(messages.chainToggleDetails)}">
-							<input id="chainDetailsToggle" type="checkbox" />
-							<span class="switch-track"></span>
-							<span class="chain-toggle-label">${messages.chainToggleDetails}</span>
-						</label>
-						${buildRefreshButtonHtml('chain')}
-					</div>
+					<div class="toolbar"><button id="addInstructionFile" class="icon-button" type="button" title="${escapeHtml(messages.chainAddInstruction)}" aria-label="${escapeHtml(messages.chainAddInstruction)}"><span class="codicon codicon-add" aria-hidden="true"></span></button>${buildRefreshButtonHtml('chain')}</div>
 				</div>
 			</div>
 			<section class="bottom-pane">
@@ -578,9 +571,8 @@ function buildHistoryWebviewHtml(
 	<script nonce="${nonce}">
 		const vscode = acquireVsCodeApi();
 		const labels = ${labels};
-		let chainPayload = ${serializeAgentsChain({ entries: [], summary: { currentCount: 0, ignoredCount: 0, problemCount: 0, hiddenCount: 0 } })};
+		let chainPayload = ${serializeAgentsChain({ entries: [], summary: { foundCount: 0, hasPotentialConflict: false } })};
 		let hooksPayload = { sources: [], entries: [], emptyStateMessage: labels.noResult };
-		let showDetailedChainCandidates = false;
 		let selectedChainId = chainPayload.entries[0]?.id;
 		let selectedHookSourceId = undefined;
 		let state = { appliedQuery: '', items: [], selectedTurn: undefined };
@@ -593,9 +585,11 @@ function buildHistoryWebviewHtml(
 		const chainPreview = document.getElementById('chainPreview');
 		const chainContext = document.getElementById('chainContext');
 		const chainSummary = document.getElementById('chainSummary');
-		const chainDetailsToggle = document.getElementById('chainDetailsToggle');
 		const hooksList = document.getElementById('hooksList');
 		const hooksPreview = document.getElementById('hooksPreview');
+		const renderChainRowIcon = (entry) => entry.iconKind === 'agent' && ${JSON.stringify(Boolean(agentLightIconHref && agentDarkIconHref))}
+			? '<span class="row-icon" aria-hidden="true"><img class="chain-icon-image light" src="${agentLightIconHref ?? ''}" alt="" /><img class="chain-icon-image dark" src="${agentDarkIconHref ?? ''}" alt="" /></span>'
+			: '<span class="codicon codicon-copilot row-icon" aria-hidden="true"></span>';
 		const escapeHtml = (value) => String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll(\"'\", '&#39;');
 		const escapeRegExp = (value) => value.replace(/[.*+?^$()|[\\]{}\\\\]/g, '\\\\$&');
 		const renderInlineMarkdown = (text) => escapeHtml(text || '')
@@ -675,21 +669,6 @@ function buildHistoryWebviewHtml(
 			}
 			return escaped.replace(new RegExp(escapeRegExp(query), 'gi'), (match) => '<mark class="search-highlight">' + match + '</mark>');
 		};
-		const chainSections = [['current', labels.chainCurrentSection], ['ignored', labels.chainIgnoredSection], ['problems', labels.chainProblemsSection], ['details', labels.chainDetailsSection]];
-		const getChainStatusIcon = (entry) => {
-			switch (entry.section) {
-				case 'current':
-					return 'check';
-				case 'ignored':
-					return 'circle-slash';
-				case 'problems':
-					return 'warning';
-				default:
-					return 'search';
-			}
-		};
-		const renderChainStatusBadge = (entry) => '<div class="chain-status-badge chain-status-' + entry.section + '" title="' + escapeHtml(entry.statusLabel) + '"><span class="codicon codicon-' + getChainStatusIcon(entry) + '" aria-hidden="true"></span><span>' + escapeHtml(entry.statusLabel) + '</span></div>';
-
 		searchInput.placeholder = labels.searchPlaceholder;
 		clearButton.title = labels.clear;
 		clearButton.innerHTML = '<span class="codicon codicon-clear-all" aria-hidden="true"></span>';
@@ -724,6 +703,11 @@ function buildHistoryWebviewHtml(
 				vscode.postMessage({ type: 'addHooksFile' });
 				return;
 			}
+			const addInstructionFileButton = target?.closest('#addInstructionFile');
+			if (addInstructionFileButton) {
+				vscode.postMessage({ type: 'addInstruction' });
+				return;
+			}
 			const removeTrustedButton = target?.closest('[data-remove-trusted]');
 			if (removeTrustedButton?.dataset?.removeTrusted && removeTrustedButton?.dataset?.removeTrustedSource) {
 				vscode.postMessage({ type: 'removeTrustedDirectory', targetPath: removeTrustedButton.dataset.removeTrusted, sourcePath: removeTrustedButton.dataset.removeTrustedSource });
@@ -739,14 +723,6 @@ function buildHistoryWebviewHtml(
 				selectedHookSourceId = hookSourceRow.dataset.hookSourceId;
 				renderHooks();
 				return;
-			}
-		});
-
-		document.addEventListener('change', (event) => {
-			const target = event.target instanceof HTMLInputElement ? event.target : null;
-			if (target === chainDetailsToggle) {
-				showDetailedChainCandidates = Boolean(chainDetailsToggle.checked);
-				renderChain();
 			}
 		});
 
@@ -789,12 +765,12 @@ function buildHistoryWebviewHtml(
 			}
 		};
 
-		const getVisibleChainEntries = () => (chainPayload.entries || []).filter((entry) => entry.defaultVisible || showDetailedChainCandidates);
 		const renderChain = () => {
-			const visibleEntries = getVisibleChainEntries();
-			const summary = chainPayload.summary || { currentCount: 0, ignoredCount: 0, problemCount: 0, hiddenCount: 0 };
+			const visibleEntries = chainPayload.entries || [];
+			const summary = chainPayload.summary || { foundCount: 0, hasPotentialConflict: false };
 			chainContext.innerHTML = chainPayload.workspaceRoot ? escapeHtml(labels.chainWorkspaceRootLabel + ': ' + chainPayload.workspaceRoot) : escapeHtml(labels.chainWorkspaceRootLabel + ': ' + labels.chainNoWorkspace);
-			chainSummary.innerHTML = labels.chainSummaryCurrent + ': ' + summary.currentCount + ' / ' + labels.chainSummaryIgnored + ': ' + summary.ignoredCount + ' / ' + labels.chainSummaryProblems + ': ' + summary.problemCount;
+			chainSummary.innerHTML = escapeHtml(labels.chainSummaryFound + ': ' + summary.foundCount)
+				+ (summary.hasPotentialConflict ? ' <span class="chain-summary-warning">' + escapeHtml(labels.chainSummaryPotentialConflict) + '</span>' : '');
 			if (visibleEntries.length === 0) {
 				chainList.innerHTML = '<div class="preview-empty">' + (chainPayload.emptyStateMessage || labels.noResult) + '</div>';
 				chainPreview.innerHTML = '<div class="preview-empty">' + (chainPayload.emptyStateMessage || labels.noResult) + '</div>';
@@ -804,26 +780,19 @@ function buildHistoryWebviewHtml(
 				selectedChainId = visibleEntries[0].id;
 			}
 			chainList.innerHTML = '';
-			for (const [sectionId, sectionLabel] of chainSections) {
-				const sectionEntries = visibleEntries.filter((entry) => entry.section === sectionId);
-				if (sectionEntries.length === 0) {
-					continue;
-				}
-				const section = document.createElement('section');
-				section.className = 'chain-group' + (sectionId === 'details' ? ' chain-group-details' : '');
-				section.innerHTML = '<h3 class="chain-section-title">' + escapeHtml(sectionLabel) + '</h3>';
-				for (const entry of sectionEntries) {
-					const card = document.createElement('button');
-					card.type = 'button';
-					card.className = 'chain-row' + (entry.id === selectedChainId ? ' active' : '');
-					card.innerHTML = '<span class="codicon codicon-copilot row-icon" aria-hidden="true"></span><div class="chain-main"><div class="chain-title">' + escapeHtml(entry.title) + '</div><div class="chain-subtitle">' + escapeHtml(entry.summary) + '</div></div>' + renderChainStatusBadge(entry);
-					card.addEventListener('click', () => { selectedChainId = entry.id; renderChain(); });
-					section.appendChild(card);
-				}
-				chainList.appendChild(section);
+			const section = document.createElement('section');
+			section.className = 'chain-group';
+			for (const entry of visibleEntries) {
+				const card = document.createElement('button');
+				card.type = 'button';
+				card.className = 'chain-row' + (entry.id === selectedChainId ? ' active' : '');
+				card.innerHTML = renderChainRowIcon(entry) + '<div class="chain-main"><div class="chain-row-header"><div class="chain-title">' + escapeHtml(entry.title) + '</div>' + (entry.applyTo ? '<span class="chain-list-badge">Path-specific</span>' : '') + '</div><div class="chain-subtitle">' + escapeHtml(entry.summary) + '</div></div>';
+				card.addEventListener('click', () => { selectedChainId = entry.id; renderChain(); });
+				section.appendChild(card);
 			}
+			chainList.appendChild(section);
 			const selected = visibleEntries.find((entry) => entry.id === selectedChainId) || visibleEntries[0];
-			chainPreview.innerHTML = '<section class="chain-detail-card">' + renderChainStatusBadge(selected) + '<div class="chain-main"><div class="chain-title">' + escapeHtml(selected.title) + '</div><div class="chain-status-meta">' + escapeHtml(selected.subtitle) + '</div></div><div class="chain-detail-grid"><div class="chain-detail-label">' + escapeHtml(labels.chainDetailClassification) + '</div><div>' + escapeHtml(selected.subtitle) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailPath) + '</div><div class="chain-path">' + escapeHtml(selected.path) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailExplanation) + '</div><div>' + escapeHtml(selected.explanation) + '</div></div>' + (selected.contentPreview ? '<div class="chain-preview-block"><div class="markdown-content">' + renderMarkdown(selected.contentPreview) + '</div></div>' : '') + '</section>';
+			chainPreview.innerHTML = '<section class="chain-detail-card"><div class="chain-main"><div class="chain-title">' + escapeHtml(selected.title) + '</div><div class="chain-status-meta">' + escapeHtml(selected.subtitle) + '</div></div><div class="chain-detail-grid"><div class="chain-detail-label">' + escapeHtml(labels.chainDetailClassification) + '</div><div>' + escapeHtml(selected.classification) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailScope) + '</div><div>' + escapeHtml(selected.scope) + '</div><div class="chain-detail-label">' + escapeHtml(labels.chainDetailPath) + '</div><div class="chain-path">' + escapeHtml(selected.path) + '</div>' + (selected.applyTo ? '<div class="chain-detail-label">' + escapeHtml(labels.chainDetailApplyTo) + '</div><div>' + escapeHtml(selected.applyTo) + '</div>' : '') + '<div class="chain-detail-label">' + escapeHtml(labels.chainDetailExplanation) + '</div><div>' + escapeHtml(selected.explanation) + '</div></div>' + (selected.contentPreview ? '<div class="chain-preview-block"><div class="markdown-content">' + renderMarkdown(selected.contentPreview) + '</div></div>' : '') + '</section>';
 		};
 
 		const renderHooks = () => {
@@ -875,8 +844,8 @@ function buildHistoryWebviewHtml(
 			if (message?.type === 'tabContent') {
 				if (message.tab === 'chain') {
 					loadedTabs.add('chain');
-					chainPayload = message.payload || { entries: [], summary: { currentCount: 0, ignoredCount: 0, problemCount: 0, hiddenCount: 0 } };
-					selectedChainId = chainPayload.entries.find((entry) => entry.defaultVisible)?.id || chainPayload.entries[0]?.id;
+					chainPayload = message.payload || { entries: [], summary: { foundCount: 0, hasPotentialConflict: false } };
+					selectedChainId = chainPayload.entries[0]?.id;
 					renderChain();
 				}
 				if (message.tab === 'trusted') {
@@ -909,8 +878,11 @@ export function createHistoryWebviewPanel(): vscode.WebviewPanel {
 	const panelOptions: vscode.WebviewPanelOptions & vscode.WebviewOptions = {
 		enableScripts: true,
 		retainContextWhenHidden: true,
-		...(CODICON_RESOURCE_ROOTS.length > 0
-			? { localResourceRoots: CODICON_RESOURCE_ROOTS }
+		...([...
+			CODICON_RESOURCE_ROOTS,
+			...IMAGE_RESOURCE_ROOTS,
+		].length > 0
+			? { localResourceRoots: [...CODICON_RESOURCE_ROOTS, ...IMAGE_RESOURCE_ROOTS] }
 			: {}),
 	};
 	const panel = vscode.window.createWebviewPanel(
@@ -1013,6 +985,10 @@ export class HistoryPanelManager implements vscode.Disposable {
 			void this.addHooksFile();
 			return;
 		}
+		if (incoming.type === 'addInstruction') {
+			void this.addInstruction();
+			return;
+		}
 		if (
 			incoming.type === 'removeTrustedDirectory' &&
 			typeof incoming.targetPath === 'string' &&
@@ -1071,6 +1047,115 @@ export class HistoryPanelManager implements vscode.Disposable {
 				error instanceof Error ? error.message : String(error),
 			);
 		}
+	}
+
+	private async addInstruction(): Promise<void> {
+		const selection = await vscode.window.showQuickPick(
+			[
+				{
+					label: `${messages.chainClassificationUser} (~/.copilot/)`,
+					value: 'user' as const,
+				},
+				{
+					label: `${messages.chainClassificationWorkspace} (.github/)`,
+					value: 'workspace' as const,
+				},
+				{
+					label: `${messages.chainClassificationPath} (.github/instructions/)`,
+					value: 'path' as const,
+				},
+			],
+			{ placeHolder: messages.chainAddInstructionTypePlaceholder },
+		);
+		if (!selection) {
+			return;
+		}
+		const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+		if ((selection.value === 'workspace' || selection.value === 'path') && !workspaceRoot) {
+			vscode.window.showInformationMessage(messages.chainNoWorkspace);
+			return;
+		}
+		if (selection.value === 'path') {
+			await this.addPathInstruction(workspaceRoot as string);
+			return;
+		}
+		const targetPath = selection.value === 'user'
+			? path.join(resolveCopilotPaths().copilotDir, 'copilot-instructions.md')
+			: path.join(workspaceRoot as string, '.github', 'copilot-instructions.md');
+		const createdPath = createInstructionFile(targetPath, selection.value);
+		if (!createdPath) {
+			vscode.window.showErrorMessage(messages.chainInstructionAlreadyExists);
+			return;
+		}
+		await this.openPath(createdPath);
+		this.refreshTab('chain');
+	}
+
+	private async addPathInstruction(workspaceRoot: string): Promise<void> {
+		const folderInput = await vscode.window.showInputBox({
+			prompt: messages.file.inputFolderName,
+			ignoreFocusOut: true,
+		});
+		const folderName = sanitizeName((folderInput ?? '').trim());
+		if (!folderInput) {
+			return;
+		}
+		if (!folderName) {
+			vscode.window.showErrorMessage(messages.file.invalidName);
+			return;
+		}
+		const fileStem = await this.promptPathInstructionFileName(folderName);
+		if (fileStem === undefined) {
+			return;
+		}
+		const normalizedFileStem = sanitizeName(fileStem.trim() || folderName);
+		if (!normalizedFileStem) {
+			vscode.window.showErrorMessage(messages.file.invalidName);
+			return;
+		}
+		const targetPath = path.join(
+			workspaceRoot,
+			'.github',
+			'instructions',
+			folderName,
+			`${normalizedFileStem}.instructions.md`,
+		);
+		const createdPath = createInstructionFile(targetPath, 'path');
+		if (!createdPath) {
+			vscode.window.showErrorMessage(messages.chainInstructionAlreadyExists);
+			return;
+		}
+		await this.openPath(createdPath);
+		this.refreshTab('chain');
+	}
+
+	private async promptPathInstructionFileName(folderName: string): Promise<string | undefined> {
+		return new Promise((resolve) => {
+			const inputBox = vscode.window.createInputBox();
+			inputBox.ignoreFocusOut = true;
+			inputBox.prompt = messages.chainPathInstructionFilePrompt;
+			const updateTitle = (): void => {
+				const currentValue = sanitizeName(inputBox.value.trim() || folderName);
+				inputBox.title = messages.chainPathInstructionPreview(
+					`${currentValue}.instructions.md`,
+				);
+			};
+			let settled = false;
+			const finish = (value: string | undefined): void => {
+				if (settled) {
+					return;
+				}
+				settled = true;
+				inputBox.hide();
+				inputBox.dispose();
+				resolve(value);
+			};
+			inputBox.onDidAccept(() => finish(inputBox.value));
+			inputBox.onDidHide(() => finish(undefined));
+			inputBox.onDidChangeValue(() => updateTitle());
+			updateTitle();
+			inputBox.show();
+		});
 	}
 
 	private async removeTrustedDirectory(sourcePath: string, targetPath: string): Promise<void> {

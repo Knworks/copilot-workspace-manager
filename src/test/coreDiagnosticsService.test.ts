@@ -19,36 +19,132 @@ function withTempDir(run: (root: string) => void): void {
 }
 
 suite('Core diagnostics service', () => {
-	test('buildAgentsLoadingChain prefers user instructions over workspace instructions', () => {
+	test('buildAgentsLoadingChain lists only existing instruction files', () => {
 		withTempDir((root) => {
 			const homeDir = path.join(root, 'home');
 			const copilotDir = path.join(homeDir, '.copilot');
 			const workspaceRoot = path.join(root, 'workspace');
 			fs.mkdirSync(path.join(workspaceRoot, '.github'), { recursive: true });
+			fs.mkdirSync(path.join(workspaceRoot, '.github', 'instructions', 'typescript'), { recursive: true });
 			fs.mkdirSync(copilotDir, { recursive: true });
 			fs.writeFileSync(path.join(copilotDir, 'copilot-instructions.md'), 'user', 'utf8');
 			fs.writeFileSync(path.join(workspaceRoot, '.github', 'copilot-instructions.md'), 'workspace', 'utf8');
+			fs.writeFileSync(
+				path.join(
+					workspaceRoot,
+					'.github',
+					'instructions',
+					'typescript',
+					'typescript.instructions.md',
+				),
+				'---\napplyTo: "**/*.ts"\n---\npath',
+				'utf8',
+			);
+			fs.writeFileSync(path.join(workspaceRoot, 'AGENTS.md'), 'agent', 'utf8');
 
 			const nodes = buildAgentsLoadingChain(workspaceRoot, homeDir);
 
-			assert.strictEqual(nodes[0].status, 'Active');
-			assert.strictEqual(nodes[1].status, 'Skipped');
+			assert.deepStrictEqual(
+				nodes.map((node) => ({
+					kind: node.kind,
+					fileName: node.fileName,
+					status: node.status,
+				})),
+				[
+					{ kind: 'user', fileName: 'copilot-instructions.md', status: 'found' },
+					{ kind: 'workspace', fileName: 'copilot-instructions.md', status: 'found' },
+					{
+						kind: 'path',
+						fileName: 'typescript.instructions.md',
+						status: 'appliesWhenPathMatches',
+					},
+					{ kind: 'agent', fileName: 'AGENTS.md', status: 'found' },
+				],
+			);
 		});
 	});
 
-	test('buildAgentsLoadingChain marks missing workspace instructions', () => {
+	test('buildAgentsLoadingChain detects path instructions and current file matches', () => {
 		withTempDir((root) => {
 			const homeDir = path.join(root, 'home');
-			const copilotDir = path.join(homeDir, '.copilot');
 			const workspaceRoot = path.join(root, 'workspace');
-			fs.mkdirSync(copilotDir, { recursive: true });
-			fs.mkdirSync(workspaceRoot, { recursive: true });
-			fs.writeFileSync(path.join(copilotDir, 'copilot-instructions.md'), 'user', 'utf8');
+			const instructionDir = path.join(workspaceRoot, '.github', 'instructions');
+			const sourceDir = path.join(workspaceRoot, 'src');
+			const currentFilePath = path.join(sourceDir, 'index.ts');
+			fs.mkdirSync(instructionDir, { recursive: true });
+			fs.mkdirSync(sourceDir, { recursive: true });
+			fs.writeFileSync(
+				path.join(instructionDir, 'typescript.instructions.md'),
+				'---\napplyTo: "**/*.ts,**/*.tsx"\n---\nUse explicit types.\n',
+				'utf8',
+			);
+			fs.writeFileSync(currentFilePath, 'export {};\n', 'utf8');
+
+			const nodes = buildAgentsLoadingChain(
+				workspaceRoot,
+				homeDir,
+				undefined,
+				currentFilePath,
+			);
+
+			assert.strictEqual(nodes.length, 1);
+			assert.strictEqual(nodes[0].kind, 'path');
+			assert.strictEqual(nodes[0].status, 'matched');
+			assert.strictEqual(nodes[0].applyTo, '**/*.ts,**/*.tsx');
+			assert.strictEqual(nodes[0].currentFilePath, currentFilePath);
+		});
+	});
+
+	test('buildAgentsLoadingChain marks invalid applyTo for path instructions', () => {
+		withTempDir((root) => {
+			const homeDir = path.join(root, 'home');
+			const workspaceRoot = path.join(root, 'workspace');
+			const instructionDir = path.join(workspaceRoot, '.github', 'instructions');
+			fs.mkdirSync(instructionDir, { recursive: true });
+			fs.writeFileSync(
+				path.join(instructionDir, 'broken.instructions.md'),
+				'---\ntitle: Broken\n---\nNo applyTo.\n',
+				'utf8',
+			);
 
 			const nodes = buildAgentsLoadingChain(workspaceRoot, homeDir);
 
-			assert.strictEqual(nodes[0].status, 'Active');
-			assert.strictEqual(nodes[1].status, 'Missing');
+			assert.strictEqual(nodes.length, 1);
+			assert.strictEqual(nodes[0].status, 'invalidApplyTo');
+		});
+	});
+
+	test('buildAgentsLoadingChain includes custom instruction directories', () => {
+		withTempDir((root) => {
+			const homeDir = path.join(root, 'home');
+			const workspaceRoot = path.join(root, 'workspace');
+			const customDir = path.join(root, 'custom-instructions');
+			fs.mkdirSync(customDir, { recursive: true });
+			fs.writeFileSync(path.join(customDir, 'AGENTS.md'), 'custom', 'utf8');
+
+			const nodes = buildAgentsLoadingChain(
+				workspaceRoot,
+				homeDir,
+				customDir,
+			);
+
+			assert.strictEqual(nodes.length, 1);
+			assert.strictEqual(nodes[0].kind, 'customAgent');
+			assert.strictEqual(nodes[0].fileName, 'AGENTS.md');
+		});
+	});
+
+	test('buildAgentsLoadingChain ignores nested workspace AGENTS.md files', () => {
+		withTempDir((root) => {
+			const homeDir = path.join(root, 'home');
+			const workspaceRoot = path.join(root, 'workspace');
+			const nestedDir = path.join(workspaceRoot, 'docs');
+			fs.mkdirSync(nestedDir, { recursive: true });
+			fs.writeFileSync(path.join(nestedDir, 'AGENTS.md'), 'nested agent', 'utf8');
+
+			const nodes = buildAgentsLoadingChain(workspaceRoot, homeDir);
+
+			assert.strictEqual(nodes.length, 0);
 		});
 	});
 

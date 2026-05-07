@@ -8,6 +8,7 @@ import {
 	getCopilotConfigStatus,
 	resolveCopilotPaths,
 } from '../services/workspaceStatus';
+import { AgentsChainNode, buildAgentsLoadingChain } from '../services/coreDiagnosticsService';
 import { messages } from '../i18n';
 
 type CoreEntry = {
@@ -71,24 +72,8 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 				fsPath: paths.mcpConfigPath,
 				icon: 'mcp',
 			},
-			{
-				label: 'copilot-instructions.md',
-				fsPath: path.join(paths.copilotDir, 'copilot-instructions.md'),
-				icon: 'copilot',
-				description: 'User Instructions',
-			},
 			...(workspaceRoot
-				? [
-					{
-						label: 'copilot-instructions.md',
-						fsPath: path.join(workspaceRoot, '.github', 'copilot-instructions.md'),
-						icon: 'copilot',
-						description: 'Workspace Instructions',
-					},
-				]
-				: []),
-			...(workspaceRoot
-				? this.collectAgentsEntries(workspaceRoot)
+				? this.collectInstructionEntries(workspaceRoot)
 				: []),
 		];
 
@@ -98,51 +83,34 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 		return items.length > 0 ? items : [this.toEmptyItem()];
 	}
 
-	private collectAgentsEntries(workspaceRoot: string): CoreEntry[] {
-		const primaryAgentsPath = path.join(workspaceRoot, 'AGENTS.md');
-		const additionalAgentsPaths = this.findAdditionalAgentsPaths(workspaceRoot).sort((left, right) =>
-			left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }),
-		);
-		return [
-			{
-				label: 'AGENTS.md',
-				fsPath: primaryAgentsPath,
-				icon: { light: 'agents_light.png', dark: 'agents_dark.png' },
-				description: 'Primary Instructions',
-			},
-			...additionalAgentsPaths.map((agentsPath) => ({
-				label: 'AGENTS.md',
-				fsPath: agentsPath,
-				icon: { light: 'agents_light.png', dark: 'agents_dark.png' },
-				description: 'Additional Instructions',
-			})),
-		];
+	private collectInstructionEntries(workspaceRoot: string): CoreEntry[] {
+		return buildAgentsLoadingChain(workspaceRoot).map((entry) => this.toInstructionEntry(entry));
 	}
 
-	private findAdditionalAgentsPaths(workspaceRoot: string): string[] {
-		const results: string[] = [];
-		const skipDirNames = new Set(['.git', 'node_modules', '.vscode-test', 'dist', 'out']);
-		const visit = (currentDir: string): void => {
-			for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
-				if (entry.isDirectory()) {
-					if (skipDirNames.has(entry.name)) {
-						continue;
-					}
-					visit(path.join(currentDir, entry.name));
-					continue;
-				}
-				if (!entry.isFile() || entry.name !== 'AGENTS.md') {
-					continue;
-				}
-				const fullPath = path.join(currentDir, entry.name);
-				if (path.resolve(fullPath) === path.resolve(path.join(workspaceRoot, 'AGENTS.md'))) {
-					continue;
-				}
-				results.push(fullPath);
-			}
+	private toInstructionEntry(entry: AgentsChainNode): CoreEntry {
+		return {
+			label: entry.fileName,
+			fsPath: entry.absolutePath,
+			icon: entry.kind === 'agent' || entry.kind === 'customAgent'
+				? { light: 'agents_light.png', dark: 'agents_dark.png' }
+				: 'copilot',
+			description: this.toInstructionDescription(entry),
 		};
-		visit(workspaceRoot);
-		return results;
+	}
+
+	private toInstructionDescription(entry: AgentsChainNode): string {
+		switch (entry.kind) {
+			case 'user':
+				return 'User Instructions';
+			case 'workspace':
+				return 'Workspace Instructions';
+			case 'path':
+				return 'Path Instructions';
+			case 'agent':
+				return 'Agent Instructions';
+			case 'customAgent':
+				return 'Custom Agent Instructions';
+		}
 	}
 
 	private toTreeItem(

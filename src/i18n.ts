@@ -398,42 +398,33 @@ export const messages = {
 		'message.coreViewAgentsChainTab',
 		'Instructions Chain',
 	),
-	chainCurrentSection: localize(
-		'message.chainCurrentSection',
-		'Current',
+	chainSummaryFound: localize('message.chainSummaryFound', 'Found'),
+	chainSummaryPotentialConflict: localize(
+		'message.chainSummaryPotentialConflict',
+		'Multiple Instructions may contain conflicting guidance.',
 	),
-	chainIgnoredSection: localize(
-		'message.chainIgnoredSection',
-		'Ignored',
+	chainAddInstruction: localize(
+		'message.chainAddInstruction',
+		'Add instruction file',
 	),
-	chainProblemsSection: localize(
-		'message.chainProblemsSection',
-		'Needs attention',
+	chainAddInstructionTypePlaceholder: localize(
+		'message.chainAddInstructionTypePlaceholder',
+		'Select an instruction type.',
 	),
-	chainDetailsSection: localize(
-		'message.chainDetailsSection',
-		'Detailed candidates',
+	chainInstructionAlreadyExists: localize(
+		'message.chainInstructionAlreadyExists',
+		'A file with the same name already exists.',
 	),
-	chainToggleDetails: localize(
-		'message.chainToggleDetails',
-		'Show detailed candidates',
+	chainPathInstructionFilePrompt: localize(
+		'message.chainPathInstructionFilePrompt',
+		'Enter a file name. Leave empty to use the folder name.',
 	),
-	chainSummaryCurrent: localize(
-		'message.chainSummaryCurrent',
-		'Using',
-	),
-	chainSummaryIgnored: localize(
-		'message.chainSummaryIgnored',
-		'Ignored',
-	),
-	chainSummaryProblems: localize(
-		'message.chainSummaryProblems',
-		'Problems',
-	),
-	chainSummaryHidden: localize(
-		'message.chainSummaryHidden',
-		'Hidden candidates',
-	),
+	chainPathInstructionPreview: (fileName: string) =>
+		localize(
+			'message.chainPathInstructionPreview',
+			'File to create: {0}',
+			fileName,
+		),
 	chainWorkspaceRootLabel: localize(
 		'message.chainWorkspaceRootLabel',
 		'Workspace root',
@@ -450,26 +441,30 @@ export const messages = {
 		'message.chainPreviewEmpty',
 		'Select an item on the left to view details.',
 	),
-	chainStatusCurrent: localize(
-		'message.chainStatusCurrent',
-		'Using',
+	chainStatusFound: localize('message.chainStatusFound', 'Found'),
+	chainStatusUsedTogether: localize(
+		'message.chainStatusUsedTogether',
+		'Used together',
 	),
-	chainStatusIgnored: localize(
-		'message.chainStatusIgnored',
-		'Ignored',
+	chainStatusMatched: localize('message.chainStatusMatched', 'Matched'),
+	chainStatusNotMatched: localize('message.chainStatusNotMatched', 'Not matched'),
+	chainStatusAppliesWhenPathMatches: localize(
+		'message.chainStatusAppliesWhenPathMatches',
+		'Applies when path matches',
+	),
+	chainStatusInvalidApplyTo: localize(
+		'message.chainStatusInvalidApplyTo',
+		'Invalid applyTo',
 	),
 	chainStatusProblem: localize(
 		'message.chainStatusProblem',
 		'Problem',
 	),
-	chainStatusMissing: localize(
-		'message.chainStatusMissing',
-		'Missing',
-	),
 	chainDetailStatus: localize(
 		'message.chainDetailStatus',
 		'Status',
 	),
+	chainDetailScope: localize('message.chainDetailScope', 'Scope'),
 	chainDetailClassification: localize(
 		'message.chainDetailClassification',
 		'Classification',
@@ -478,26 +473,66 @@ export const messages = {
 		'message.chainDetailPath',
 		'Path',
 	),
+	chainDetailApplyTo: localize('message.chainDetailApplyTo', 'Apply condition'),
+	chainDetailCurrentFile: localize('message.chainDetailCurrentFile', 'Current file'),
 	chainDetailExplanation: localize(
 		'message.chainDetailExplanation',
 		'Explanation',
 	),
-	chainExplainCurrent: (layer: string, fileName: string) =>
-		localize(
-			'message.chainExplainCurrent',
-			'{0} layer is currently using {1}.',
-			layer,
-			fileName,
-		),
-	chainExplainIgnoredPreferred: (preferred: string) =>
-		localize(
-			'message.chainExplainIgnoredPreferred',
-			'{0} has higher priority, so this file is not used.',
-			preferred,
-		),
-	chainExplainIgnoredGeneric: localize(
-		'message.chainExplainIgnoredGeneric',
-		'A higher-priority candidate exists, so this file is not used.',
+	chainClassificationUser: localize(
+		'message.chainClassificationUser',
+		'User Instructions',
+	),
+	chainClassificationWorkspace: localize(
+		'message.chainClassificationWorkspace',
+		'Workspace Instructions',
+	),
+	chainClassificationPath: localize(
+		'message.chainClassificationPath',
+		'Path Instructions',
+	),
+	chainClassificationAgent: localize(
+		'message.chainClassificationAgent',
+		'Agent Instructions',
+	),
+	chainClassificationCustomAgent: localize(
+		'message.chainClassificationCustomAgent',
+		'Custom Agent Instructions',
+	),
+	chainScopeUser: localize('message.chainScopeUser', 'User / All workspaces'),
+	chainScopeWorkspace: localize(
+		'message.chainScopeWorkspace',
+		'Workspace / Repository',
+	),
+	chainScopePath: localize('message.chainScopePath', 'Path-specific'),
+	chainScopeAgent: localize('message.chainScopeAgent', 'Workspace / Agent'),
+	chainScopeCustomAgent: localize(
+		'message.chainScopeCustomAgent',
+		'Custom / Agent',
+	),
+	chainExplainUser: localize(
+		'message.chainExplainUser',
+		'User-wide Copilot CLI instructions. Used together with workspace, path, agent, and custom instructions when those files exist.',
+	),
+	chainExplainWorkspace: localize(
+		'message.chainExplainWorkspace',
+		'Workspace-wide Copilot instructions. Used together with user, path, agent, and custom instructions when those files exist.',
+	),
+	chainExplainPath: localize(
+		'message.chainExplainPath',
+		'Instructions that apply when the current work matches the applyTo frontmatter glob patterns.',
+	),
+	chainExplainAgent: localize(
+		'message.chainExplainAgent',
+		'Agent-oriented instructions defined in AGENTS.md. Used together with other Copilot instructions.',
+	),
+	chainExplainCustomAgent: localize(
+		'message.chainExplainCustomAgent',
+		'Custom agent instructions loaded from AGENTS.md in directories specified by COPILOT_CUSTOM_INSTRUCTIONS_DIRS.',
+	),
+	chainExplainInvalidApplyTo: localize(
+		'message.chainExplainInvalidApplyTo',
+		'The applyTo frontmatter is missing or invalid.',
 	),
 	chainExplainProblem: (reason: string) =>
 		localize(
@@ -505,13 +540,9 @@ export const messages = {
 			'The file exists but could not be read. {0}',
 			reason,
 		),
-	chainExplainMissingFallback: localize(
-		'message.chainExplainMissingFallback',
-		'This fallback candidate is configured but the file does not exist.',
-	),
-	chainExplainMissingGeneric: localize(
-		'message.chainExplainMissingGeneric',
-		'This candidate was checked, but the file does not exist.',
+	chainEmpty: localize(
+		'message.chainEmpty',
+		'No instruction files were found.',
 	),
 	coreViewTrustedDirectoriesTab: localize(
 		'message.coreViewTrustedDirectoriesTab',
