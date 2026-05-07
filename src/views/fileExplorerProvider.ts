@@ -12,6 +12,7 @@ import {
 	getSkillLocations,
 	SkillLocation,
 } from '../services/skillLocations';
+import { messages } from '../i18n';
 
 const FILE_ICON_MAP: Record<string, string> = {
 	'.md': 'markdown32.png',
@@ -129,9 +130,11 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 	protected getAvailableChildren(element?: WorkspaceTreeItem): vscode.ProviderResult<WorkspaceTreeItem[]> {
 		if (!element) {
 			if (this.kind === 'skills') {
-				return this.readSkillRoots();
+				const items = this.readSkillRoots();
+				return items.length > 0 ? items : [this.toEmptyItem()];
 			}
-			return this.readDirectory(this.getRootPath());
+			const items = this.readDirectory(this.getRootPath());
+			return items.length > 0 ? items : [this.toEmptyItem()];
 		}
 
 		if (element.nodeType === 'root' || element.nodeType === 'folder') {
@@ -294,5 +297,28 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 		return this.listEntries(folderPath).some(
 			(entry) => entry.isFile && entry.name === 'SKILL.md',
 		);
+	}
+
+	private toEmptyItem(): WorkspaceTreeItem {
+		const item = new WorkspaceTreeItem(
+			'file',
+			this.kind,
+			this.getEmptyLabel(),
+			vscode.TreeItemCollapsibleState.None,
+		);
+		item.contextValue = `workspace-${this.kind}-empty`;
+		item.iconPath = new vscode.ThemeIcon('info');
+		return item;
+	}
+
+	private getEmptyLabel(): string {
+		switch (this.kind) {
+			case 'prompts':
+				return messages.promptsExplorerEmpty;
+			case 'skills':
+				return messages.skillsExplorerEmpty;
+			case 'templates':
+				return messages.templatesExplorerEmpty;
+		}
 	}
 }

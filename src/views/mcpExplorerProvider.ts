@@ -3,6 +3,7 @@ import { WorkspaceTreeDataProvider } from './workspaceTreeProvider';
 import { WorkspaceTreeItem } from '../models/treeItems';
 import { getMcpConfigPath, readMcpServers } from '../services/mcpService';
 import { getCoreWorkspaceStatus, resolveCopilotPaths } from '../services/workspaceStatus';
+import { messages } from '../i18n';
 
 export class McpExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTreeItem> {
 	constructor(_context: vscode.ExtensionContext) {
@@ -12,7 +13,7 @@ export class McpExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTree
 	protected getAvailableChildren(): vscode.ProviderResult<WorkspaceTreeItem[]> {
 		const configPath = getMcpConfigPath(resolveCopilotPaths().copilotDir);
 		const servers = readMcpServers(configPath);
-		return servers.map((server) => {
+		const items = servers.map((server) => {
 			const item = new WorkspaceTreeItem(
 				'mcpServer',
 				'mcp',
@@ -26,5 +27,18 @@ export class McpExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTree
 				: new vscode.ThemeIcon('circle-slash', new vscode.ThemeColor('disabledForeground'));
 			return item;
 		});
+		return items.length > 0 ? items : [this.toEmptyItem()];
+	}
+
+	private toEmptyItem(): WorkspaceTreeItem {
+		const item = new WorkspaceTreeItem(
+			'file',
+			'mcp',
+			messages.mcpExplorerEmpty,
+			vscode.TreeItemCollapsibleState.None,
+		);
+		item.contextValue = 'copilot-mcp-empty';
+		item.iconPath = new vscode.ThemeIcon('info');
+		return item;
 	}
 }

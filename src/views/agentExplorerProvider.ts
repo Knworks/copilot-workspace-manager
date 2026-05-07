@@ -8,6 +8,7 @@ import {
 	findAgentLocationForPath,
 	getAgentLocations,
 } from '../services/agentLocations';
+import { messages } from '../i18n';
 
 type AgentEntry = {
 	name: string;
@@ -96,7 +97,7 @@ export class AgentExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTr
 		const item = new WorkspaceTreeItem(
 			'file',
 			'agents',
-			'No agents to display',
+			messages.agentExplorerEmpty,
 			vscode.TreeItemCollapsibleState.None,
 		);
 		item.contextValue = 'copilot-agent-empty';

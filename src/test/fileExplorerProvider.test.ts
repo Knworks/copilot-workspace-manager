@@ -42,6 +42,19 @@ suite('File explorer provider', () => {
 		assert.strictEqual(items[0].label, getUnavailableLabel('missing'));
 	});
 
+	test('returns prompts empty item when no entries exist', () => {
+		const provider = new FileExplorerProvider(
+			'prompts',
+			contextStub,
+			() => ({ isAvailable: true }),
+			'root',
+			() => [],
+		);
+		const items = provider.getChildren() as vscode.TreeItem[];
+		assert.strictEqual(items.length, 1);
+		assert.strictEqual(items[0].label, 'No commands to display.');
+	});
+
 	test('prompt files use terminal icon', () => {
 		const provider = new FileExplorerProvider(
 			'prompts',

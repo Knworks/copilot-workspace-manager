@@ -8,6 +8,7 @@ import {
 	getCopilotConfigStatus,
 	resolveCopilotPaths,
 } from '../services/workspaceStatus';
+import { messages } from '../i18n';
 
 type CoreEntry = {
 	label: string;
@@ -91,9 +92,10 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 				: []),
 		];
 
-		return entries
+		const items = entries
 			.filter((entry) => fs.existsSync(entry.fsPath))
 			.map((entry) => this.toTreeItem(entry, configStatus));
+		return items.length > 0 ? items : [this.toEmptyItem()];
 	}
 
 	private collectAgentsEntries(workspaceRoot: string): CoreEntry[] {
@@ -167,6 +169,18 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 			return item;
 		}
 		item.iconPath = this.getIcon(entry.icon);
+		return item;
+	}
+
+	private toEmptyItem(): WorkspaceTreeItem {
+		const item = new WorkspaceTreeItem(
+			'file',
+			'core',
+			messages.coreExplorerEmpty,
+			vscode.TreeItemCollapsibleState.None,
+		);
+		item.contextValue = 'copilot-core-empty';
+		item.iconPath = new vscode.ThemeIcon('info');
 		return item;
 	}
 

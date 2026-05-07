@@ -204,4 +204,36 @@ suite('Core explorer provider', () => {
 		assert.strictEqual(items.length, 1);
 		assert.strictEqual(items[0].label, getUnavailableLabel('missing'));
 	});
+
+	test('returns empty item when no core entries exist', () => {
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'core-empty-'));
+		const originalCopilotHome = process.env.COPILOT_HOME;
+		const originalWorkspaceFolders = vscode.workspace.workspaceFolders;
+		try {
+			process.env.COPILOT_HOME = path.join(tempDir, '.copilot');
+			Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+				configurable: true,
+				value: [{ uri: vscode.Uri.file(path.join(tempDir, 'workspace')) }],
+			});
+			const provider = new CoreExplorerProvider(
+				contextStub,
+				() => ({ isAvailable: true }),
+				() => ({ isAvailable: true }),
+			);
+			const items = provider.getChildren() as vscode.TreeItem[];
+			assert.strictEqual(items.length, 1);
+			assert.strictEqual(items[0].label, 'No Copilot Manager files to display.');
+		} finally {
+			Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+				configurable: true,
+				value: originalWorkspaceFolders,
+			});
+			if (originalCopilotHome === undefined) {
+				delete process.env.COPILOT_HOME;
+			} else {
+				process.env.COPILOT_HOME = originalCopilotHome;
+			}
+			fs.rmSync(tempDir, { recursive: true, force: true });
+		}
+	});
 });

@@ -45,4 +45,31 @@ suite('MCP explorer provider', () => {
 				originalReadMcpServers;
 		}
 	});
+
+	test('returns empty item when no MCP servers exist', () => {
+		const originalReadMcpServers = mcpService.readMcpServers;
+		const originalCopilotHome = process.env.COPILOT_HOME;
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-explorer-empty-'));
+		try {
+			process.env.COPILOT_HOME = tempDir;
+			fs.writeFileSync(path.join(tempDir, 'config.json'), '{}', 'utf8');
+			(mcpService as unknown as { readMcpServers: typeof mcpService.readMcpServers }).readMcpServers =
+				() => [];
+
+			const provider = new McpExplorerProvider({} as vscode.ExtensionContext);
+			const items = provider.getChildren() as vscode.TreeItem[];
+
+			assert.strictEqual(items.length, 1);
+			assert.strictEqual(items[0].label, 'No MCP servers to display.');
+		} finally {
+			if (originalCopilotHome === undefined) {
+				delete process.env.COPILOT_HOME;
+			} else {
+				process.env.COPILOT_HOME = originalCopilotHome;
+			}
+			fs.rmSync(tempDir, { recursive: true, force: true });
+			(mcpService as unknown as { readMcpServers: typeof mcpService.readMcpServers }).readMcpServers =
+				originalReadMcpServers;
+		}
+	});
 });

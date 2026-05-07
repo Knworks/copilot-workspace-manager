@@ -150,6 +150,30 @@ export const messages = {
 		'message.skillManagerNoResult',
 		'No skills found.',
 	),
+	coreExplorerEmpty: localize(
+		'message.coreExplorerEmpty',
+		'No Copilot Manager files to display.',
+	),
+	promptsExplorerEmpty: localize(
+		'message.promptsExplorerEmpty',
+		'No commands to display.',
+	),
+	skillsExplorerEmpty: localize(
+		'message.skillsExplorerEmpty',
+		'No skills to display.',
+	),
+	templatesExplorerEmpty: localize(
+		'message.templatesExplorerEmpty',
+		'No templates to display.',
+	),
+	mcpExplorerEmpty: localize(
+		'message.mcpExplorerEmpty',
+		'No MCP servers to display.',
+	),
+	agentExplorerEmpty: localize(
+		'message.agentExplorerEmpty',
+		'No Sub Agents to display.',
+	),
 	agentManagerTitle: localize(
 		'message.agentManagerTitle',
 		'Sub Agents Manager',

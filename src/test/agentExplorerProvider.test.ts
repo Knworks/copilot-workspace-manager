@@ -57,4 +57,16 @@ suite('Agent explorer provider', () => {
 		assert.strictEqual(items.length, 1);
 		assert.strictEqual(items[0].label, getUnavailableLabel('missing'));
 	});
+
+	test('returns empty item when no agents exist', () => {
+		const provider = new AgentExplorerProvider(
+			contextStub,
+			() => ({ isAvailable: true }),
+			() => [],
+			() => [],
+		);
+		const items = provider.getChildren() as vscode.TreeItem[];
+		assert.strictEqual(items.length, 1);
+		assert.strictEqual(items[0].label, 'No Sub Agents to display.');
+	});
 });
