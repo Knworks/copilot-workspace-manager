@@ -228,41 +228,55 @@ export const messages = {
 		'message.mcpManagerServerName',
 		'Server name',
 	),
-	mcpManagerTransportLabel: localize(
-		'message.mcpManagerTransportLabel',
-		'Transport',
-	),
+	mcpManagerTypeLabel: localize('message.mcpManagerTypeLabel', 'Type'),
 	mcpManagerCommandLabel: localize(
 		'message.mcpManagerCommandLabel',
 		'Command',
 	),
 	mcpManagerArgsLabel: localize('message.mcpManagerArgsLabel', 'Args'),
+	mcpManagerArgPlaceholder: localize(
+		'message.mcpManagerArgPlaceholder',
+		'argument',
+	),
+	mcpManagerToolsLabel: localize('message.mcpManagerToolsLabel', 'Tools'),
+	mcpManagerToolPlaceholder: localize(
+		'message.mcpManagerToolPlaceholder',
+		'tool name or *',
+	),
 	mcpManagerUrlLabel: localize('message.mcpManagerUrlLabel', 'URL'),
 	mcpManagerEnvLabel: localize('message.mcpManagerEnvLabel', 'Env'),
-	mcpManagerRequiredLabel: localize(
-		'message.mcpManagerRequiredLabel',
-		'Required',
+	mcpManagerHeadersLabel: localize('message.mcpManagerHeadersLabel', 'Headers'),
+	mcpManagerCwdLabel: localize('message.mcpManagerCwdLabel', 'CWD'),
+	mcpManagerTimeoutLabel: localize('message.mcpManagerTimeoutLabel', 'Timeout'),
+	mcpManagerOAuthClientIdLabel: localize(
+		'message.mcpManagerOAuthClientIdLabel',
+		'OAuth Client ID',
 	),
-	mcpManagerStartupTimeoutLabel: localize(
-		'message.mcpManagerStartupTimeoutLabel',
-		'Startup Timeout',
+	mcpManagerOAuthPublicClientLabel: localize(
+		'message.mcpManagerOAuthPublicClientLabel',
+		'OAuth Public Client',
 	),
-	mcpManagerToolTimeoutLabel: localize(
-		'message.mcpManagerToolTimeoutLabel',
-		'Tool Timeout',
+	mcpManagerOidcLabel: localize('message.mcpManagerOidcLabel', 'OIDC'),
+	mcpManagerFilterMappingLabel: localize(
+		'message.mcpManagerFilterMappingLabel',
+		'Filter Mapping',
 	),
-	mcpManagerEnabledToolsLabel: localize(
-		'message.mcpManagerEnabledToolsLabel',
-		'Enabled Tools',
-	),
-	mcpManagerDisabledToolsLabel: localize(
-		'message.mcpManagerDisabledToolsLabel',
-		'Disabled Tools',
-	),
+	mcpManagerLocalSection: localize('message.mcpManagerLocalSection', 'Local / STDIO'),
+	mcpManagerRemoteSection: localize('message.mcpManagerRemoteSection', 'HTTP / SSE'),
+	mcpManagerCommonSection: localize('message.mcpManagerCommonSection', 'Common'),
+	mcpManagerAddArg: localize('message.mcpManagerAddArg', 'Add arg'),
+	mcpManagerRemoveArg: localize('message.mcpManagerRemoveArg', 'Remove arg'),
+	mcpManagerAddTool: localize('message.mcpManagerAddTool', 'Add tool'),
+	mcpManagerRemoveTool: localize('message.mcpManagerRemoveTool', 'Remove tool'),
 	mcpManagerAddEnv: localize('message.mcpManagerAddEnv', 'Add env'),
 	mcpManagerRemoveEnv: localize(
 		'message.mcpManagerRemoveEnv',
 		'Remove env',
+	),
+	mcpManagerAddHeader: localize('message.mcpManagerAddHeader', 'Add header'),
+	mcpManagerRemoveHeader: localize(
+		'message.mcpManagerRemoveHeader',
+		'Remove header',
 	),
 	mcpManagerEnvKeyPlaceholder: localize(
 		'message.mcpManagerEnvKeyPlaceholder',
@@ -272,50 +286,70 @@ export const messages = {
 		'message.mcpManagerEnvValuePlaceholder',
 		'value',
 	),
+	mcpManagerHeaderKeyPlaceholder: localize(
+		'message.mcpManagerHeaderKeyPlaceholder',
+		'HEADER',
+	),
+	mcpManagerHeaderValuePlaceholder: localize(
+		'message.mcpManagerHeaderValuePlaceholder',
+		'value',
+	),
 	mcpManagerToggle: localize('message.mcpManagerToggle', 'Toggle'),
 	mcpManagerDescriptionServerName: localize(
 		'message.mcpManagerDescriptionServerName',
-		'Unique server name under [mcp_servers.<name>].',
+		'Unique server name stored as the mcpServers.<name> key.',
 	),
-	mcpManagerDescriptionTransport: localize(
-		'message.mcpManagerDescriptionTransport',
-		'Connection type. Use stdio for command based servers, http for URL based servers.',
+	mcpManagerDescriptionType: localize(
+		'message.mcpManagerDescriptionType',
+		'Server transport type. Choose local, stdio, http, or sse.',
 	),
 	mcpManagerDescriptionCommand: localize(
 		'message.mcpManagerDescriptionCommand',
-		'Command to launch a stdio MCP server. Leave empty for http servers.',
+		'Command used to launch local or stdio MCP servers.',
 	),
 	mcpManagerDescriptionArgs: localize(
 		'message.mcpManagerDescriptionArgs',
-		'Command arguments for stdio servers. Enter one item per line.',
+		'Arguments passed to local or stdio servers. Add one argument per row.',
+	),
+	mcpManagerDescriptionTools: localize(
+		'message.mcpManagerDescriptionTools',
+		'Tools saved as a list of entries. When left empty, ["*"] is stored automatically.',
 	),
 	mcpManagerDescriptionUrl: localize(
 		'message.mcpManagerDescriptionUrl',
-		'HTTP MCP server URL. Leave empty for stdio servers.',
+		'URL for http or sse MCP servers.',
 	),
 	mcpManagerDescriptionEnv: localize(
 		'message.mcpManagerDescriptionEnv',
-		'Environment variables passed to the MCP server. Enter key and value pairs.',
+		'Environment variables passed to local or stdio servers as key and value pairs.',
 	),
-	mcpManagerDescriptionRequired: localize(
-		'message.mcpManagerDescriptionRequired',
-		'Whether Codex should treat this MCP server as required.',
+	mcpManagerDescriptionHeaders: localize(
+		'message.mcpManagerDescriptionHeaders',
+		'HTTP or SSE request headers stored as key and value pairs.',
 	),
-	mcpManagerDescriptionStartupTimeout: localize(
-		'message.mcpManagerDescriptionStartupTimeout',
-		'Startup timeout in seconds. Use a non-negative number.',
+	mcpManagerDescriptionCwd: localize(
+		'message.mcpManagerDescriptionCwd',
+		'Working directory for local or stdio MCP servers.',
 	),
-	mcpManagerDescriptionToolTimeout: localize(
-		'message.mcpManagerDescriptionToolTimeout',
-		'Tool execution timeout in seconds. Use a non-negative number.',
+	mcpManagerDescriptionTimeout: localize(
+		'message.mcpManagerDescriptionTimeout',
+		'Timeout in milliseconds. Use a non-negative number.',
 	),
-	mcpManagerDescriptionEnabledTools: localize(
-		'message.mcpManagerDescriptionEnabledTools',
-		'Allow only these tools. Enter one tool name per line. Do not combine with Disabled Tools.',
+	mcpManagerDescriptionOAuthClientId: localize(
+		'message.mcpManagerDescriptionOAuthClientId',
+		'Static OAuth client identifier for remote MCP servers.',
 	),
-	mcpManagerDescriptionDisabledTools: localize(
-		'message.mcpManagerDescriptionDisabledTools',
-		'Disable these tools. Enter one tool name per line. Do not combine with Enabled Tools.',
+	mcpManagerDescriptionOAuthPublicClient: localize(
+		'message.mcpManagerDescriptionOAuthPublicClient',
+		'Whether the remote MCP server should use public-client OAuth behavior.',
+	),
+	mcpManagerDescriptionOidc: localize(
+		'message.mcpManagerDescriptionOidc',
+		'Inject an OIDC token when supported.',
+	),
+	mcpManagerDescriptionFilterMapping: localize(
+		'message.mcpManagerDescriptionFilterMapping',
+		'Tool output filter mapping. Use none, markdown, or hidden_characters.',
 	),
 	mcpManagerDeleteConfirm: (serverId: string) =>
 		localize(
@@ -332,37 +366,33 @@ export const messages = {
 		'message.mcpValidationServerNameDuplicate',
 		'An MCP server with the same name already exists.',
 	),
-	mcpValidationTransportRequired: localize(
-		'message.mcpValidationTransportRequired',
-		'Transport must be stdio or http.',
+	mcpValidationTypeInvalid: localize(
+		'message.mcpValidationTypeInvalid',
+		'Type must be local, stdio, http, or sse.',
 	),
 	mcpValidationCommandRequired: localize(
 		'message.mcpValidationCommandRequired',
-		'Command is required for stdio transport.',
+		'Command is required for local or stdio servers.',
 	),
 	mcpValidationUrlRequired: localize(
 		'message.mcpValidationUrlRequired',
-		'URL is required for http transport.',
+		'URL is required for http or sse servers.',
 	),
 	mcpValidationTimeoutInvalid: localize(
 		'message.mcpValidationTimeoutInvalid',
 		'Timeout must be a non-negative number.',
 	),
-	mcpValidationToolsMutuallyExclusive: localize(
-		'message.mcpValidationToolsMutuallyExclusive',
-		'enabled_tools and disabled_tools cannot be set at the same time.',
+	mcpValidationHeadersKeyRequired: localize(
+		'message.mcpValidationHeadersKeyRequired',
+		'Header rows with a value must also have a key.',
 	),
 	mcpValidationEnvKeyRequired: localize(
 		'message.mcpValidationEnvKeyRequired',
 		'Env rows with a value must also have a key.',
 	),
-	mcpValidationEnvKeyInvalid: localize(
-		'message.mcpValidationEnvKeyInvalid',
-		'Env keys must start with a letter or underscore and use only letters, numbers, and underscores.',
-	),
-	mcpValidationEnvKeyDuplicate: localize(
-		'message.mcpValidationEnvKeyDuplicate',
-		'Env keys must be unique.',
+	mcpValidationFilterMappingInvalid: localize(
+		'message.mcpValidationFilterMappingInvalid',
+		'Filter Mapping must be none, markdown, or hidden_characters.',
 	),
 	coreViewAgentsChainTab: localize(
 		'message.coreViewAgentsChainTab',

@@ -2,25 +2,33 @@ import fs from 'fs';
 import path from 'path';
 import { sortMcpServersById } from './mcpService';
 
-export type McpTransport = 'stdio' | 'http';
+export type McpServerType = 'local' | 'stdio' | 'http' | 'sse';
+export type McpFilterMapping = 'none' | 'markdown' | 'hidden_characters';
 
-export type McpEnvEntry = {
+export type McpListEntry = {
+	value: string;
+};
+
+export type McpKeyValueEntry = {
 	key: string;
 	value: string;
 };
 
 export type McpFormModel = {
 	id: string;
-	transport: McpTransport;
+	type: McpServerType;
 	command: string;
 	args: string[];
+	tools: string[];
+	env: McpKeyValueEntry[];
+	cwd: string;
 	url: string;
-	env: McpEnvEntry[];
-	required?: boolean;
-	startupTimeoutSec?: number;
-	toolTimeoutSec?: number;
-	enabledTools: string[];
-	disabledTools: string[];
+	headers: McpKeyValueEntry[];
+	timeout?: number;
+	oauthClientId: string;
+	oauthPublicClient: boolean;
+	oidc: boolean;
+	filterMapping?: McpFilterMapping;
 	enabled: boolean;
 };
 
@@ -34,7 +42,14 @@ type McpConfigShape = {
 	servers?: Record<string, Record<string, unknown>>;
 };
 
-const MCP_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const LOCAL_TYPES: McpServerType[] = ['local', 'stdio'];
+const REMOTE_TYPES: McpServerType[] = ['http', 'sse'];
+const MCP_TYPES = new Set<McpServerType>([...LOCAL_TYPES, ...REMOTE_TYPES]);
+const FILTER_MAPPINGS = new Set<McpFilterMapping>([
+	'none',
+	'markdown',
+	'hidden_characters',
+]);
 
 /**
  * Lists MCP entries from both enabled and disabled config files as one A-Z sorted collection.
@@ -51,47 +66,46 @@ export function validateMcpModel(
 	previousId?: string,
 ): McpValidationResult {
 	const errors: string[] = [];
+
 	if (!model.id.trim()) {
 		errors.push('serverNameRequired');
 	}
 	if (existingIds.includes(model.id) && model.id !== previousId) {
 		errors.push('serverNameDuplicate');
 	}
-	if (model.transport === 'stdio' && !model.command.trim()) {
+	if (!MCP_TYPES.has(model.type)) {
+		errors.push('typeInvalid');
+	}
+	if (isLocalType(model.type) && !model.command.trim()) {
 		errors.push('commandRequired');
 	}
-	if (model.transport === 'http' && !model.url.trim()) {
+	if (isRemoteType(model.type) && !model.url.trim()) {
 		errors.push('urlRequired');
 	}
-	for (const timeout of [model.startupTimeoutSec, model.toolTimeoutSec]) {
-		if (timeout !== undefined && (!Number.isFinite(timeout) || timeout < 0)) {
-			errors.push('timeoutInvalid');
-		}
+	if (model.timeout !== undefined && (!Number.isFinite(model.timeout) || model.timeout < 0)) {
+		errors.push('timeoutInvalid');
 	}
-	if (model.enabledTools.length > 0 && model.disabledTools.length > 0) {
-		errors.push('toolsMutuallyExclusive');
+	if (model.filterMapping && !FILTER_MAPPINGS.has(model.filterMapping)) {
+		errors.push('filterMappingInvalid');
 	}
-	const seenEnvKeys = new Set<string>();
+
 	for (const entry of model.env) {
-		const key = entry.key.trim();
-		const value = entry.value.trim();
-		if (!key && !value) {
+		if (!entry.key.trim() && !entry.value.trim()) {
 			continue;
 		}
-		if (!key) {
+		if (!entry.key.trim()) {
 			errors.push('envKeyRequired');
-			continue;
 		}
-		if (!MCP_ENV_KEY_PATTERN.test(key)) {
-			errors.push('envKeyInvalid');
-			continue;
-		}
-		if (seenEnvKeys.has(key)) {
-			errors.push('envKeyDuplicate');
-			continue;
-		}
-		seenEnvKeys.add(key);
 	}
+	for (const entry of model.headers) {
+		if (!entry.key.trim() && !entry.value.trim()) {
+			continue;
+		}
+		if (!entry.key.trim()) {
+			errors.push('headersKeyRequired');
+		}
+	}
+
 	return { ok: errors.length === 0, errors };
 }
 
@@ -113,14 +127,17 @@ export function saveMcpServer(
 	if (!validation.ok) {
 		return validation;
 	}
+
 	if (previousId) {
 		delete servers[previousId];
 		delete disabledServers[previousId];
 	}
 	delete servers[model.id];
 	delete disabledServers[model.id];
+
 	const targetServers = model.enabled ? servers : disabledServers;
 	targetServers[model.id] = fromModel(model);
+
 	parsed.mcpServers = servers;
 	disabledParsed.mcpServers = disabledServers;
 	delete parsed.servers;
@@ -154,67 +171,67 @@ export function deleteMcpServer(configPath: string, disabledConfigPath: string, 
 }
 
 function toModel(id: string, value: Record<string, unknown>): McpFormModel {
-	const url = typeof value.url === 'string' ? value.url : '';
-	const command = typeof value.command === 'string' ? value.command : '';
-	const type = typeof value.type === 'string' ? value.type : '';
+	const type = readType(value);
 	return {
 		id,
-		transport: url || type === 'http' || type === 'sse' ? 'http' : 'stdio',
-		command,
-		args: Array.isArray(value.args) ? value.args.filter((item): item is string => typeof item === 'string') : [],
-		url,
-		env: Object.entries(
-			value.env && typeof value.env === 'object' && !Array.isArray(value.env)
-				? value.env as Record<string, unknown>
-				: {},
-		)
-			.filter(([, envValue]) => typeof envValue === 'string')
-			.map(([key, envValue]) => ({ key, value: envValue as string })),
-		required: typeof value.required === 'boolean' ? value.required : undefined,
-		startupTimeoutSec: typeof value.startupTimeoutSec === 'number' ? value.startupTimeoutSec : undefined,
-		toolTimeoutSec: typeof value.toolTimeoutSec === 'number' ? value.toolTimeoutSec : undefined,
-		enabledTools: Array.isArray(value.enabledTools)
-			? value.enabledTools.filter((item): item is string => typeof item === 'string')
-			: [],
-		disabledTools: Array.isArray(value.disabledTools)
-			? value.disabledTools.filter((item): item is string => typeof item === 'string')
-			: [],
+		type,
+		command: typeof value.command === 'string' ? value.command : '',
+		args: readStringArray(value.args),
+		tools: readStringArray(Array.isArray(value.tools) ? value.tools : value.enabledTools),
+		env: readKeyValueEntries(value.env),
+		cwd: typeof value.cwd === 'string' ? value.cwd : '',
+		url: typeof value.url === 'string' ? value.url : '',
+		headers: readKeyValueEntries(value.headers),
+		timeout: readTimeout(value),
+		oauthClientId: typeof value.oauthClientId === 'string' ? value.oauthClientId : '',
+		oauthPublicClient: typeof value.oauthPublicClient === 'boolean' ? value.oauthPublicClient : true,
+		oidc: value.oidc === true,
+		filterMapping: readFilterMapping(value.filterMapping),
 		enabled: true,
 	};
 }
 
 function fromModel(model: McpFormModel): Record<string, unknown> {
-	const next: Record<string, unknown> = {};
-	if (model.transport === 'stdio') {
-		next.type = 'stdio';
+	const tools = model.tools.length > 0 ? model.tools : ['*'];
+	const next: Record<string, unknown> = {
+		type: model.type,
+		tools,
+	};
+
+	if (isLocalType(model.type)) {
 		next.command = model.command;
-		if (model.args.length > 0) {
-			next.args = model.args;
+		next.args = model.args;
+		const env = toKeyValueObject(model.env);
+		if (env) {
+			next.env = env;
+		}
+		if (model.cwd.trim()) {
+			next.cwd = model.cwd.trim();
 		}
 	} else {
-		next.type = 'http';
-		next.url = model.url;
+		next.url = model.url.trim();
+		const headers = toKeyValueObject(model.headers);
+		if (headers) {
+			next.headers = headers;
+		}
+		if (model.oauthClientId.trim()) {
+			next.oauthClientId = model.oauthClientId.trim();
+		}
+		if (model.oauthPublicClient === false) {
+			next.oauthPublicClient = false;
+		}
 	}
-	if (model.env.length > 0) {
-		next.env = Object.fromEntries(
-			model.env.filter((entry) => entry.key.trim()).map((entry) => [entry.key.trim(), entry.value]),
-		);
+
+	if (model.timeout !== undefined) {
+		next.timeout = model.timeout;
 	}
-	if (model.required !== undefined) {
-		next.required = model.required;
+	if (model.oidc) {
+		next.oidc = true;
 	}
-	if (model.startupTimeoutSec !== undefined) {
-		next.startupTimeoutSec = model.startupTimeoutSec;
+	if (model.filterMapping) {
+		next.filterMapping = model.filterMapping;
 	}
-	if (model.toolTimeoutSec !== undefined) {
-		next.toolTimeoutSec = model.toolTimeoutSec;
-	}
-	if (model.enabledTools.length > 0) {
-		next.enabledTools = model.enabledTools;
-	}
-	if (model.disabledTools.length > 0) {
-		next.disabledTools = model.disabledTools;
-	}
+
 	return next;
 }
 
@@ -241,4 +258,52 @@ function readModelsFromConfig(configPath: string, enabled: boolean): McpFormMode
 		...toModel(id, value),
 		enabled,
 	}));
+}
+
+function readType(value: Record<string, unknown>): McpServerType {
+	if (typeof value.type === 'string' && MCP_TYPES.has(value.type as McpServerType)) {
+		return value.type as McpServerType;
+	}
+	return typeof value.url === 'string' && value.url.trim() ? 'http' : 'local';
+}
+
+function readStringArray(value: unknown): string[] {
+	return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function readKeyValueEntries(value: unknown): McpKeyValueEntry[] {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) {
+		return [];
+	}
+	return Object.entries(value as Record<string, unknown>)
+		.filter(([, entryValue]) => typeof entryValue === 'string')
+		.map(([key, entryValue]) => ({ key, value: entryValue as string }));
+}
+
+function toKeyValueObject(entries: McpKeyValueEntry[]): Record<string, string> | undefined {
+	const filtered = entries
+		.map((entry) => ({ key: entry.key.trim(), value: entry.value }))
+		.filter((entry) => entry.key);
+	return filtered.length > 0 ? Object.fromEntries(filtered.map((entry) => [entry.key, entry.value])) : undefined;
+}
+
+function readTimeout(value: Record<string, unknown>): number | undefined {
+	if (typeof value.timeout === 'number') {
+		return value.timeout;
+	}
+	return typeof value.toolTimeoutSec === 'number' ? value.toolTimeoutSec : undefined;
+}
+
+function readFilterMapping(value: unknown): McpFilterMapping | undefined {
+	return typeof value === 'string' && FILTER_MAPPINGS.has(value as McpFilterMapping)
+		? value as McpFilterMapping
+		: undefined;
+}
+
+function isLocalType(type: McpServerType): boolean {
+	return LOCAL_TYPES.includes(type);
+}
+
+function isRemoteType(type: McpServerType): boolean {
+	return REMOTE_TYPES.includes(type);
 }
