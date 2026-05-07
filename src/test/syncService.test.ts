@@ -5,6 +5,7 @@ import path from 'path';
 import {
 	getSyncStatePath,
 	removeSyncStateEntry,
+	syncCoreFilesBidirectional,
 	syncCoreInstructionsBidirectional,
 	syncDirectoryBidirectional,
 } from '../services/syncService';
@@ -190,6 +191,37 @@ suite('Sync service', () => {
 			syncCoreInstructionsBidirectional(workspaceRoot, copilotRoot);
 
 			assert.strictEqual(fs.readFileSync(userInstructions, 'utf8'), 'repository');
+		});
+	});
+
+	test('syncCoreFilesBidirectional syncs disabled MCP config under workspace manager directory', () => {
+		withTempDir((root) => {
+			const copilotRoot = path.join(root, '.copilot');
+			const configuredRoot = path.join(root, 'sync-core');
+			const sourcePath = path.join(
+				copilotRoot,
+				'.copilot-workspace-manager',
+				'mcp-config.disabled.json',
+			);
+			const targetPath = path.join(
+				configuredRoot,
+				'.copilot-workspace-manager',
+				'mcp-config.disabled.json',
+			);
+			fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+			fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+			fs.writeFileSync(sourcePath, '{"mcpServers":{"demo":{}}}', 'utf8');
+			fs.writeFileSync(targetPath, '{"mcpServers":{"old":{}}}', 'utf8');
+			setMtime(sourcePath, 2_000);
+			setMtime(targetPath, 1_000);
+
+			syncCoreFilesBidirectional(copilotRoot, configuredRoot);
+
+			assert.strictEqual(
+				fs.readFileSync(targetPath, 'utf8'),
+				'{"mcpServers":{"demo":{}}}',
+			);
+			assert.ok(!fs.existsSync(path.join(configuredRoot, 'mcp-config.disabled.json')));
 		});
 	});
 

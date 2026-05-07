@@ -353,30 +353,33 @@ export function syncCoreFilesBidirectional(
 	copilotDir: string,
 	targetDir: string,
 ): SyncResult {
-	const fileNames = [
-		'config.json',
-		'settings.json',
-		'mcp-config.json',
-		'copilot-instructions.md',
+	const fileMappings = [
+		{ relativePath: 'config.json', sourcePath: path.join(copilotDir, 'config.json'), targetPath: path.join(targetDir, 'config.json') },
+		{ relativePath: 'settings.json', sourcePath: path.join(copilotDir, 'settings.json'), targetPath: path.join(targetDir, 'settings.json') },
+		{ relativePath: 'mcp-config.json', sourcePath: path.join(copilotDir, 'mcp-config.json'), targetPath: path.join(targetDir, 'mcp-config.json') },
+		{ relativePath: 'copilot-instructions.md', sourcePath: path.join(copilotDir, 'copilot-instructions.md'), targetPath: path.join(targetDir, 'copilot-instructions.md') },
+		{
+			relativePath: path.join(WORKSPACE_META_DIR, 'mcp-config.disabled.json'),
+			sourcePath: path.join(copilotDir, WORKSPACE_META_DIR, 'mcp-config.disabled.json'),
+			targetPath: path.join(targetDir, WORKSPACE_META_DIR, 'mcp-config.disabled.json'),
+		},
 	];
 	const sourceEntries = new Map<string, FileEntry>();
 	const targetEntries = new Map<string, FileEntry>();
 
-	for (const fileName of fileNames) {
-		const sourcePath = path.join(copilotDir, fileName);
-		if (fs.existsSync(sourcePath)) {
-			const stat = fs.statSync(sourcePath);
-			sourceEntries.set(fileName, {
-				fullPath: sourcePath,
+	for (const fileMapping of fileMappings) {
+		if (fs.existsSync(fileMapping.sourcePath)) {
+			const stat = fs.statSync(fileMapping.sourcePath);
+			sourceEntries.set(fileMapping.relativePath, {
+				fullPath: fileMapping.sourcePath,
 				mtimeMs: stat.mtimeMs,
 			});
 		}
 
-		const mirroredPath = path.join(targetDir, fileName);
-		if (fs.existsSync(mirroredPath)) {
-			const stat = fs.statSync(mirroredPath);
-			targetEntries.set(fileName, {
-				fullPath: mirroredPath,
+		if (fs.existsSync(fileMapping.targetPath)) {
+			const stat = fs.statSync(fileMapping.targetPath);
+			targetEntries.set(fileMapping.relativePath, {
+				fullPath: fileMapping.targetPath,
 				mtimeMs: stat.mtimeMs,
 			});
 		}
