@@ -14,6 +14,7 @@ export type WorkspacePaths = {
 	configPath: string;
 	managerDir: string;
 	mcpConfigPath: string;
+	mcpDisabledConfigPath: string;
 };
 
 export const WORKSPACE_MANAGER_FOLDER_NAME = '.copilot-workspace-manager';
@@ -39,11 +40,13 @@ export function resolveCopilotPaths(
 	const copilotDir = copilotHome && copilotHome.trim()
 		? copilotHome
 		: path.join(homeDir, '.copilot');
+	const managerDir = path.join(copilotDir, WORKSPACE_MANAGER_FOLDER_NAME);
 	return {
 		copilotDir,
 		configPath: path.join(copilotDir, 'config.json'),
-		managerDir: path.join(copilotDir, WORKSPACE_MANAGER_FOLDER_NAME),
+		managerDir,
 		mcpConfigPath: path.join(copilotDir, 'mcp-config.json'),
+		mcpDisabledConfigPath: path.join(managerDir, 'mcp-config.disabled.json'),
 	};
 }
 

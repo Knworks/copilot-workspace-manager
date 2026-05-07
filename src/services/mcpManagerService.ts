@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { sortMcpServersById } from './mcpService';
 
 export type McpTransport = 'stdio' | 'http';
 
@@ -35,10 +36,13 @@ type McpConfigShape = {
 
 const MCP_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-export function listMcpFormModels(configPath: string): McpFormModel[] {
-	const parsed = readConfig(configPath);
-	const servers = parsed.mcpServers ?? parsed.servers ?? {};
-	return Object.entries(servers).map(([id, value]) => toModel(id, value));
+/**
+ * Lists MCP entries from both enabled and disabled config files as one A-Z sorted collection.
+ */
+export function listMcpFormModels(configPath: string, disabledConfigPath?: string): McpFormModel[] {
+	const enabledModels = readModelsFromConfig(configPath, true);
+	const disabledModels = disabledConfigPath ? readModelsFromConfig(disabledConfigPath, false) : [];
+	return sortMcpServersById([...enabledModels, ...disabledModels]);
 }
 
 export function validateMcpModel(
@@ -93,35 +97,59 @@ export function validateMcpModel(
 
 export function saveMcpServer(
 	configPath: string,
+	disabledConfigPath: string,
 	model: McpFormModel,
 	previousId?: string,
 ): McpValidationResult {
 	const parsed = readConfig(configPath);
+	const disabledParsed = readConfig(disabledConfigPath);
 	const servers = { ...(parsed.mcpServers ?? parsed.servers ?? {}) };
-	const validation = validateMcpModel(model, Object.keys(servers), previousId);
+	const disabledServers = { ...(disabledParsed.mcpServers ?? disabledParsed.servers ?? {}) };
+	const validation = validateMcpModel(
+		model,
+		Array.from(new Set([...Object.keys(servers), ...Object.keys(disabledServers)])),
+		previousId,
+	);
 	if (!validation.ok) {
 		return validation;
 	}
-	if (previousId && previousId !== model.id) {
+	if (previousId) {
 		delete servers[previousId];
+		delete disabledServers[previousId];
 	}
-	servers[model.id] = fromModel(model);
+	delete servers[model.id];
+	delete disabledServers[model.id];
+	const targetServers = model.enabled ? servers : disabledServers;
+	targetServers[model.id] = fromModel(model);
 	parsed.mcpServers = servers;
+	disabledParsed.mcpServers = disabledServers;
 	delete parsed.servers;
+	delete disabledParsed.servers;
 	writeConfig(configPath, parsed);
+	writeConfig(disabledConfigPath, disabledParsed);
 	return validation;
 }
 
-export function deleteMcpServer(configPath: string, serverId: string): boolean {
+/**
+ * Deletes one MCP entry from both enabled and disabled config files.
+ */
+export function deleteMcpServer(configPath: string, disabledConfigPath: string, serverId: string): boolean {
 	const parsed = readConfig(configPath);
+	const disabledParsed = readConfig(disabledConfigPath);
 	const servers = { ...(parsed.mcpServers ?? parsed.servers ?? {}) };
-	if (!(serverId in servers)) {
+	const disabledServers = { ...(disabledParsed.mcpServers ?? disabledParsed.servers ?? {}) };
+	const existed = serverId in servers || serverId in disabledServers;
+	if (!existed) {
 		return false;
 	}
 	delete servers[serverId];
+	delete disabledServers[serverId];
 	parsed.mcpServers = servers;
+	disabledParsed.mcpServers = disabledServers;
 	delete parsed.servers;
+	delete disabledParsed.servers;
 	writeConfig(configPath, parsed);
+	writeConfig(disabledConfigPath, disabledParsed);
 	return true;
 }
 
@@ -151,14 +179,12 @@ function toModel(id: string, value: Record<string, unknown>): McpFormModel {
 		disabledTools: Array.isArray(value.disabledTools)
 			? value.disabledTools.filter((item): item is string => typeof item === 'string')
 			: [],
-		enabled: value.disabled !== true,
+		enabled: true,
 	};
 }
 
 function fromModel(model: McpFormModel): Record<string, unknown> {
-	const next: Record<string, unknown> = {
-		disabled: !model.enabled,
-	};
+	const next: Record<string, unknown> = {};
 	if (model.transport === 'stdio') {
 		next.type = 'stdio';
 		next.command = model.command;
@@ -206,4 +232,13 @@ function readConfig(configPath: string): McpConfigShape {
 function writeConfig(configPath: string, config: McpConfigShape): void {
 	fs.mkdirSync(path.dirname(configPath), { recursive: true });
 	fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+}
+
+function readModelsFromConfig(configPath: string, enabled: boolean): McpFormModel[] {
+	const parsed = readConfig(configPath);
+	const servers = parsed.mcpServers ?? parsed.servers ?? {};
+	return Object.entries(servers).map(([id, value]) => ({
+		...toModel(id, value),
+		enabled,
+	}));
 }

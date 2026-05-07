@@ -8,48 +8,66 @@ export type McpServer = {
 	configPath?: string;
 };
 
-export function readMcpServers(configPath: string): McpServer[] {
+type McpConfigShape = {
+	servers?: Record<string, unknown>;
+	mcpServers?: Record<string, unknown>;
+};
+
+/**
+ * Reads enabled and disabled MCP entries from their respective config files and
+ * returns a single A-Z sorted list for UI consumers.
+ */
+export function readMcpServers(configPath: string, disabledConfigPath?: string): McpServer[] {
 	try {
-		if (!fs.existsSync(configPath)) {
-			return [];
-		}
-		const contents = fs.readFileSync(configPath, 'utf8');
-		return parseMcpServers(contents);
+		const enabledServers = readServersFromConfig(configPath, true);
+		const disabledServers = disabledConfigPath
+			? readServersFromConfig(disabledConfigPath, false)
+			: [];
+		return sortMcpServersById([...enabledServers, ...disabledServers]);
 	} catch {
 		return [];
 	}
 }
 
-export function parseMcpServers(contents: string): McpServer[] {
-	const parsed = JSON.parse(contents) as { servers?: Record<string, unknown>; mcpServers?: Record<string, unknown> };
+/**
+ * Parses one MCP config file and marks all entries with the provided enabled state.
+ */
+export function parseMcpServers(contents: string, enabled: boolean): McpServer[] {
+	const parsed = JSON.parse(contents) as McpConfigShape;
 	const servers = parsed.servers ?? parsed.mcpServers ?? {};
-	return Object.entries(servers).map(([id, value], index) => ({
+	return Object.keys(servers).map((id, index) => ({
 		id,
-		enabled: !isDisabledServer(value),
+		enabled,
 		headerLineIndex: index,
 	}));
 }
 
-export function toggleMcpServer(configPath: string, serverId: string): boolean {
+/**
+ * Moves one MCP entry between the enabled and disabled config files.
+ */
+export function toggleMcpServer(
+	configPath: string,
+	disabledConfigPath: string,
+	serverId: string,
+): boolean {
 	try {
-		const parsed = fs.existsSync(configPath)
-			? JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
-				mcpServers?: Record<string, Record<string, unknown>>;
-				servers?: Record<string, Record<string, unknown>>;
-			}
-			: {};
-		const key = parsed.mcpServers ? 'mcpServers' : 'servers';
-		const servers = parsed[key] ?? {};
-		const current = servers[serverId];
-		if (!current || typeof current !== 'object') {
+		const enabledConfig = readConfig(configPath);
+		const disabledConfig = readConfig(disabledConfigPath);
+		const enabledServers = { ...(enabledConfig.mcpServers ?? enabledConfig.servers ?? {}) };
+		const disabledServers = { ...(disabledConfig.mcpServers ?? disabledConfig.servers ?? {}) };
+		const currentEnabled = asServerRecord(enabledServers[serverId]);
+		const currentDisabled = asServerRecord(disabledServers[serverId]);
+		if (currentEnabled) {
+			delete enabledServers[serverId];
+			disabledServers[serverId] = stripDisabledField(currentEnabled);
+		} else if (currentDisabled) {
+			delete disabledServers[serverId];
+			enabledServers[serverId] = stripDisabledField(currentDisabled);
+		} else {
 			return false;
 		}
-		servers[serverId] = {
-			...current,
-			disabled: !isDisabledServer(current),
-		};
-		parsed[key] = servers;
-		fs.writeFileSync(configPath, JSON.stringify(parsed, null, 2), 'utf8');
+		writeConfig(configPath, { mcpServers: enabledServers });
+		writeConfig(disabledConfigPath, { mcpServers: disabledServers });
 		return true;
 	} catch {
 		return false;
@@ -60,11 +78,50 @@ export function getMcpConfigPath(copilotDir: string): string {
 	return path.join(copilotDir, 'mcp-config.json');
 }
 
-function isDisabledServer(value: unknown): boolean {
-	return Boolean(
-		value &&
-		typeof value === 'object' &&
-		'disabled' in value &&
-		(value as { disabled?: unknown }).disabled === true,
-	);
+export function getDisabledMcpConfigPath(copilotDir: string): string {
+	return path.join(copilotDir, '.copilot-workspace-manager', 'mcp-config.disabled.json');
+}
+
+export function sortMcpServersById<T extends { id: string }>(servers: T[]): T[] {
+	return [...servers].sort((left, right) => left.id.localeCompare(right.id, undefined, { sensitivity: 'base' }));
+}
+
+function readServersFromConfig(configPath: string, enabled: boolean): McpServer[] {
+	if (!fs.existsSync(configPath)) {
+		return [];
+	}
+	const contents = fs.readFileSync(configPath, 'utf8');
+	return parseMcpServers(contents, enabled).map((server) => ({
+		...server,
+		configPath,
+	}));
+}
+
+function readConfig(configPath: string): { mcpServers?: Record<string, Record<string, unknown>>; servers?: Record<string, Record<string, unknown>> } {
+	if (!fs.existsSync(configPath)) {
+		return {};
+	}
+	return JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
+		mcpServers?: Record<string, Record<string, unknown>>;
+		servers?: Record<string, Record<string, unknown>>;
+	};
+}
+
+function writeConfig(
+	configPath: string,
+	config: { mcpServers?: Record<string, Record<string, unknown>> },
+): void {
+	fs.mkdirSync(path.dirname(configPath), { recursive: true });
+	fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+}
+
+function asServerRecord(value: unknown): Record<string, unknown> | undefined {
+	return value && typeof value === 'object' && !Array.isArray(value)
+		? { ...(value as Record<string, unknown>) }
+		: undefined;
+}
+
+function stripDisabledField(value: Record<string, unknown>): Record<string, unknown> {
+	const { disabled: _disabled, ...rest } = value;
+	return rest;
 }

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { WorkspaceTreeDataProvider } from './workspaceTreeProvider';
 import { WorkspaceTreeItem } from '../models/treeItems';
-import { getMcpConfigPath, readMcpServers } from '../services/mcpService';
+import { readMcpServers } from '../services/mcpService';
 import { getCoreWorkspaceStatus, resolveCopilotPaths } from '../services/workspaceStatus';
 import { messages } from '../i18n';
 
@@ -11,8 +11,8 @@ export class McpExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTree
 	}
 
 	protected getAvailableChildren(): vscode.ProviderResult<WorkspaceTreeItem[]> {
-		const configPath = getMcpConfigPath(resolveCopilotPaths().copilotDir);
-		const servers = readMcpServers(configPath);
+		const paths = resolveCopilotPaths();
+		const servers = readMcpServers(paths.mcpConfigPath, paths.mcpDisabledConfigPath);
 		const items = servers.map((server) => {
 			const item = new WorkspaceTreeItem(
 				'mcpServer',

@@ -82,6 +82,10 @@ suite('Workspace status', () => {
 			const paths = resolveCopilotPaths(homeDir, customHome);
 			assert.strictEqual(paths.copilotDir, customHome);
 			assert.strictEqual(paths.configPath, path.join(customHome, 'config.json'));
+			assert.strictEqual(
+				paths.mcpDisabledConfigPath,
+				path.join(customHome, '.copilot-workspace-manager', 'mcp-config.disabled.json'),
+			);
 		});
 	});
 });

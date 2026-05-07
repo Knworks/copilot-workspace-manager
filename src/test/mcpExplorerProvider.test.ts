@@ -17,7 +17,7 @@ suite('MCP explorer provider', () => {
 			(mcpService as unknown as { readMcpServers: typeof mcpService.readMcpServers }).readMcpServers =
 				() => [
 					{ id: 'github', enabled: true, headerLineIndex: 0 },
-					{ id: 'remote', enabled: true, headerLineIndex: 1 },
+					{ id: 'remote', enabled: false, headerLineIndex: 1 },
 				];
 
 			const provider = new McpExplorerProvider({} as vscode.ExtensionContext);
@@ -33,7 +33,7 @@ suite('MCP explorer provider', () => {
 			assert.strictEqual((items[0].iconPath as vscode.ThemeIcon).color, undefined);
 
 			assert.ok(items[1].iconPath instanceof vscode.ThemeIcon);
-			assert.strictEqual((items[1].iconPath as vscode.ThemeIcon).id, 'mcp');
+			assert.strictEqual((items[1].iconPath as vscode.ThemeIcon).id, 'circle-slash');
 		} finally {
 			if (originalCopilotHome === undefined) {
 				delete process.env.COPILOT_HOME;
