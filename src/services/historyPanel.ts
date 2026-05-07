@@ -20,6 +20,7 @@ import {
 	HookSourceRecord,
 	listHookDiagnostics,
 } from './coreManagerConfigService';
+import { PluginRecord, listPluginDiagnostics } from './pluginDiagnosticsService';
 import { getCoreWorkspaceStatus, resolveCopilotPaths } from './workspaceStatus';
 import {
 	CODICON_RESOURCE_ROOTS,
@@ -47,7 +48,7 @@ type HistoryPanelInboundMessage =
 	| { type: 'removeTrustedDirectory'; targetPath: string; sourcePath: string }
 	| { type: 'openPath'; targetPath: string };
 
-type CoreViewTab = 'history' | 'chain' | 'trusted' | 'hooks';
+type CoreViewTab = 'history' | 'chain' | 'trusted' | 'hooks' | 'plugins';
 
 type HistoryTurnSummary = {
 	turnId: string;
@@ -109,6 +110,11 @@ type AgentsChainDisplayPayload = {
 type HooksDisplayPayload = {
 	sources: HookSourceRecord[];
 	entries: HookEntryRecord[];
+	emptyStateMessage?: string;
+};
+
+type PluginsDisplayPayload = {
+	plugins: PluginRecord[];
 	emptyStateMessage?: string;
 };
 
@@ -217,7 +223,8 @@ function isCoreViewTab(value: unknown): value is CoreViewTab {
 		value === 'history' ||
 		value === 'chain' ||
 		value === 'trusted' ||
-		value === 'hooks'
+		value === 'hooks' ||
+		value === 'plugins'
 	);
 }
 
@@ -353,6 +360,14 @@ function buildHooksPayload(): HooksDisplayPayload {
 	};
 }
 
+function buildPluginsPayload(): PluginsDisplayPayload {
+	const plugins = listPluginDiagnostics();
+	return {
+		plugins,
+		emptyStateMessage: plugins.length > 0 ? undefined : messages.pluginsEmpty,
+	};
+}
+
 function serializeAgentsChain(payload: AgentsChainDisplayPayload): string {
 	return JSON.stringify(payload);
 }
@@ -418,6 +433,34 @@ function buildHistoryWebviewHtml(
 		hooksPromptLabel: messages.hooksPromptLabel,
 		hooksTimeoutLabel: messages.hooksTimeoutLabel,
 		hooksStatusMessageLabel: messages.hooksStatusMessageLabel,
+		pluginsEmpty: messages.pluginsEmpty,
+		pluginsOverview: messages.pluginsOverview,
+		pluginsFeatureSummary: messages.pluginsFeatureSummary,
+		pluginsAgents: messages.pluginsAgents,
+		pluginsSkills: messages.pluginsSkills,
+		pluginsCommands: messages.pluginsCommands,
+		pluginsHooks: messages.pluginsHooks,
+		pluginsMcpServers: messages.pluginsMcpServers,
+		pluginsLspServers: messages.pluginsLspServers,
+		pluginsDiagnostics: messages.pluginsDiagnostics,
+		pluginsState: messages.pluginsState,
+		pluginsInstallKind: messages.pluginsInstallKind,
+		pluginsPluginRoot: messages.pluginsPluginRoot,
+		pluginsManifestPath: messages.pluginsManifestPath,
+		pluginsVersion: messages.pluginsVersion,
+		pluginsAuthor: messages.pluginsAuthor,
+		pluginsLicense: messages.pluginsLicense,
+		pluginsHomepage: messages.pluginsHomepage,
+		pluginsRepository: messages.pluginsRepository,
+		pluginsKeywords: messages.pluginsKeywords,
+		pluginsCategory: messages.pluginsCategory,
+		pluginsTags: messages.pluginsTags,
+		pluginsDescription: messages.pluginsDescription,
+		pluginsPath: messages.pluginsPath,
+		pluginsStatus: messages.pluginsStatus,
+		pluginsSource: messages.pluginsSource,
+		pluginsCount: messages.pluginsCount,
+		pluginsNone: messages.pluginsNone,
 	});
 	const csp = [
 		"default-src 'none'",
@@ -534,6 +577,7 @@ function buildHistoryWebviewHtml(
 			<button class="tab" data-tab="chain" type="button"><span class="codicon codicon-copilot" aria-hidden="true"></span><span>${messages.coreViewAgentsChainTab}</span></button>
 			<button class="tab" data-tab="trusted" type="button"><span class="codicon codicon-workspace-trusted" aria-hidden="true"></span><span>${messages.coreViewTrustedDirectoriesTab}</span></button>
 			<button class="tab" data-tab="hooks" type="button"><span class="codicon codicon-symbol-event" aria-hidden="true"></span><span>${messages.coreViewHooksTab}</span></button>
+			<button class="tab" data-tab="plugins" type="button"><span class="codicon codicon-plug" aria-hidden="true"></span><span>${messages.coreViewPluginsTab}</span></button>
 		</nav>
 		<section id="historyTab" class="diag-tab active">
 			<section class="top-pane">
@@ -571,14 +615,23 @@ function buildHistoryWebviewHtml(
 				<main id="hooksPreview" class="right-pane"></main>
 			</section>
 		</section>
+		<section id="pluginsTab" class="diag-tab">
+			<div class="tab-toolbar tab-toolbar-actions-right">${buildRefreshButtonHtml('plugins')}</div>
+			<section class="bottom-pane">
+				<aside class="left-pane"><div id="pluginsList" class="hooks-list"></div></aside>
+				<main id="pluginsPreview" class="right-pane"></main>
+			</section>
+		</section>
 	</div>
 	<script nonce="${nonce}">
 		const vscode = acquireVsCodeApi();
 		const labels = ${labels};
 		let chainPayload = ${serializeAgentsChain({ entries: [], summary: { foundCount: 0, hasPotentialConflict: false } })};
 		let hooksPayload = { sources: [], entries: [], emptyStateMessage: labels.noResult };
+		let pluginsPayload = { plugins: [], emptyStateMessage: labels.pluginsEmpty };
 		let selectedChainId = chainPayload.entries[0]?.id;
 		let selectedHookSourceId = undefined;
+		let selectedPluginId = undefined;
 		let state = { appliedQuery: '', items: [], selectedTurn: undefined };
 		const loadedTabs = new Set();
 		const searchInput = document.getElementById('searchInput');
@@ -591,6 +644,8 @@ function buildHistoryWebviewHtml(
 		const chainSummary = document.getElementById('chainSummary');
 		const hooksList = document.getElementById('hooksList');
 		const hooksPreview = document.getElementById('hooksPreview');
+		const pluginsList = document.getElementById('pluginsList');
+		const pluginsPreview = document.getElementById('pluginsPreview');
 		const renderChainRowIcon = (entry) => entry.iconKind === 'agent' && ${JSON.stringify(Boolean(agentLightIconHref && agentDarkIconHref))}
 			? '<span class="row-icon" aria-hidden="true"><img class="chain-icon-image light" src="${agentLightIconHref ?? ''}" alt="" /><img class="chain-icon-image dark" src="${agentDarkIconHref ?? ''}" alt="" /></span>'
 			: '<span class="codicon codicon-copilot row-icon" aria-hidden="true"></span>';
@@ -728,6 +783,12 @@ function buildHistoryWebviewHtml(
 				renderHooks();
 				return;
 			}
+			const pluginRow = target?.closest('[data-plugin-id]');
+			if (pluginRow?.dataset?.pluginId) {
+				selectedPluginId = pluginRow.dataset.pluginId;
+				renderPlugins();
+				return;
+			}
 		});
 
 		const renderList = () => {
@@ -829,12 +890,90 @@ function buildHistoryWebviewHtml(
 			).join('') + '</div>';
 		};
 
+		const renderPluginBlock = (title, itemsHtml, count, open) =>
+			'<details class="hook-entry-card"' + (open ? ' open' : '') + '><summary class="hook-entry-heading"><span>' + escapeHtml(title) + ' (' + count + ')</span></summary><div class="hook-entry-list">' + itemsHtml + '</div></details>';
+
+		const renderTwoColumnGrid = (rows) =>
+			'<div class="hook-entry-detail-grid">' + rows.map((row) => '<div class="hook-entry-detail-label">' + escapeHtml(String(row[0])) + '</div><div>' + escapeHtml(String(row[1])) + '</div>').join('') + '</div>';
+
+		const renderPlugins = () => {
+			const plugins = pluginsPayload.plugins || [];
+			if (plugins.length === 0) {
+				pluginsList.innerHTML = '<div class="preview-empty">' + escapeHtml(pluginsPayload.emptyStateMessage || labels.pluginsEmpty) + '</div>';
+				pluginsPreview.innerHTML = '<div class="preview-empty">' + escapeHtml(pluginsPayload.emptyStateMessage || labels.pluginsEmpty) + '</div>';
+				return;
+			}
+			if (!plugins.some((plugin) => plugin.id === selectedPluginId)) {
+				selectedPluginId = plugins[0].id;
+			}
+			pluginsList.innerHTML = plugins.map((plugin) =>
+				'<button type="button" class="hook-source-row' + (plugin.id === selectedPluginId ? ' active' : '') + '" data-plugin-id="' + escapeHtml(plugin.id) + '"><span class="codicon codicon-plug row-icon" aria-hidden="true"></span><div class="hook-source-main"><div class="hook-source-title">' + escapeHtml(plugin.name) + '</div><div class="hook-source-path">' + escapeHtml(plugin.description || plugin.pluginRoot) + '</div><div class="hook-source-meta">' + escapeHtml((plugin.version || plugin.installKind) + ' · A:' + plugin.agents.length + ' S:' + plugin.skills.length + ' C:' + plugin.commands.length + ' H:' + plugin.hooks.length + ' M:' + plugin.mcpServers.length + ' L:' + plugin.lspServers.length) + '</div></div></button>'
+			).join('');
+			const plugin = plugins.find((entry) => entry.id === selectedPluginId) || plugins[0];
+			const overviewRows = [
+				[labels.pluginsDescription, plugin.description],
+				[labels.pluginsState, plugin.state],
+				[labels.pluginsInstallKind, plugin.installKind],
+				[labels.pluginsVersion, plugin.version],
+				[labels.pluginsAuthor, plugin.author],
+				[labels.pluginsLicense, plugin.license],
+				[labels.pluginsHomepage, plugin.homepage],
+				[labels.pluginsRepository, plugin.repository],
+				[labels.pluginsKeywords, plugin.keywords.join(', ')],
+				[labels.pluginsCategory, plugin.category],
+				[labels.pluginsTags, plugin.tags.join(', ')],
+				[labels.pluginsPluginRoot, plugin.pluginRoot],
+				[labels.pluginsManifestPath, plugin.manifestPath || ''],
+			].filter((row) => row[1]);
+			const summaryRows = [
+				[labels.pluginsAgents, plugin.agents.length],
+				[labels.pluginsSkills, plugin.skills.length],
+				[labels.pluginsCommands, plugin.commands.length],
+				[labels.pluginsHooks, plugin.hooks.length],
+				[labels.pluginsMcpServers, plugin.mcpServers.length],
+				[labels.pluginsLspServers, plugin.lspServers.length],
+			];
+			const agentItems = plugin.agents.length
+				? plugin.agents.map((entry) => '<article class="hook-entry-card"><div class="hook-entry-heading"><span>' + escapeHtml(entry.id) + '</span></div>' + renderTwoColumnGrid([[labels.pluginsDescription, entry.description || labels.pluginsNone], [labels.pluginsPath, entry.relativePath], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
+			const skillItems = plugin.skills.length
+				? plugin.skills.map((entry) => '<article class="hook-entry-card"><div class="hook-entry-heading"><span>' + escapeHtml(entry.name) + '</span></div>' + renderTwoColumnGrid([[labels.pluginsDescription, entry.description || labels.pluginsNone], [labels.pluginsPath, entry.relativePath], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
+			const commandItems = plugin.commands.length
+				? plugin.commands.map((entry) => '<article class="hook-entry-card"><div class="hook-entry-heading"><span>' + escapeHtml(entry.name) + '</span></div>' + renderTwoColumnGrid([[labels.pluginsDescription, entry.description || labels.pluginsNone], [labels.pluginsPath, entry.relativePath], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
+			const hookItems = plugin.hooks.length
+				? plugin.hooks.map((entry) => '<article class="hook-entry-card"><div class="hook-entry-heading"><span>' + escapeHtml(entry.event) + '</span></div>' + renderTwoColumnGrid([[labels.pluginsCount, entry.count], [labels.pluginsSource, entry.source], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
+			const mcpItems = plugin.mcpServers.length
+				? plugin.mcpServers.map((entry) => '<article class="hook-entry-card"><div class="hook-entry-heading"><span>' + escapeHtml(entry.id) + '</span></div>' + renderTwoColumnGrid([['type', entry.type], ['tools', entry.tools], [labels.pluginsSource, entry.source], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
+			const lspItems = plugin.lspServers.length
+				? plugin.lspServers.map((entry) => '<article class="hook-entry-card"><div class="hook-entry-heading"><span>' + escapeHtml(entry.id) + '</span></div>' + renderTwoColumnGrid([[labels.pluginsSource, entry.source], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
+			const diagnosticItems = plugin.diagnostics.length
+				? plugin.diagnostics.map((entry) => '<article class="hook-entry-card"><div class="hook-entry-heading"><span>' + escapeHtml(entry.message) + '</span></div>' + renderTwoColumnGrid([['Severity', entry.severity]]) + '</article>').join('')
+				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
+			pluginsPreview.innerHTML = '<div class="hook-entry-list">'
+				+ renderPluginBlock(labels.pluginsOverview, renderTwoColumnGrid(overviewRows), overviewRows.length, true)
+				+ renderPluginBlock(labels.pluginsFeatureSummary, renderTwoColumnGrid(summaryRows), summaryRows.length, true)
+				+ renderPluginBlock(labels.pluginsAgents, agentItems, plugin.agents.length, plugin.agents.length > 0)
+				+ renderPluginBlock(labels.pluginsSkills, skillItems, plugin.skills.length, plugin.skills.length > 0)
+				+ renderPluginBlock(labels.pluginsCommands, commandItems, plugin.commands.length, plugin.commands.length > 0)
+				+ renderPluginBlock(labels.pluginsHooks, hookItems, plugin.hooks.length, false)
+				+ renderPluginBlock(labels.pluginsMcpServers, mcpItems, plugin.mcpServers.length, plugin.mcpServers.length > 0)
+				+ renderPluginBlock(labels.pluginsLspServers, lspItems, plugin.lspServers.length, false)
+				+ renderPluginBlock(labels.pluginsDiagnostics, diagnosticItems, plugin.diagnostics.length, plugin.diagnostics.length > 0)
+				+ '</div>';
+		};
+
 		const render = () => {
 			searchInput.value = state.appliedQuery;
 			renderList();
 			renderPreview();
 			renderChain();
 			renderHooks();
+			renderPlugins();
 		};
 
 		searchInput.addEventListener('input', () => vscode.postMessage({ type: 'search', query: searchInput.value }));
@@ -861,6 +1000,12 @@ function buildHistoryWebviewHtml(
 					hooksPayload = message.payload || { sources: [], entries: [], emptyStateMessage: labels.noResult };
 					selectedHookSourceId = hooksPayload.sources[0]?.id;
 					renderHooks();
+				}
+				if (message.tab === 'plugins') {
+					loadedTabs.add('plugins');
+					pluginsPayload = message.payload || { plugins: [], emptyStateMessage: labels.pluginsEmpty };
+					selectedPluginId = pluginsPayload.plugins[0]?.id;
+					renderPlugins();
 				}
 				return;
 			}
@@ -1261,6 +1406,14 @@ export class HistoryPanelManager implements vscode.Disposable {
 				type: 'tabContent',
 				tab,
 				payload: buildHooksPayload(),
+			});
+			return;
+		}
+		if (tab === 'plugins') {
+			void this.panel.webview.postMessage({
+				type: 'tabContent',
+				tab,
+				payload: buildPluginsPayload(),
 			});
 			return;
 		}

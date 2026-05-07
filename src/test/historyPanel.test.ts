@@ -116,6 +116,7 @@ suite('History panel manager', () => {
 		assert.ok(fakePanel.panel.webview.html.includes('agents_light.png'));
 		assert.ok(fakePanel.panel.webview.html.includes('agents_dark.png'));
 		assert.ok(fakePanel.panel.webview.html.includes('addInstructionFile'));
+		assert.ok(fakePanel.panel.webview.html.includes('codicon-plug'));
 		assert.ok(!fakePanel.panel.webview.html.includes('chainDetailsToggle'));
 		assert.ok(!fakePanel.panel.webview.html.includes('featuresTab'));
 		manager.dispose();
