@@ -46,6 +46,36 @@ suite('MCP explorer provider', () => {
 		}
 	});
 
+	test('shows plugin MCP description after regular entries', () => {
+		const originalReadMcpServers = mcpService.readMcpServers;
+		const originalCopilotHome = process.env.COPILOT_HOME;
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-explorer-plugin-'));
+		try {
+			process.env.COPILOT_HOME = tempDir;
+			fs.writeFileSync(path.join(tempDir, 'config.json'), '{}', 'utf8');
+			(mcpService as unknown as { readMcpServers: typeof mcpService.readMcpServers }).readMcpServers =
+				() => [
+					{ id: 'alpha', entryId: 'alpha', enabled: true, headerLineIndex: 0 },
+					{ id: 'beta', entryId: 'plugin:x:beta', enabled: true, headerLineIndex: 1, readOnly: true, sourceLabel: 'Plugin MCP' },
+				];
+
+			const provider = new McpExplorerProvider({} as vscode.ExtensionContext);
+			const items = provider.getChildren() as vscode.TreeItem[];
+
+			assert.strictEqual(items[1].label, 'beta');
+			assert.strictEqual(items[1].description, 'Plugin MCP');
+		} finally {
+			if (originalCopilotHome === undefined) {
+				delete process.env.COPILOT_HOME;
+			} else {
+				process.env.COPILOT_HOME = originalCopilotHome;
+			}
+			fs.rmSync(tempDir, { recursive: true, force: true });
+			(mcpService as unknown as { readMcpServers: typeof mcpService.readMcpServers }).readMcpServers =
+				originalReadMcpServers;
+		}
+	});
+
 	test('returns empty item when no MCP servers exist', () => {
 		const originalReadMcpServers = mcpService.readMcpServers;
 		const originalCopilotHome = process.env.COPILOT_HOME;

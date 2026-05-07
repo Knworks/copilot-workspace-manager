@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { sortMcpServersById } from './mcpService';
+import { listPluginMcpDefinitions } from './pluginMcpService';
 
 export type McpServerType = 'local' | 'stdio' | 'http' | 'sse';
 export type McpFilterMapping = 'none' | 'markdown' | 'hidden_characters';
@@ -16,6 +17,7 @@ export type McpKeyValueEntry = {
 
 export type McpFormModel = {
 	id: string;
+	entryId?: string;
 	type: McpServerType;
 	command: string;
 	args: string[];
@@ -30,6 +32,8 @@ export type McpFormModel = {
 	oidc: boolean;
 	filterMapping?: McpFilterMapping;
 	enabled: boolean;
+	readOnly?: boolean;
+	sourceLabel?: string;
 };
 
 export type McpValidationResult = {
@@ -57,7 +61,18 @@ const FILTER_MAPPINGS = new Set<McpFilterMapping>([
 export function listMcpFormModels(configPath: string, disabledConfigPath?: string): McpFormModel[] {
 	const enabledModels = readModelsFromConfig(configPath, true);
 	const disabledModels = disabledConfigPath ? readModelsFromConfig(disabledConfigPath, false) : [];
-	return sortMcpServersById([...enabledModels, ...disabledModels]);
+	const pluginModels = listPluginMcpDefinitions(path.join(path.dirname(configPath), 'installed-plugins'))
+		.map((definition) => ({
+			...toModel(definition.id, definition.value),
+			entryId: definition.entryId,
+			enabled: true,
+			readOnly: true,
+			sourceLabel: 'Plugin MCP',
+		}));
+	return [
+		...sortMcpServersById([...enabledModels, ...disabledModels]),
+		...sortMcpServersById(pluginModels),
+	];
 }
 
 export function validateMcpModel(
@@ -174,6 +189,7 @@ function toModel(id: string, value: Record<string, unknown>): McpFormModel {
 	const type = readType(value);
 	return {
 		id,
+		entryId: id,
 		type,
 		command: typeof value.command === 'string' ? value.command : '',
 		args: readStringArray(value.args),
@@ -188,6 +204,8 @@ function toModel(id: string, value: Record<string, unknown>): McpFormModel {
 		oidc: value.oidc === true,
 		filterMapping: readFilterMapping(value.filterMapping),
 		enabled: true,
+		readOnly: false,
+		sourceLabel: undefined,
 	};
 }
 
@@ -256,7 +274,10 @@ function readModelsFromConfig(configPath: string, enabled: boolean): McpFormMode
 	const servers = parsed.mcpServers ?? parsed.servers ?? {};
 	return Object.entries(servers).map(([id, value]) => ({
 		...toModel(id, value),
+		entryId: id,
 		enabled,
+		readOnly: false,
+		sourceLabel: undefined,
 	}));
 }
 

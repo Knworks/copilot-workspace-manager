@@ -96,6 +96,73 @@ suite('MCP service', () => {
 		});
 	});
 
+	test('reads plugin MCP servers after regular entries and marks them readonly', () => {
+		withTempDir((root) => {
+			const configPath = path.join(root, 'mcp-config.json');
+			const disabledConfigPath = path.join(root, '.copilot-workspace-manager', 'mcp-config.disabled.json');
+			const pluginRoot = path.join(root, 'installed-plugins', 'marketplace', 'plugin-a');
+			fs.mkdirSync(path.dirname(disabledConfigPath), { recursive: true });
+			fs.mkdirSync(pluginRoot, { recursive: true });
+			fs.writeFileSync(
+				configPath,
+				JSON.stringify({
+					mcpServers: {
+						alpha: { type: 'stdio', command: 'a' },
+					},
+				}, null, 2),
+				'utf8',
+			);
+			fs.writeFileSync(
+				path.join(pluginRoot, 'plugin.json'),
+				JSON.stringify({
+					name: 'plugin-a',
+					mcpServers: {
+						zeta: { type: 'http', url: 'https://example.test/zeta' },
+						beta: { type: 'http', url: 'https://example.test/beta' },
+					},
+				}, null, 2),
+				'utf8',
+			);
+
+			const servers = readMcpServers(configPath, disabledConfigPath);
+			assert.deepStrictEqual(
+				servers.map((server) => `${server.id}:${server.sourceLabel ?? 'regular'}`),
+				['alpha:regular', 'beta:Plugin MCP', 'zeta:Plugin MCP'],
+			);
+			assert.strictEqual(servers[1].readOnly, true);
+			assert.ok(servers[1].entryId?.startsWith('plugin:'));
+		});
+	});
+
+	test('reads plugin MCP config from default candidate file when manifest omits mcpServers', () => {
+		withTempDir((root) => {
+			const configPath = path.join(root, 'mcp-config.json');
+			const disabledConfigPath = path.join(root, '.copilot-workspace-manager', 'mcp-config.disabled.json');
+			const pluginRoot = path.join(root, 'installed-plugins', '_direct', 'plugin-b');
+			fs.mkdirSync(path.dirname(disabledConfigPath), { recursive: true });
+			fs.mkdirSync(pluginRoot, { recursive: true });
+			fs.writeFileSync(path.join(configPath), JSON.stringify({ mcpServers: {} }, null, 2), 'utf8');
+			fs.writeFileSync(
+				path.join(pluginRoot, 'plugin.json'),
+				JSON.stringify({ name: 'plugin-b' }, null, 2),
+				'utf8',
+			);
+			fs.writeFileSync(
+				path.join(pluginRoot, '.mcp.json'),
+				JSON.stringify({
+					mcpServers: {
+						gamma: { type: 'stdio', command: 'g' },
+					},
+				}, null, 2),
+				'utf8',
+			);
+
+			const servers = readMcpServers(configPath, disabledConfigPath);
+			assert.strictEqual(servers[0].id, 'gamma');
+			assert.strictEqual(servers[0].sourceLabel, 'Plugin MCP');
+		});
+	});
+
 	test('uses Copilot user MCP config file name', () => {
 		assert.strictEqual(
 			getMcpConfigPath(path.join('home', '.copilot')),

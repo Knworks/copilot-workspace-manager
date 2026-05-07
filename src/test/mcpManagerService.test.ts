@@ -76,6 +76,52 @@ suite('MCP manager service', () => {
 		});
 	});
 
+	test('listMcpFormModels appends plugin MCP records after regular entries', () => {
+		withTempDir((root) => {
+			const configPath = path.join(root, 'mcp-config.json');
+			const disabledConfigPath = path.join(root, '.copilot-workspace-manager', 'mcp-config.disabled.json');
+			const pluginRoot = path.join(root, 'installed-plugins', 'marketplace', 'plugin-a');
+			fs.mkdirSync(path.dirname(disabledConfigPath), { recursive: true });
+			fs.mkdirSync(pluginRoot, { recursive: true });
+			fs.writeFileSync(
+				configPath,
+				JSON.stringify({
+					mcpServers: {
+						alpha: {
+							type: 'local',
+							command: 'a',
+							args: [],
+							tools: ['*'],
+						},
+					},
+				}, null, 2),
+				'utf8',
+			);
+			fs.writeFileSync(
+				path.join(pluginRoot, 'plugin.json'),
+				JSON.stringify({
+					name: 'plugin-a',
+					mcpServers: {
+						beta: {
+							type: 'http',
+							url: 'https://example.test/beta',
+							tools: ['*'],
+						},
+					},
+				}, null, 2),
+				'utf8',
+			);
+
+			const models = listMcpFormModels(configPath, disabledConfigPath);
+			assert.deepStrictEqual(
+				models.map((model) => `${model.id}:${model.sourceLabel ?? 'regular'}`),
+				['alpha:regular', 'beta:Plugin MCP'],
+			);
+			assert.strictEqual(models[1].readOnly, true);
+			assert.ok(models[1].entryId?.startsWith('plugin:'));
+		});
+	});
+
 	test('saveMcpServer writes local server entries in Copilot format', () => {
 		withTempDir((root) => {
 			const configPath = path.join(root, 'mcp-config.json');

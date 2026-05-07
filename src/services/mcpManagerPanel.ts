@@ -47,6 +47,7 @@ function createNonce(): string {
 function emptyModel(): McpFormModel {
 	return {
 		id: '',
+		entryId: '',
 		type: 'local',
 		command: '',
 		args: [],
@@ -61,17 +62,20 @@ function emptyModel(): McpFormModel {
 		oidc: false,
 		filterMapping: undefined,
 		enabled: true,
+		readOnly: false,
+		sourceLabel: undefined,
 	};
 }
 
 function buildList(models: McpFormModel[], selectedId: string | undefined): string {
-	return models.map((model) => `<button type="button" class="server ${model.id === selectedId ? 'active' : ''}${model.enabled ? '' : ' disabled'}" data-select="${escapeHtml(model.id)}" data-filter-text="${escapeHtml(model.id.toLocaleLowerCase())}">
+	return models.map((model) => `<button type="button" class="server ${(model.entryId ?? model.id) === selectedId ? 'active' : ''}${model.enabled ? '' : ' disabled'}${model.readOnly ? ' readonly' : ''}" data-select="${escapeHtml(model.entryId ?? model.id)}" data-filter-text="${escapeHtml(model.id.toLocaleLowerCase())}">
 		<span class="codicon codicon-mcp server-icon" aria-hidden="true"></span>
 		<span class="server-name">${escapeHtml(model.id)}</span>
-		<label class="switch" title="${escapeHtml(messages.mcpManagerToggle)}">
+		${model.sourceLabel ? `<span class="server-meta">${escapeHtml(model.sourceLabel)}</span>` : ''}
+		${model.readOnly ? '' : `<label class="switch" title="${escapeHtml(messages.mcpManagerToggle)}">
 			<input type="checkbox" data-toggle="${escapeHtml(model.id)}" ${model.enabled ? 'checked' : ''} />
 			<span></span>
-		</label>
+		</label>`}
 	</button>`).join('');
 }
 
@@ -132,7 +136,7 @@ function buildHtml(
 	query: string,
 ): string {
 	const nonce = createNonce();
-	const selected = models.find((model) => model.id === selectedId) ?? models[0] ?? emptyModel();
+	const selected = models.find((model) => (model.entryId ?? model.id) === selectedId) ?? models[0] ?? emptyModel();
 	const codiconCssHref = getCodiconCssHref(webview);
 	const fontFamily = getWebviewFontFamily();
 	const serializedModels = JSON.stringify(models);
@@ -169,8 +173,10 @@ function buildHtml(
 		.server-list { padding: 10px 12px; overflow: auto; }
 		.server { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; width: 100%; margin-bottom: 6px; padding: 8px; background: var(--vscode-editorWidget-background); color: var(--vscode-foreground); border: 1px solid var(--vscode-panel-border); border-radius: 6px; text-align: left; cursor: pointer; }
 		.server.disabled { opacity: 0.55; }
+		.server.readonly { opacity: 0.65; }
 		.server.active { border-color: var(--vscode-focusBorder); background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
 		.server-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+		.server-meta { font-size: 11px; color: var(--vscode-descriptionForeground); white-space: nowrap; }
 		.server-icon { color: var(--vscode-descriptionForeground); }
 		.detail-form-shell { width: 100%; padding: 0 0 0 12px; box-sizing: border-box; }
 		form { display: grid; gap: 12px; width: 100%; box-sizing: border-box; }
@@ -227,7 +233,7 @@ function buildHtml(
 						<button id="cancel" class="icon-button" type="button" title="${escapeHtml(messages.mcpManagerCancel)}" aria-label="${escapeHtml(messages.mcpManagerCancel)}"><span class="codicon codicon-discard" aria-hidden="true"></span></button>
 					</div>
 				</div>
-				<div class="server-list">${buildList(models, selected.id)}</div>
+				<div class="server-list">${buildList(models, selected.entryId ?? selected.id)}</div>
 			</section>
 			<section id="detailPane" class="right"></section>
 		</div>
@@ -237,12 +243,13 @@ function buildHtml(
 		const models = ${serializedModels};
 		const descriptions = ${fieldDescriptions};
 		const initialModel = ${serializedSelected};
-		let selectedId = ${JSON.stringify(selected.id)};
+		let selectedId = ${JSON.stringify(selected.entryId ?? selected.id)};
 		let draftModel = cloneModel(initialModel);
 
 		function emptyModel() {
 			return {
 				id: '',
+				entryId: '',
 				type: 'local',
 				command: '',
 				args: [],
@@ -257,6 +264,8 @@ function buildHtml(
 				oidc: false,
 				filterMapping: undefined,
 				enabled: true,
+				readOnly: false,
+				sourceLabel: undefined,
 			};
 		}
 
@@ -284,71 +293,75 @@ function buildHtml(
 			return '<span class="field-label">' + escapeHtml(label) + '<span class="codicon codicon-info info-icon" title="' + escapeHtml(description) + '" aria-label="' + escapeHtml(description) + '"></span></span>';
 		}
 
-		function buildListRowsHtml(name, entries, placeholder, removeLabel) {
+		function buildListRowsHtml(name, entries, placeholder, removeLabel, disabled) {
+			const disabledAttr = disabled ? ' disabled' : '';
 			const resolvedEntries = entries && entries.length > 0 ? entries : [''];
 			return resolvedEntries.map((entry) =>
 				'<div class="list-row">' +
-				'<input name="' + name + '" value="' + escapeHtml(entry || '') + '" placeholder="' + escapeHtml(placeholder) + '" />' +
-				'<button class="icon-button list-remove" type="button" title="' + escapeHtml(removeLabel) + '" aria-label="' + escapeHtml(removeLabel) + '"><span class="codicon codicon-close" aria-hidden="true"></span></button>' +
+				'<input name="' + name + '" value="' + escapeHtml(entry || '') + '" placeholder="' + escapeHtml(placeholder) + '"' + disabledAttr + ' />' +
+				'<button class="icon-button list-remove" type="button" title="' + escapeHtml(removeLabel) + '" aria-label="' + escapeHtml(removeLabel) + '"' + disabledAttr + '><span class="codicon codicon-close" aria-hidden="true"></span></button>' +
 				'</div>'
 			).join('');
 		}
 
-		function buildPairRowsHtml(keyName, valueName, entries, keyPlaceholder, valuePlaceholder, removeLabel) {
+		function buildPairRowsHtml(keyName, valueName, entries, keyPlaceholder, valuePlaceholder, removeLabel, disabled) {
+			const disabledAttr = disabled ? ' disabled' : '';
 			const resolvedEntries = entries && entries.length > 0 ? entries : [{ key: '', value: '' }];
 			return resolvedEntries.map((entry) =>
 				'<div class="pair-row">' +
-				'<input name="' + keyName + '" value="' + escapeHtml(entry.key || '') + '" placeholder="' + escapeHtml(keyPlaceholder) + '" />' +
-				'<input name="' + valueName + '" value="' + escapeHtml(entry.value || '') + '" placeholder="' + escapeHtml(valuePlaceholder) + '" />' +
-				'<button class="icon-button pair-remove" type="button" title="' + escapeHtml(removeLabel) + '" aria-label="' + escapeHtml(removeLabel) + '"><span class="codicon codicon-close" aria-hidden="true"></span></button>' +
+				'<input name="' + keyName + '" value="' + escapeHtml(entry.key || '') + '" placeholder="' + escapeHtml(keyPlaceholder) + '"' + disabledAttr + ' />' +
+				'<input name="' + valueName + '" value="' + escapeHtml(entry.value || '') + '" placeholder="' + escapeHtml(valuePlaceholder) + '"' + disabledAttr + ' />' +
+				'<button class="icon-button pair-remove" type="button" title="' + escapeHtml(removeLabel) + '" aria-label="' + escapeHtml(removeLabel) + '"' + disabledAttr + '><span class="codicon codicon-close" aria-hidden="true"></span></button>' +
 				'</div>'
 			).join('');
 		}
 
 		function buildForm(model) {
+			const disabledAttr = model.readOnly ? ' disabled' : '';
 			const localSection = isLocalType(model.type)
 				? '<div class="section">' +
 					'<div class="section-title">${escapeHtml(messages.mcpManagerLocalSection)}</div>' +
-					'<label>' + fieldLabel(${JSON.stringify(messages.mcpManagerCommandLabel)}, descriptions.command) + '<input name="command" value="' + escapeHtml(model.command) + '" /></label>' +
+					'<label>' + fieldLabel(${JSON.stringify(messages.mcpManagerCommandLabel)}, descriptions.command) + '<input name="command" value="' + escapeHtml(model.command) + '"' + disabledAttr + ' /></label>' +
 					'<div class="list-field">' +
 						'<span class="field-label-row">' +
 							fieldLabel(${JSON.stringify(messages.mcpManagerArgsLabel)}, descriptions.args) +
-							'<button id="addArgRow" class="icon-button" type="button" title="${escapeHtml(messages.mcpManagerAddArg)}" aria-label="${escapeHtml(messages.mcpManagerAddArg)}"><span class="codicon codicon-add" aria-hidden="true"></span></button>' +
+							(model.readOnly ? '' : '<button id="addArgRow" class="icon-button" type="button" title="${escapeHtml(messages.mcpManagerAddArg)}" aria-label="${escapeHtml(messages.mcpManagerAddArg)}"><span class="codicon codicon-add" aria-hidden="true"></span></button>') +
 						'</span>' +
-						'<div id="argRows" class="list-rows">' + buildListRowsHtml('argItem', model.args, ${JSON.stringify(messages.mcpManagerArgPlaceholder)}, ${JSON.stringify(messages.mcpManagerRemoveArg)}) + '</div>' +
+						'<div id="argRows" class="list-rows">' + buildListRowsHtml('argItem', model.args, ${JSON.stringify(messages.mcpManagerArgPlaceholder)}, ${JSON.stringify(messages.mcpManagerRemoveArg)}, model.readOnly) + '</div>' +
 					'</div>' +
 					'<div class="list-field">' +
 						'<span class="field-label-row">' +
 							fieldLabel(${JSON.stringify(messages.mcpManagerEnvLabel)}, descriptions.env) +
-							'<button id="addEnvRow" class="icon-button" type="button" title="${escapeHtml(messages.mcpManagerAddEnv)}" aria-label="${escapeHtml(messages.mcpManagerAddEnv)}"><span class="codicon codicon-add" aria-hidden="true"></span></button>' +
+							(model.readOnly ? '' : '<button id="addEnvRow" class="icon-button" type="button" title="${escapeHtml(messages.mcpManagerAddEnv)}" aria-label="${escapeHtml(messages.mcpManagerAddEnv)}"><span class="codicon codicon-add" aria-hidden="true"></span></button>') +
 						'</span>' +
-						'<div id="envRows" class="list-rows">' + buildPairRowsHtml('envKey', 'envValue', model.env, ${JSON.stringify(messages.mcpManagerEnvKeyPlaceholder)}, ${JSON.stringify(messages.mcpManagerEnvValuePlaceholder)}, ${JSON.stringify(messages.mcpManagerRemoveEnv)}) + '</div>' +
+						'<div id="envRows" class="list-rows">' + buildPairRowsHtml('envKey', 'envValue', model.env, ${JSON.stringify(messages.mcpManagerEnvKeyPlaceholder)}, ${JSON.stringify(messages.mcpManagerEnvValuePlaceholder)}, ${JSON.stringify(messages.mcpManagerRemoveEnv)}, model.readOnly) + '</div>' +
 					'</div>' +
-					'<label>' + fieldLabel(${JSON.stringify(messages.mcpManagerCwdLabel)}, descriptions.cwd) + '<input name="cwd" value="' + escapeHtml(model.cwd) + '" /></label>' +
+					'<label>' + fieldLabel(${JSON.stringify(messages.mcpManagerCwdLabel)}, descriptions.cwd) + '<input name="cwd" value="' + escapeHtml(model.cwd) + '"' + disabledAttr + ' /></label>' +
 				'</div>'
 				: '';
 			const remoteSection = isRemoteType(model.type)
 				? '<div class="section">' +
 					'<div class="section-title">${escapeHtml(messages.mcpManagerRemoteSection)}</div>' +
-					'<label>' + fieldLabel(${JSON.stringify(messages.mcpManagerUrlLabel)}, descriptions.url) + '<input name="url" value="' + escapeHtml(model.url) + '" /></label>' +
+					'<label>' + fieldLabel(${JSON.stringify(messages.mcpManagerUrlLabel)}, descriptions.url) + '<input name="url" value="' + escapeHtml(model.url) + '"' + disabledAttr + ' /></label>' +
 					'<div class="list-field">' +
 						'<span class="field-label-row">' +
 							fieldLabel(${JSON.stringify(messages.mcpManagerHeadersLabel)}, descriptions.headers) +
-							'<button id="addHeaderRow" class="icon-button" type="button" title="${escapeHtml(messages.mcpManagerAddHeader)}" aria-label="${escapeHtml(messages.mcpManagerAddHeader)}"><span class="codicon codicon-add" aria-hidden="true"></span></button>' +
+							(model.readOnly ? '' : '<button id="addHeaderRow" class="icon-button" type="button" title="${escapeHtml(messages.mcpManagerAddHeader)}" aria-label="${escapeHtml(messages.mcpManagerAddHeader)}"><span class="codicon codicon-add" aria-hidden="true"></span></button>') +
 						'</span>' +
-						'<div id="headerRows" class="list-rows">' + buildPairRowsHtml('headerKey', 'headerValue', model.headers, ${JSON.stringify(messages.mcpManagerHeaderKeyPlaceholder)}, ${JSON.stringify(messages.mcpManagerHeaderValuePlaceholder)}, ${JSON.stringify(messages.mcpManagerRemoveHeader)}) + '</div>' +
+						'<div id="headerRows" class="list-rows">' + buildPairRowsHtml('headerKey', 'headerValue', model.headers, ${JSON.stringify(messages.mcpManagerHeaderKeyPlaceholder)}, ${JSON.stringify(messages.mcpManagerHeaderValuePlaceholder)}, ${JSON.stringify(messages.mcpManagerRemoveHeader)}, model.readOnly) + '</div>' +
 					'</div>' +
-					'<label>' + fieldLabel(${JSON.stringify(messages.mcpManagerOAuthClientIdLabel)}, descriptions.oauthClientId) + '<input name="oauthClientId" value="' + escapeHtml(model.oauthClientId) + '" /></label>' +
+					'<label>' + fieldLabel(${JSON.stringify(messages.mcpManagerOAuthClientIdLabel)}, descriptions.oauthClientId) + '<input name="oauthClientId" value="' + escapeHtml(model.oauthClientId) + '"' + disabledAttr + ' /></label>' +
 					'<label class="checkbox-field">' +
-						'<input name="oauthPublicClient" type="checkbox" ' + (model.oauthPublicClient ? 'checked' : '') + ' />' +
+						'<input name="oauthPublicClient" type="checkbox" ' + (model.oauthPublicClient ? 'checked' : '') + disabledAttr + ' />' +
 						fieldLabel(${JSON.stringify(messages.mcpManagerOAuthPublicClientLabel)}, descriptions.oauthPublicClient) +
 					'</label>' +
 				'</div>'
 				: '';
 			return '<div class="detail-form-shell"><form id="form" data-previous-id="' + escapeHtml(model.id) + '" data-enabled="' + (model.enabled === false ? 'false' : 'true') + '">' +
 				'<div class="section">' +
-					'<label>' + fieldLabel(${JSON.stringify(messages.mcpManagerServerName)}, descriptions.id) + '<input name="id" value="' + escapeHtml(model.id) + '" /></label>' +
-					'<label>' + fieldLabel(${JSON.stringify(messages.mcpManagerTypeLabel)}, descriptions.type) + '<select name="type">' +
+					(model.sourceLabel ? '<div class="section-title">' + escapeHtml(model.sourceLabel) + '</div>' : '') +
+					'<label>' + fieldLabel(${JSON.stringify(messages.mcpManagerServerName)}, descriptions.id) + '<input name="id" value="' + escapeHtml(model.id) + '"' + disabledAttr + ' /></label>' +
+					'<label>' + fieldLabel(${JSON.stringify(messages.mcpManagerTypeLabel)}, descriptions.type) + '<select name="type"' + disabledAttr + '>' +
 						'<option value="local" ' + (model.type === 'local' ? 'selected' : '') + '>Local</option>' +
 						'<option value="stdio" ' + (model.type === 'stdio' ? 'selected' : '') + '>STDIO</option>' +
 						'<option value="http" ' + (model.type === 'http' ? 'selected' : '') + '>HTTP</option>' +
@@ -362,13 +375,13 @@ function buildHtml(
 					'<div class="list-field">' +
 						'<span class="field-label-row">' +
 							fieldLabel(${JSON.stringify(messages.mcpManagerToolsLabel)}, descriptions.tools) +
-							'<button id="addToolRow" class="icon-button" type="button" title="${escapeHtml(messages.mcpManagerAddTool)}" aria-label="${escapeHtml(messages.mcpManagerAddTool)}"><span class="codicon codicon-add" aria-hidden="true"></span></button>' +
+							(model.readOnly ? '' : '<button id="addToolRow" class="icon-button" type="button" title="${escapeHtml(messages.mcpManagerAddTool)}" aria-label="${escapeHtml(messages.mcpManagerAddTool)}"><span class="codicon codicon-add" aria-hidden="true"></span></button>') +
 						'</span>' +
-						'<div id="toolRows" class="list-rows">' + buildListRowsHtml('toolItem', model.tools, ${JSON.stringify(messages.mcpManagerToolPlaceholder)}, ${JSON.stringify(messages.mcpManagerRemoveTool)}) + '</div>' +
+						'<div id="toolRows" class="list-rows">' + buildListRowsHtml('toolItem', model.tools, ${JSON.stringify(messages.mcpManagerToolPlaceholder)}, ${JSON.stringify(messages.mcpManagerRemoveTool)}, model.readOnly) + '</div>' +
 					'</div>' +
-					'<label>' + fieldLabel(${JSON.stringify(messages.mcpManagerTimeoutLabel)}, descriptions.timeout) + '<input name="timeout" value="' + escapeHtml(model.timeout ?? '') + '" /></label>' +
-					'<label class="toggle-field">' + fieldLabel(${JSON.stringify(messages.mcpManagerOidcLabel)}, descriptions.oidc) + '<span class="toggle-switch"><input name="oidc" type="checkbox" ' + (model.oidc ? 'checked' : '') + ' /><span></span></span></label>' +
-					'<label>' + fieldLabel(${JSON.stringify(messages.mcpManagerFilterMappingLabel)}, descriptions.filterMapping) + '<select name="filterMapping">' +
+					'<label>' + fieldLabel(${JSON.stringify(messages.mcpManagerTimeoutLabel)}, descriptions.timeout) + '<input name="timeout" value="' + escapeHtml(model.timeout ?? '') + '"' + disabledAttr + ' /></label>' +
+					'<label class="toggle-field">' + fieldLabel(${JSON.stringify(messages.mcpManagerOidcLabel)}, descriptions.oidc) + '<span class="toggle-switch"><input name="oidc" type="checkbox" ' + (model.oidc ? 'checked' : '') + disabledAttr + ' /><span></span></span></label>' +
+					'<label>' + fieldLabel(${JSON.stringify(messages.mcpManagerFilterMappingLabel)}, descriptions.filterMapping) + '<select name="filterMapping"' + disabledAttr + '>' +
 						'<option value="" ' + (!model.filterMapping ? 'selected' : '') + '></option>' +
 						'<option value="none" ' + (model.filterMapping === 'none' ? 'selected' : '') + '>none</option>' +
 						'<option value="markdown" ' + (model.filterMapping === 'markdown' ? 'selected' : '') + '>markdown</option>' +
@@ -403,6 +416,7 @@ function buildHtml(
 			const data = new FormData(form);
 			return {
 				id: String(data.get('id') ?? '').trim(),
+				entryId: draftModel.entryId || String(data.get('id') ?? '').trim(),
 				type: String(data.get('type') ?? 'local'),
 				command: String(data.get('command') ?? ''),
 				args: collectListEntries('argItem'),
@@ -417,6 +431,8 @@ function buildHtml(
 				oidc: data.get('oidc') === 'on',
 				filterMapping: String(data.get('filterMapping') ?? '').trim() || undefined,
 				enabled: form.dataset.enabled !== 'false',
+				readOnly: draftModel.readOnly === true,
+				sourceLabel: draftModel.sourceLabel,
 			};
 		}
 
@@ -508,9 +524,15 @@ function buildHtml(
 			bindRowCollection('envRows');
 			bindRowCollection('headerRows');
 			form?.addEventListener('input', () => {
+				if (draftModel.readOnly) {
+					return;
+				}
 				draftModel = collectModelFromForm();
 			});
 			form?.addEventListener('change', (event) => {
+				if (draftModel.readOnly) {
+					return;
+				}
 				const target = event.target;
 				if (target?.name === 'type') {
 					draftModel = applyTypeChange(collectModelFromForm(), String(target.value));
@@ -521,6 +543,9 @@ function buildHtml(
 			});
 			form?.addEventListener('submit', (event) => {
 				event.preventDefault();
+				if (draftModel.readOnly) {
+					return;
+				}
 				const model = collectModelFromForm();
 				vscode.postMessage({
 					type: 'save',
@@ -533,6 +558,14 @@ function buildHtml(
 		function renderForm(model) {
 			draftModel = cloneModel(model || emptyModel());
 			document.getElementById('detailPane').innerHTML = buildForm(draftModel);
+			const deleteButton = document.getElementById('delete');
+			const saveButton = document.getElementById('save');
+			if (deleteButton) {
+				deleteButton.toggleAttribute('disabled', draftModel.readOnly === true);
+			}
+			if (saveButton) {
+				saveButton.toggleAttribute('disabled', draftModel.readOnly === true);
+			}
 			bindForm();
 		}
 
@@ -541,12 +574,13 @@ function buildHtml(
 			document.querySelectorAll('.server').forEach((server) => {
 				server.classList.toggle('active', server.dataset?.select === id);
 			});
-			renderForm(models.find((model) => model.id === id) || emptyModel());
+			renderForm(models.find((model) => (model.entryId ?? model.id) === id) || emptyModel());
 		}
 
 		document.querySelectorAll('.server').forEach((server) => {
-			const model = models.find((item) => item.id === server.dataset?.select);
+			const model = models.find((item) => (item.entryId ?? item.id) === server.dataset?.select);
 			server.classList.toggle('disabled', model?.enabled === false);
+			server.classList.toggle('readonly', model?.readOnly === true);
 		});
 
 		const searchInput = document.getElementById('search');
@@ -573,13 +607,18 @@ function buildHtml(
 			vscode.postMessage({ type: 'add' });
 		});
 		document.getElementById('delete')?.addEventListener('click', () => {
+			if (draftModel.readOnly) {
+				return;
+			}
 			const previousId = document.getElementById('form')?.dataset?.previousId;
 			if (previousId) {
 				vscode.postMessage({ type: 'delete', id: previousId });
 			}
 		});
 		document.getElementById('save')?.addEventListener('click', () => {
-			document.getElementById('form')?.requestSubmit();
+			if (!draftModel.readOnly) {
+				document.getElementById('form')?.requestSubmit();
+			}
 		});
 		document.getElementById('cancel')?.addEventListener('click', () => {
 			vscode.postMessage({ type: 'cancel' });
@@ -600,7 +639,7 @@ function buildHtml(
 			const target = event.target;
 			if (target?.dataset?.toggle) {
 				event.stopPropagation();
-				const model = models.find((item) => item.id === target.dataset.toggle);
+				const model = models.find((item) => (item.entryId ?? item.id) === target.dataset.toggle || item.id === target.dataset.toggle);
 				if (model) {
 					model.enabled = Boolean(target.checked);
 				}
@@ -632,7 +671,7 @@ export class McpManagerPanelManager implements vscode.Disposable {
 			return;
 		}
 		this.models = this.readModels();
-		this.selectedId = this.models[0]?.id;
+		this.selectedId = this.models[0]?.entryId ?? this.models[0]?.id;
 		this.panel = vscode.window.createWebviewPanel(
 			MCP_MANAGER_VIEW_TYPE,
 			messages.mcpManagerTitle,
@@ -657,8 +696,8 @@ export class McpManagerPanelManager implements vscode.Disposable {
 
 	refresh(): void {
 		this.models = this.readModels();
-		if (!this.selectedId || !this.models.some((model) => model.id === this.selectedId)) {
-			this.selectedId = this.models[0]?.id;
+		if (!this.selectedId || !this.models.some((model) => (model.entryId ?? model.id) === this.selectedId)) {
+			this.selectedId = this.models[0]?.entryId ?? this.models[0]?.id;
 		}
 		this.render();
 	}
@@ -708,7 +747,7 @@ export class McpManagerPanelManager implements vscode.Disposable {
 				vscode.window.showErrorMessage(localizeValidationErrors(result.errors).join('\n'));
 			} else {
 				vscode.window.showInformationMessage(messages.mcpToggleUpdated);
-				this.selectedId = message.model.id;
+				this.selectedId = message.model.entryId ?? message.model.id;
 				this.onDidChangeMcp();
 				this.refresh();
 			}

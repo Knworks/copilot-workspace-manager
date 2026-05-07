@@ -1,11 +1,15 @@
 import fs from 'fs';
 import path from 'path';
+import { listPluginMcpDefinitions } from './pluginMcpService';
 
 export type McpServer = {
 	id: string;
+	entryId?: string;
 	enabled: boolean;
 	headerLineIndex: number;
 	configPath?: string;
+	readOnly?: boolean;
+	sourceLabel?: string;
 };
 
 type McpConfigShape = {
@@ -23,7 +27,15 @@ export function readMcpServers(configPath: string, disabledConfigPath?: string):
 		const disabledServers = disabledConfigPath
 			? readServersFromConfig(disabledConfigPath, false)
 			: [];
-		return sortMcpServersById([...enabledServers, ...disabledServers]);
+		const pluginServers = listPluginMcpDefinitions(path.join(path.dirname(configPath), 'installed-plugins')).map((definition, index) => ({
+			id: definition.id,
+			entryId: definition.entryId,
+			enabled: true,
+			headerLineIndex: index,
+			readOnly: true,
+			sourceLabel: 'Plugin MCP',
+		}));
+		return sortMcpServersForDisplay([...enabledServers, ...disabledServers], pluginServers);
 	} catch {
 		return [];
 	}
@@ -37,6 +49,7 @@ export function parseMcpServers(contents: string, enabled: boolean): McpServer[]
 	const servers = parsed.servers ?? parsed.mcpServers ?? {};
 	return Object.keys(servers).map((id, index) => ({
 		id,
+		entryId: id,
 		enabled,
 		headerLineIndex: index,
 	}));
@@ -84,6 +97,16 @@ export function getDisabledMcpConfigPath(copilotDir: string): string {
 
 export function sortMcpServersById<T extends { id: string }>(servers: T[]): T[] {
 	return [...servers].sort((left, right) => left.id.localeCompare(right.id, undefined, { sensitivity: 'base' }));
+}
+
+export function sortMcpServersForDisplay<T extends { id: string }>(
+	regularServers: T[],
+	pluginServers: T[],
+): T[] {
+	return [
+		...sortMcpServersById(regularServers),
+		...sortMcpServersById(pluginServers),
+	];
 }
 
 function readServersFromConfig(configPath: string, enabled: boolean): McpServer[] {
