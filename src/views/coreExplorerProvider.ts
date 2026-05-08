@@ -42,14 +42,14 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 				label: 'config.json',
 				fsPath: paths.configPath,
 				icon: 'settings-gear',
-				description: 'Internal Config',
+				description: messages.coreInternalConfigDescription,
 				warnOnInvalidConfig: true,
 			},
 			{
 				label: 'settings.json',
 				fsPath: path.join(paths.copilotDir, 'settings.json'),
 				icon: 'settings-gear',
-				description: 'User Settings',
+				description: messages.coreUserSettingsDescription,
 			},
 			...(workspaceRoot
 				? [
@@ -57,13 +57,13 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 						label: 'settings.json',
 						fsPath: path.join(workspaceRoot, '.github', 'copilot', 'settings.json'),
 						icon: 'settings-gear',
-						description: 'Workspace Settings',
+						description: messages.coreWorkspaceSettingsDescription,
 					},
 					{
 						label: 'settings.local.json',
 						fsPath: path.join(workspaceRoot, '.github', 'copilot', 'settings.local.json'),
 						icon: 'settingsfile32.png',
-						description: 'Workspace Local Settings',
+						description: messages.coreWorkspaceLocalSettingsDescription,
 					},
 				]
 				: []),
@@ -101,15 +101,15 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 	private toInstructionDescription(entry: AgentsChainNode): string {
 		switch (entry.kind) {
 			case 'user':
-				return 'User Instructions';
+				return messages.chainClassificationUser;
 			case 'workspace':
-				return 'Workspace Instructions';
+				return messages.chainClassificationWorkspace;
 			case 'path':
-				return 'Path Instructions';
+				return messages.chainClassificationPath;
 			case 'agent':
-				return 'Agent Instructions';
+				return messages.chainClassificationAgent;
 			case 'customAgent':
-				return 'Custom Agent Instructions';
+				return messages.chainClassificationCustomAgent;
 		}
 	}
 
@@ -128,7 +128,7 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 		item.tooltip = entry.fsPath;
 		item.command = {
 			command: 'copilot-workspace-manager.openFile',
-			title: `Open ${entry.label}`,
+			title: messages.explorerOpenItem(entry.label),
 			arguments: [item],
 		};
 		if (entry.warnOnInvalidConfig && !configStatus.isAvailable && configStatus.reason) {

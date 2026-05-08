@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { CoreExplorerProvider } from '../views/coreExplorerProvider';
 import { getUnavailableLabel } from '../services/workspaceStatus';
+import { messages } from '../i18n';
 
 const contextStub = {
 	asAbsolutePath: (target: string) => path.join('root', target),
@@ -61,15 +62,15 @@ suite('Core explorer provider', () => {
 			assert.deepStrictEqual(
 				items.map((item) => `${item.label}:${item.description ?? ''}`),
 				[
-					'config.json:Internal Config',
-					'settings.json:User Settings',
-					'settings.local.json:Workspace Local Settings',
+					`config.json:${messages.coreInternalConfigDescription}`,
+					`settings.json:${messages.coreUserSettingsDescription}`,
+					`settings.local.json:${messages.coreWorkspaceLocalSettingsDescription}`,
 					'mcp-config.json:',
-					'copilot-instructions.md:User Instructions',
-					'copilot-instructions.md:Workspace Instructions',
-					'typescript.instructions.md:Path Instructions',
-					'AGENTS.md:Agent Instructions',
-					'AGENTS.md:Custom Agent Instructions',
+					`copilot-instructions.md:${messages.chainClassificationUser}`,
+					`copilot-instructions.md:${messages.chainClassificationWorkspace}`,
+					`typescript.instructions.md:${messages.chainClassificationPath}`,
+					`AGENTS.md:${messages.chainClassificationAgent}`,
+					`AGENTS.md:${messages.chainClassificationCustomAgent}`,
 				],
 			);
 		} finally {
@@ -110,8 +111,8 @@ suite('Core explorer provider', () => {
 
 			const provider = new CoreExplorerProvider(contextStub, () => ({ isAvailable: true }));
 			const items = provider.getChildren() as vscode.TreeItem[];
-			assert.ok(items.some((item) => item.description === 'User Instructions'));
-			assert.ok(items.some((item) => item.description === 'Workspace Instructions'));
+			assert.ok(items.some((item) => item.description === messages.chainClassificationUser));
+			assert.ok(items.some((item) => item.description === messages.chainClassificationWorkspace));
 		} finally {
 			Object.defineProperty(vscode.workspace, 'workspaceFolders', {
 				configurable: true,
@@ -154,16 +155,16 @@ suite('Core explorer provider', () => {
 			const items = provider.getChildren() as vscode.TreeItem[];
 			const configItem = items.find((item) => item.label === 'config.json');
 			const settingsItem = items.find(
-				(item) => item.label === 'settings.json' && item.description === 'User Settings',
+				(item) => item.label === 'settings.json' && item.description === messages.coreUserSettingsDescription,
 			);
 			const mcpItem = items.find((item) => item.label === 'mcp-config.json');
 			const instructionsItem = items.find(
 				(item) =>
 					item.label === 'copilot-instructions.md' &&
-					item.description === 'User Instructions',
+					item.description === messages.chainClassificationUser,
 			);
 			const agentsItem = items.find(
-				(item) => item.label === 'AGENTS.md' && item.description === 'Agent Instructions',
+				(item) => item.label === 'AGENTS.md' && item.description === messages.chainClassificationAgent,
 			);
 
 			assert.ok(configItem?.iconPath instanceof vscode.ThemeIcon);
@@ -247,7 +248,7 @@ suite('Core explorer provider', () => {
 			);
 			const items = provider.getChildren() as vscode.TreeItem[];
 			assert.strictEqual(items.length, 1);
-			assert.strictEqual(items[0].label, 'No Copilot Manager files to display.');
+			assert.strictEqual(items[0].label, messages.coreExplorerEmpty);
 		} finally {
 			Object.defineProperty(vscode.workspace, 'workspaceFolders', {
 				configurable: true,

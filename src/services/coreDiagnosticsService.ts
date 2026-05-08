@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import * as vscode from 'vscode';
 import { resolveCopilotPaths } from './workspaceStatus';
+import { messages } from '../i18n';
 
 export type InstructionsChainKind =
 	| 'user'
@@ -76,8 +77,8 @@ export function listTrustedDirectories(
 	workspaceSettingsPath?: string,
 ): TrustedDirectory[] {
 	return [
-		...readTrustedDirectories(userSettingsPath, 'User Settings'),
-		...readTrustedDirectories(workspaceSettingsPath, 'Workspace Settings'),
+		...readTrustedDirectories(userSettingsPath, messages.trustedSourceUserSettings),
+		...readTrustedDirectories(workspaceSettingsPath, messages.trustedSourceWorkspaceSettings),
 	];
 }
 
@@ -141,7 +142,7 @@ function readInstructionFile(
 			kind,
 			fileName,
 			absolutePath: targetPath,
-			reason: 'Instruction file is available.',
+			reason: messages.chainReasonAvailable,
 			contentPreview: contents.slice(0, 2000),
 		};
 	} catch (error) {
@@ -150,7 +151,7 @@ function readInstructionFile(
 			kind,
 			fileName,
 			absolutePath: targetPath,
-			reason: error instanceof Error ? error.message : 'Read failed.',
+			reason: error instanceof Error ? error.message : messages.chainReasonReadFailed,
 		};
 	}
 }
@@ -169,7 +170,7 @@ function readPathInstructionFile(
 		return {
 			...node,
 			status: 'invalidApplyTo',
-			reason: 'The applyTo frontmatter is missing or invalid.',
+			reason: messages.chainReasonInvalidApplyTo,
 		};
 	}
 	if (!currentFilePath) {
@@ -177,7 +178,7 @@ function readPathInstructionFile(
 			...node,
 			status: 'appliesWhenPathMatches',
 			applyTo,
-			reason: 'Applies when the current file matches applyTo.',
+			reason: messages.chainReasonAppliesWhenPathMatches,
 		};
 	}
 	const relativePath = toRelativeWorkspacePath(workspaceRoot, currentFilePath);
@@ -187,7 +188,7 @@ function readPathInstructionFile(
 			status: 'notMatched',
 			applyTo,
 			currentFilePath,
-			reason: 'The current file is outside the workspace.',
+			reason: messages.chainReasonOutsideWorkspace,
 		};
 	}
 	return {
@@ -196,8 +197,8 @@ function readPathInstructionFile(
 		applyTo,
 		currentFilePath,
 		reason: matchesApplyTo(relativePath, applyTo)
-			? 'The current file matches applyTo.'
-			: 'The current file does not match applyTo.',
+			? messages.chainReasonCurrentFileMatchesApplyTo
+			: messages.chainReasonCurrentFileDoesNotMatchApplyTo,
 	};
 }
 
@@ -351,7 +352,7 @@ function readTrustedDirectories(
 			exists: fs.existsSync(targetPath),
 			reason: fs.existsSync(targetPath)
 				? undefined
-				: 'Directory does not exist or cannot be accessed.',
+				: messages.trustedDirectoryMissing,
 			sourceLabel,
 			sourcePath: settingsPath,
 		}));

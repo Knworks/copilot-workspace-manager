@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 import { InstalledPluginDescriptor, listInstalledPluginsFromConfig } from './pluginConfigService';
 import { readSkillMetadata } from './skillConfigService';
 import { resolveCopilotPaths } from './workspaceStatus';
+import { messages } from '../i18n';
 
 export type PluginInstallKind = 'Marketplace' | 'Direct' | 'Unknown';
 export type PluginState = 'Enabled' | 'Disabled' | 'Unknown';
@@ -155,7 +156,7 @@ function readPluginRecord(
 	const diagnostics: PluginDiagnosticRecord[] = [];
 	const manifestPath = candidate.manifestPath;
 	if (!manifestPath) {
-		diagnostics.push({ severity: 'error', message: 'Manifest not found' });
+		diagnostics.push({ severity: 'error', message: messages.pluginsManifestNotFound });
 		return buildPluginRecord(candidate, diagnostics, undefined, undefined, agentConflicts, skillConflicts, mcpConflicts);
 	}
 	let manifest: PluginManifestShape | undefined;
@@ -164,7 +165,7 @@ function readPluginRecord(
 	} catch (error) {
 		diagnostics.push({
 			severity: 'error',
-			message: `Manifest parse error: ${error instanceof Error ? error.message : String(error)}`,
+			message: messages.pluginsManifestParseError(error instanceof Error ? error.message : String(error)),
 		});
 		return buildPluginRecord(candidate, diagnostics, manifestPath, undefined, agentConflicts, skillConflicts, mcpConflicts);
 	}
@@ -182,10 +183,10 @@ function buildPluginRecord(
 ): PluginRecord {
 	const name = readNonEmptyString(manifest?.name) ?? path.basename(candidate.pluginRoot);
 	if (!readNonEmptyString(manifest?.name)) {
-		diagnostics.push({ severity: 'warning', message: 'Missing plugin name' });
+		diagnostics.push({ severity: 'warning', message: messages.pluginsMissingName });
 	}
 	if (candidate.installKind === 'Direct') {
-		diagnostics.push({ severity: 'warning', message: 'Direct plugin install detected.' });
+		diagnostics.push({ severity: 'warning', message: messages.pluginsDirectInstallDetected });
 	}
 	const agents = manifest
 		? readPluginAgents(candidate.pluginRoot, manifest, agentConflicts, diagnostics)
@@ -213,7 +214,7 @@ function buildPluginRecord(
 		mcpServers.length > 0 ||
 		lspServers.length > 0
 	) {
-		diagnostics.push({ severity: 'info', message: 'Plugin components are read-only.' });
+		diagnostics.push({ severity: 'info', message: messages.pluginsReadonlyComponents });
 	}
 	return {
 		id: candidate.pluginRoot,
@@ -256,7 +257,7 @@ function readPluginAgents(
 			const frontmatter = readMarkdownFrontmatter(agentPath);
 			const conflict = agentConflicts.has(id.toLowerCase());
 			if (conflict) {
-				diagnostics.push({ severity: 'warning', message: `Agent conflict: ${id}` });
+				diagnostics.push({ severity: 'warning', message: messages.pluginsAgentConflict(id) });
 			}
 			return {
 				id,
@@ -283,7 +284,7 @@ function readPluginSkills(
 			const skillName = metadata.name || path.basename(path.dirname(skillPath));
 			const conflict = skillConflicts.has(skillName.toLowerCase());
 			if (conflict) {
-				diagnostics.push({ severity: 'warning', message: `Skill conflict: ${skillName}` });
+				diagnostics.push({ severity: 'warning', message: messages.pluginsSkillConflict(skillName) });
 			}
 			return {
 				name: skillName,
@@ -357,7 +358,7 @@ function readPluginMcpServers(
 		}
 		const definitions = readMcpDefinitions(configObject);
 		if (hasSecretLikeValues(definitions)) {
-			diagnostics.push({ severity: 'warning', message: 'Secret-like value masked' });
+			diagnostics.push({ severity: 'warning', message: messages.pluginsSecretMasked });
 		}
 		return Object.entries(definitions).flatMap(([id, value]) => {
 			if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -368,7 +369,7 @@ function readPluginMcpServers(
 			const toolsValue = (value as Record<string, unknown>).tools;
 			const overridden = mcpConflicts.has(id.toLowerCase());
 			if (overridden) {
-				diagnostics.push({ severity: 'warning', message: `MCP override: ${id}` });
+				diagnostics.push({ severity: 'warning', message: messages.pluginsMcpOverride(id) });
 			}
 			return [{
 				id,
@@ -427,7 +428,10 @@ function resolvePathEntries(
 			if (configuredPaths.length > 0 || defaultPaths.length === 0) {
 				diagnostics.push({
 					severity: 'warning',
-					message: `Component path not found: ${fieldName} -> ${toRelativePath(pluginRoot, fullPath)}`,
+					message: messages.pluginsComponentPathNotFound(
+						fieldName,
+						toRelativePath(pluginRoot, fullPath),
+					),
 				});
 			}
 			return false;
@@ -446,14 +450,14 @@ function resolveObjectSource(
 		if (!fs.existsSync(fullPath)) {
 			diagnostics.push({
 				severity: 'warning',
-				message: `Component path not found: ${fieldName} -> ${value.trim()}`,
+				message: messages.pluginsComponentPathNotFound(fieldName, value.trim()),
 			});
 			return [];
 		}
 		return [{ relativeSource: toRelativePath(pluginRoot, fullPath), fullPath }];
 	}
 	if (value && typeof value === 'object' && !Array.isArray(value)) {
-		return [{ relativeSource: 'plugin.json inline', inlineValue: value as Record<string, unknown> }];
+		return [{ relativeSource: messages.pluginsInlineSource, inlineValue: value as Record<string, unknown> }];
 	}
 	return defaultPaths
 		.map((relativePath): ComponentSource | undefined => {
@@ -541,7 +545,10 @@ function readJsonObject(
 	} catch (error) {
 		diagnostics.push({
 			severity: 'error',
-			message: `${fieldName} parse error: ${error instanceof Error ? error.message : String(error)}`,
+			message: messages.pluginsJsonParseError(
+				fieldName,
+				error instanceof Error ? error.message : String(error),
+			),
 		});
 		return undefined;
 	}

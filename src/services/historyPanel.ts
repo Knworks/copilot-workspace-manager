@@ -420,9 +420,12 @@ function buildHistoryWebviewHtml(
 		chainDetailPath: messages.chainDetailPath,
 		chainDetailApplyTo: messages.chainDetailApplyTo,
 		chainDetailExplanation: messages.chainDetailExplanation,
+		chainScopePath: messages.chainScopePath,
 		hooksOpenSource: messages.hooksOpenSource,
 		hooksNoEntries: messages.hooksNoEntries,
 		hooksNoCommand: messages.hooksNoCommand,
+		hooksEntryCount: messages.hooksEntryCount(0),
+		hooksCommandLabel: messages.hooksCommandLabel,
 		hooksMatcherLabel: messages.hooksMatcherLabel,
 		hooksMatcherNotUsed: messages.hooksMatcherNotUsed,
 		hooksSchemaLabel: messages.hooksSchemaLabel,
@@ -460,6 +463,21 @@ function buildHistoryWebviewHtml(
 		pluginsStatus: messages.pluginsStatus,
 		pluginsSource: messages.pluginsSource,
 		pluginsCount: messages.pluginsCount,
+		pluginsType: messages.pluginsType,
+		pluginsTools: messages.pluginsTools,
+		pluginsSeverity: messages.pluginsSeverity,
+		pluginsStateEnabled: messages.pluginsStateEnabled,
+		pluginsStateDisabled: messages.pluginsStateDisabled,
+		pluginsStateUnknown: messages.pluginsStateUnknown,
+		pluginsInstallKindMarketplace: messages.pluginsInstallKindMarketplace,
+		pluginsInstallKindDirect: messages.pluginsInstallKindDirect,
+		pluginsInstallKindUnknown: messages.pluginsInstallKindUnknown,
+		pluginsComponentStatusReadonly: messages.pluginsComponentStatusReadonly,
+		pluginsComponentStatusConflict: messages.pluginsComponentStatusConflict,
+		pluginsComponentStatusOverridden: messages.pluginsComponentStatusOverridden,
+		pluginsDiagnosticSeverityInfo: messages.pluginsDiagnosticSeverityInfo,
+		pluginsDiagnosticSeverityWarning: messages.pluginsDiagnosticSeverityWarning,
+		pluginsDiagnosticSeverityError: messages.pluginsDiagnosticSeverityError,
 		pluginsNone: messages.pluginsNone,
 	});
 	const csp = [
@@ -880,7 +898,7 @@ function buildHistoryWebviewHtml(
 				const card = document.createElement('button');
 				card.type = 'button';
 				card.className = 'chain-row' + (entry.id === selectedChainId ? ' active' : '');
-				card.innerHTML = renderChainRowIcon(entry) + '<div class="chain-main"><div class="chain-row-header"><div class="chain-title">' + escapeHtml(entry.title) + '</div>' + (entry.applyTo ? '<span class="chain-list-badge">Path-specific</span>' : '') + '</div><div class="chain-subtitle">' + escapeHtml(entry.summary) + '</div></div>';
+				card.innerHTML = renderChainRowIcon(entry) + '<div class="chain-main"><div class="chain-row-header"><div class="chain-title">' + escapeHtml(entry.title) + '</div>' + (entry.applyTo ? '<span class="chain-list-badge">' + escapeHtml(labels.chainScopePath) + '</span>' : '') + '</div><div class="chain-subtitle">' + escapeHtml(entry.summary) + '</div></div>';
 				card.addEventListener('click', () => { selectedChainId = entry.id; renderChain(); });
 				section.appendChild(card);
 			}
@@ -892,6 +910,7 @@ function buildHistoryWebviewHtml(
 		const renderHooks = () => {
 			const sources = hooksPayload.sources || [];
 			const entries = hooksPayload.entries || [];
+			const formatHookEntryCount = (count) => labels.hooksEntryCount.replace('0', String(count));
 			if (sources.length === 0) {
 				hooksList.innerHTML = '<div class="preview-empty">' + escapeHtml(hooksPayload.emptyStateMessage || labels.noResult) + '</div>';
 				hooksPreview.innerHTML = '<div class="preview-empty">' + escapeHtml(hooksPayload.emptyStateMessage || labels.noResult) + '</div>';
@@ -905,7 +924,7 @@ function buildHistoryWebviewHtml(
 				const card = document.createElement('article');
 				card.className = 'hook-source-row' + (source.id === selectedHookSourceId ? ' active' : '');
 				card.dataset.hookSourceId = source.id;
-				card.innerHTML = '<span class="codicon codicon-symbol-event row-icon" aria-hidden="true"></span><div class="hook-source-main"><div class="hook-source-title">' + escapeHtml(source.label) + '</div><div class="hook-source-path">' + escapeHtml(source.path) + '</div><div class="hook-source-meta">' + escapeHtml(source.entryCount + ' entries') + '</div></div><div class="hook-source-actions"><button class="icon-button" type="button" data-open-path="' + escapeHtml(source.path) + '" title="' + escapeHtml(labels.hooksOpenSource) + '" aria-label="' + escapeHtml(labels.hooksOpenSource) + '"><span class="codicon codicon-file-text" aria-hidden="true"></span></button></div>';
+				card.innerHTML = '<span class="codicon codicon-symbol-event row-icon" aria-hidden="true"></span><div class="hook-source-main"><div class="hook-source-title">' + escapeHtml(source.label) + '</div><div class="hook-source-path">' + escapeHtml(source.path) + '</div><div class="hook-source-meta">' + escapeHtml(formatHookEntryCount(source.entryCount)) + '</div></div><div class="hook-source-actions"><button class="icon-button" type="button" data-open-path="' + escapeHtml(source.path) + '" title="' + escapeHtml(labels.hooksOpenSource) + '" aria-label="' + escapeHtml(labels.hooksOpenSource) + '"><span class="codicon codicon-file-text" aria-hidden="true"></span></button></div>';
 				hooksList.appendChild(card);
 			}
 			const selectedSource = sources.find((source) => source.id === selectedHookSourceId) || sources[0];
@@ -915,7 +934,7 @@ function buildHistoryWebviewHtml(
 				return;
 			}
 			hooksPreview.innerHTML = '<div class="hook-entry-list">' + selectedEntries.map((entry) =>
-				'<article class="hook-entry-card"><div class="hook-entry-heading"><div class="hook-entry-heading-main"><span class="codicon codicon-symbol-event" aria-hidden="true"></span><span class="hook-entry-heading-label">' + escapeHtml(entry.event) + '</span></div></div><div class="hook-entry-detail-grid"><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksSchemaLabel) + '</div><div>' + escapeHtml(entry.schemaKind) + '</div><div class="hook-entry-detail-label">Command</div><div>' + escapeHtml(entry.command || labels.hooksNoCommand) + '</div>' + (entry.bash ? '<div class="hook-entry-detail-label">' + escapeHtml(labels.hooksBashLabel) + '</div><div>' + escapeHtml(entry.bash) + '</div>' : '') + (entry.powershell ? '<div class="hook-entry-detail-label">' + escapeHtml(labels.hooksPowershellLabel) + '</div><div>' + escapeHtml(entry.powershell) + '</div>' : '') + (entry.prompt ? '<div class="hook-entry-detail-label">' + escapeHtml(labels.hooksPromptLabel) + '</div><div>' + escapeHtml(entry.prompt) + '</div>' : '') + '<div class="hook-entry-detail-label">' + escapeHtml(labels.hooksMatcherLabel) + '</div><div>' + escapeHtml(entry.matcher || labels.hooksMatcherNotUsed) + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksTypeLabel) + '</div><div>' + escapeHtml(entry.handlerType) + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksTimeoutLabel) + '</div><div>' + escapeHtml(entry.timeout ?? '') + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksStatusMessageLabel) + '</div><div>' + escapeHtml(entry.statusMessage ?? '') + '</div></div></article>'
+				'<article class="hook-entry-card"><div class="hook-entry-heading"><div class="hook-entry-heading-main"><span class="codicon codicon-symbol-event" aria-hidden="true"></span><span class="hook-entry-heading-label">' + escapeHtml(entry.event) + '</span></div></div><div class="hook-entry-detail-grid"><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksSchemaLabel) + '</div><div>' + escapeHtml(entry.schemaKind) + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksCommandLabel) + '</div><div>' + escapeHtml(entry.command || labels.hooksNoCommand) + '</div>' + (entry.bash ? '<div class="hook-entry-detail-label">' + escapeHtml(labels.hooksBashLabel) + '</div><div>' + escapeHtml(entry.bash) + '</div>' : '') + (entry.powershell ? '<div class="hook-entry-detail-label">' + escapeHtml(labels.hooksPowershellLabel) + '</div><div>' + escapeHtml(entry.powershell) + '</div>' : '') + (entry.prompt ? '<div class="hook-entry-detail-label">' + escapeHtml(labels.hooksPromptLabel) + '</div><div>' + escapeHtml(entry.prompt) + '</div>' : '') + '<div class="hook-entry-detail-label">' + escapeHtml(labels.hooksMatcherLabel) + '</div><div>' + escapeHtml(entry.matcher || labels.hooksMatcherNotUsed) + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksTypeLabel) + '</div><div>' + escapeHtml(entry.handlerType) + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksTimeoutLabel) + '</div><div>' + escapeHtml(entry.timeout ?? '') + '</div><div class="hook-entry-detail-label">' + escapeHtml(labels.hooksStatusMessageLabel) + '</div><div>' + escapeHtml(entry.statusMessage ?? '') + '</div></div></article>'
 			).join('') + '</div>';
 		};
 
@@ -929,7 +948,12 @@ function buildHistoryWebviewHtml(
 			'<div class="hook-entry-detail-grid">' + rows.map((row) => '<div class="hook-entry-detail-label">' + escapeHtml(String(row[0])) + '</div><div>' + escapeHtml(String(row[1])) + '</div>').join('') + '</div>';
 
 		const renderPluginOverviewGrid = (plugin, rows) => {
-			const stateValue = '<div class="plugin-state-value"><span>' + escapeHtml(plugin.state) + '</span><label class="switch" title="' + escapeHtml(labels.pluginsToggle) + '"><input type="checkbox" data-toggle-plugin-spec="' + escapeHtml(plugin.pluginSpec) + '" ' + (plugin.state === 'Enabled' ? 'checked' : '') + ' /><span></span></label></div>';
+			const localizePluginState = (value) => value === 'Enabled'
+				? labels.pluginsStateEnabled
+				: value === 'Disabled'
+					? labels.pluginsStateDisabled
+					: labels.pluginsStateUnknown;
+			const stateValue = '<div class="plugin-state-value"><span>' + escapeHtml(localizePluginState(plugin.state)) + '</span><label class="switch" title="' + escapeHtml(labels.pluginsToggle) + '"><input type="checkbox" data-toggle-plugin-spec="' + escapeHtml(plugin.pluginSpec) + '" ' + (plugin.state === 'Enabled' ? 'checked' : '') + ' /><span></span></label></div>';
 			return '<div class="hook-entry-detail-grid"><div class="hook-entry-detail-label">' + escapeHtml(labels.pluginsState) + '</div><div>' + stateValue + '</div>' + rows.map((row) => '<div class="hook-entry-detail-label">' + escapeHtml(String(row[0])) + '</div><div>' + escapeHtml(String(row[1])) + '</div>').join('') + '</div>';
 		};
 
@@ -943,6 +967,21 @@ function buildHistoryWebviewHtml(
 
 		const renderPlugins = () => {
 			const plugins = pluginsPayload.plugins || [];
+			const localizeInstallKind = (value) => value === 'Marketplace'
+				? labels.pluginsInstallKindMarketplace
+				: value === 'Direct'
+					? labels.pluginsInstallKindDirect
+					: labels.pluginsInstallKindUnknown;
+			const localizeComponentStatus = (value) => value === 'Conflict'
+				? labels.pluginsComponentStatusConflict
+				: value === 'Overridden'
+					? labels.pluginsComponentStatusOverridden
+					: labels.pluginsComponentStatusReadonly;
+			const localizeDiagnosticSeverity = (value) => value === 'error'
+				? labels.pluginsDiagnosticSeverityError
+				: value === 'warning'
+					? labels.pluginsDiagnosticSeverityWarning
+					: labels.pluginsDiagnosticSeverityInfo;
 			if (plugins.length === 0) {
 				pluginsList.innerHTML = '<div class="preview-empty">' + escapeHtml(pluginsPayload.emptyStateMessage || labels.pluginsEmpty) + '</div>';
 				pluginsPreview.innerHTML = '<div class="preview-empty">' + escapeHtml(pluginsPayload.emptyStateMessage || labels.pluginsEmpty) + '</div>';
@@ -952,12 +991,12 @@ function buildHistoryWebviewHtml(
 				selectedPluginId = plugins[0].id;
 			}
 			pluginsList.innerHTML = plugins.map((plugin) =>
-				'<button type="button" class="hook-source-row' + (plugin.id === selectedPluginId ? ' active' : '') + '" data-plugin-id="' + escapeHtml(plugin.id) + '"><span class="codicon codicon-plug row-icon" aria-hidden="true"></span><div class="hook-source-main"><div class="hook-source-title">' + escapeHtml(plugin.name) + '</div><div class="hook-source-path">' + escapeHtml(plugin.description || plugin.pluginRoot) + '</div><div class="hook-source-meta">' + escapeHtml((plugin.version || plugin.installKind) + ' · A:' + plugin.agents.length + ' S:' + plugin.skills.length + ' C:' + plugin.commands.length + ' H:' + plugin.hooks.length + ' M:' + plugin.mcpServers.length + ' L:' + plugin.lspServers.length) + '</div></div></button>'
+				'<button type="button" class="hook-source-row' + (plugin.id === selectedPluginId ? ' active' : '') + '" data-plugin-id="' + escapeHtml(plugin.id) + '"><span class="codicon codicon-plug row-icon" aria-hidden="true"></span><div class="hook-source-main"><div class="hook-source-title">' + escapeHtml(plugin.name) + '</div><div class="hook-source-path">' + escapeHtml(plugin.description || plugin.pluginRoot) + '</div><div class="hook-source-meta">' + escapeHtml((plugin.version || localizeInstallKind(plugin.installKind)) + ' · ' + labels.pluginsAgents + ':' + plugin.agents.length + ' ' + labels.pluginsSkills + ':' + plugin.skills.length + ' ' + labels.pluginsCommands + ':' + plugin.commands.length + ' ' + labels.pluginsHooks + ':' + plugin.hooks.length + ' ' + labels.pluginsMcpServers + ':' + plugin.mcpServers.length + ' ' + labels.pluginsLspServers + ':' + plugin.lspServers.length) + '</div></div></button>'
 			).join('');
 			const plugin = plugins.find((entry) => entry.id === selectedPluginId) || plugins[0];
 			const overviewRows = [
 				[labels.pluginsDescription, plugin.description],
-				[labels.pluginsInstallKind, plugin.installKind],
+				[labels.pluginsInstallKind, localizeInstallKind(plugin.installKind)],
 				[labels.pluginsVersion, plugin.version],
 				[labels.pluginsAuthor, plugin.author],
 				[labels.pluginsLicense, plugin.license],
@@ -970,25 +1009,25 @@ function buildHistoryWebviewHtml(
 				[labels.pluginsManifestPath, plugin.manifestPath || ''],
 			].filter((row) => row[1]);
 			const agentItems = plugin.agents.length
-				? plugin.agents.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.id, entry.fullPath, 'hubot') + renderTwoColumnGrid([[labels.pluginsDescription, entry.description || labels.pluginsNone], [labels.pluginsPath, entry.relativePath], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				? plugin.agents.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.id, entry.fullPath, 'hubot') + renderTwoColumnGrid([[labels.pluginsDescription, entry.description || labels.pluginsNone], [labels.pluginsPath, entry.relativePath], [labels.pluginsStatus, localizeComponentStatus(entry.status)]]) + '</article>').join('')
 				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
 			const skillItems = plugin.skills.length
-				? plugin.skills.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.name, entry.fullPath, 'agent') + renderTwoColumnGrid([[labels.pluginsDescription, entry.description || labels.pluginsNone], [labels.pluginsPath, entry.relativePath], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				? plugin.skills.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.name, entry.fullPath, 'agent') + renderTwoColumnGrid([[labels.pluginsDescription, entry.description || labels.pluginsNone], [labels.pluginsPath, entry.relativePath], [labels.pluginsStatus, localizeComponentStatus(entry.status)]]) + '</article>').join('')
 				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
 			const commandItems = plugin.commands.length
-				? plugin.commands.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.name, entry.fullPath, 'terminal') + renderTwoColumnGrid([[labels.pluginsDescription, entry.description || labels.pluginsNone], [labels.pluginsPath, entry.relativePath], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				? plugin.commands.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.name, entry.fullPath, 'terminal') + renderTwoColumnGrid([[labels.pluginsDescription, entry.description || labels.pluginsNone], [labels.pluginsPath, entry.relativePath], [labels.pluginsStatus, localizeComponentStatus(entry.status)]]) + '</article>').join('')
 				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
 			const hookItems = plugin.hooks.length
-				? plugin.hooks.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.event, entry.sourcePath || plugin.manifestPath || plugin.pluginRoot, 'symbol-event') + renderTwoColumnGrid([[labels.pluginsCount, entry.count], [labels.pluginsSource, entry.source], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				? plugin.hooks.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.event, entry.sourcePath || plugin.manifestPath || plugin.pluginRoot, 'symbol-event') + renderTwoColumnGrid([[labels.pluginsCount, entry.count], [labels.pluginsSource, entry.source], [labels.pluginsStatus, localizeComponentStatus(entry.status)]]) + '</article>').join('')
 				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
 			const mcpItems = plugin.mcpServers.length
-				? plugin.mcpServers.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.id, entry.sourcePath || plugin.manifestPath || plugin.pluginRoot, 'mcp') + renderTwoColumnGrid([['type', entry.type], ['tools', entry.tools], [labels.pluginsSource, entry.source], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				? plugin.mcpServers.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.id, entry.sourcePath || plugin.manifestPath || plugin.pluginRoot, 'mcp') + renderTwoColumnGrid([[labels.pluginsType, entry.type], [labels.pluginsTools, entry.tools], [labels.pluginsSource, entry.source], [labels.pluginsStatus, localizeComponentStatus(entry.status)]]) + '</article>').join('')
 				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
 			const lspItems = plugin.lspServers.length
-				? plugin.lspServers.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.id, entry.sourcePath || plugin.manifestPath || plugin.pluginRoot, 'server') + renderTwoColumnGrid([[labels.pluginsSource, entry.source], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				? plugin.lspServers.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.id, entry.sourcePath || plugin.manifestPath || plugin.pluginRoot, 'server') + renderTwoColumnGrid([[labels.pluginsSource, entry.source], [labels.pluginsStatus, localizeComponentStatus(entry.status)]]) + '</article>').join('')
 				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
 			const diagnosticItems = plugin.diagnostics.length
-				? plugin.diagnostics.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.message, plugin.manifestPath || plugin.pluginRoot, 'warning') + renderTwoColumnGrid([['Severity', entry.severity]]) + '</article>').join('')
+				? plugin.diagnostics.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.message, plugin.manifestPath || plugin.pluginRoot, 'warning') + renderTwoColumnGrid([[labels.pluginsSeverity, localizeDiagnosticSeverity(entry.severity)]]) + '</article>').join('')
 				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
 			pluginsPreview.innerHTML = '<div class="hook-entry-list">'
 				+ renderPluginOverviewBlock(renderPluginOverviewGrid(plugin, overviewRows))

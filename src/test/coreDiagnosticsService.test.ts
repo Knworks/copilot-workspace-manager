@@ -8,6 +8,7 @@ import {
 	listTrustedDirectories,
 	removeTrustedDirectory,
 } from '../services/coreDiagnosticsService';
+import { messages } from '../i18n';
 
 function withTempDir(run: (root: string) => void): void {
 	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'core-diag-'));
@@ -159,7 +160,7 @@ suite('Core diagnostics service', () => {
 			assert.strictEqual(trusted.length, 1);
 			assert.strictEqual(trusted[0].path, projectPath);
 			assert.strictEqual(trusted[0].exists, true);
-			assert.strictEqual(trusted[0].sourceLabel, 'User Settings');
+			assert.strictEqual(trusted[0].sourceLabel, messages.trustedSourceUserSettings);
 			assert.strictEqual(trusted[0].sourcePath, settingsPath);
 
 			const saved = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
@@ -205,13 +206,13 @@ suite('Core diagnostics service', () => {
 				[
 					{
 						path: userProjectPath,
-						sourceLabel: 'User Settings',
+						sourceLabel: messages.trustedSourceUserSettings,
 						sourcePath: userSettingsPath,
 						exists: false,
 					},
 					{
 						path: workspaceProjectPath,
-						sourceLabel: 'Workspace Settings',
+						sourceLabel: messages.trustedSourceWorkspaceSettings,
 						sourcePath: workspaceSettingsPath,
 						exists: false,
 					},

@@ -21,7 +21,7 @@ export class McpExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTree
 				vscode.TreeItemCollapsibleState.None,
 			);
 			item.contextValue = 'copilot-mcp-server';
-			item.description = server.sourceLabel ?? (server.enabled ? undefined : 'Disabled');
+			item.description = server.sourceLabel ?? (server.enabled ? undefined : messages.mcpDisabled);
 			item.iconPath = server.enabled
 				? new vscode.ThemeIcon('mcp')
 				: new vscode.ThemeIcon('circle-slash', new vscode.ThemeColor('disabledForeground'));

@@ -158,6 +158,22 @@ export const messages = {
 		'message.coreExplorerEmpty',
 		'No Copilot Manager files to display.',
 	),
+	coreInternalConfigDescription: localize(
+		'message.coreInternalConfigDescription',
+		'Internal Config',
+	),
+	coreUserSettingsDescription: localize(
+		'message.coreUserSettingsDescription',
+		'User Settings',
+	),
+	coreWorkspaceSettingsDescription: localize(
+		'message.coreWorkspaceSettingsDescription',
+		'Workspace Settings',
+	),
+	coreWorkspaceLocalSettingsDescription: localize(
+		'message.coreWorkspaceLocalSettingsDescription',
+		'Workspace Local Settings',
+	),
 	promptsExplorerEmpty: localize(
 		'message.promptsExplorerEmpty',
 		'No commands to display.',
@@ -187,6 +203,26 @@ export const messages = {
 		'Search agents',
 	),
 	agentManagerOpen: localize('message.agentManagerOpen', 'Open'),
+	explorerOpenItem: (label: string) =>
+		localize(
+			'message.explorerOpenItem',
+			'Open {0}',
+			label,
+		),
+	explorerOpenFile: localize('message.explorerOpenFile', 'Open file'),
+	explorerOpenAgentFile: localize('message.explorerOpenAgentFile', 'Open agent file'),
+	explorerWorkspaceCommands: localize(
+		'message.explorerWorkspaceCommands',
+		'Workspace Commands',
+	),
+	explorerPluginCommands: localize(
+		'message.explorerPluginCommands',
+		'Plugin Commands',
+	),
+	explorerTemplatesRoot: localize(
+		'message.explorerTemplatesRoot',
+		'Templates',
+	),
 	agentManagerNoResult: localize(
 		'message.agentManagerNoResult',
 		'No agents found.',
@@ -552,6 +588,34 @@ export const messages = {
 			'The file exists but could not be read. {0}',
 			reason,
 		),
+	chainReasonAvailable: localize(
+		'message.chainReasonAvailable',
+		'Instruction file is available.',
+	),
+	chainReasonReadFailed: localize(
+		'message.chainReasonReadFailed',
+		'Read failed.',
+	),
+	chainReasonInvalidApplyTo: localize(
+		'message.chainReasonInvalidApplyTo',
+		'The applyTo frontmatter is missing or invalid.',
+	),
+	chainReasonAppliesWhenPathMatches: localize(
+		'message.chainReasonAppliesWhenPathMatches',
+		'Applies when the current file matches applyTo.',
+	),
+	chainReasonOutsideWorkspace: localize(
+		'message.chainReasonOutsideWorkspace',
+		'The current file is outside the workspace.',
+	),
+	chainReasonCurrentFileMatchesApplyTo: localize(
+		'message.chainReasonCurrentFileMatchesApplyTo',
+		'The current file matches applyTo.',
+	),
+	chainReasonCurrentFileDoesNotMatchApplyTo: localize(
+		'message.chainReasonCurrentFileDoesNotMatchApplyTo',
+		'The current file does not match applyTo.',
+	),
 	chainEmpty: localize(
 		'message.chainEmpty',
 		'No instruction files were found.',
@@ -595,6 +659,7 @@ export const messages = {
 		'Not specified',
 	),
 	hooksSchemaLabel: localize('message.hooksSchemaLabel', 'Schema'),
+	hooksCommandLabel: localize('message.hooksCommandLabel', 'Command'),
 	hooksTypeLabel: localize('message.hooksTypeLabel', 'Type'),
 	hooksBashLabel: localize('message.hooksBashLabel', 'Bash'),
 	hooksPowershellLabel: localize('message.hooksPowershellLabel', 'PowerShell'),
@@ -655,7 +720,124 @@ export const messages = {
 	pluginsStatus: localize('message.pluginsStatus', 'Status'),
 	pluginsSource: localize('message.pluginsSource', 'Source'),
 	pluginsCount: localize('message.pluginsCount', 'Count'),
+	pluginsType: localize('message.pluginsType', 'Type'),
+	pluginsTools: localize('message.pluginsTools', 'Tools'),
+	pluginsSeverity: localize('message.pluginsSeverity', 'Severity'),
+	pluginsStateEnabled: localize('message.pluginsStateEnabled', 'Enabled'),
+	pluginsStateDisabled: localize('message.pluginsStateDisabled', 'Disabled'),
+	pluginsStateUnknown: localize('message.pluginsStateUnknown', 'Unknown'),
+	pluginsInstallKindMarketplace: localize(
+		'message.pluginsInstallKindMarketplace',
+		'Marketplace',
+	),
+	pluginsInstallKindDirect: localize(
+		'message.pluginsInstallKindDirect',
+		'Direct',
+	),
+	pluginsInstallKindUnknown: localize(
+		'message.pluginsInstallKindUnknown',
+		'Unknown',
+	),
+	pluginsComponentStatusReadonly: localize(
+		'message.pluginsComponentStatusReadonly',
+		'Readonly',
+	),
+	pluginsComponentStatusConflict: localize(
+		'message.pluginsComponentStatusConflict',
+		'Conflict',
+	),
+	pluginsComponentStatusOverridden: localize(
+		'message.pluginsComponentStatusOverridden',
+		'Overridden',
+	),
+	pluginsDiagnosticSeverityInfo: localize(
+		'message.pluginsDiagnosticSeverityInfo',
+		'Info',
+	),
+	pluginsDiagnosticSeverityWarning: localize(
+		'message.pluginsDiagnosticSeverityWarning',
+		'Warning',
+	),
+	pluginsDiagnosticSeverityError: localize(
+		'message.pluginsDiagnosticSeverityError',
+		'Error',
+	),
+	pluginsInlineSource: localize(
+		'message.pluginsInlineSource',
+		'plugin.json inline',
+	),
+	pluginsManifestNotFound: localize(
+		'message.pluginsManifestNotFound',
+		'Manifest not found',
+	),
+	pluginsManifestParseError: (reason: string) =>
+		localize(
+			'message.pluginsManifestParseError',
+			'Manifest parse error: {0}',
+			reason,
+		),
+	pluginsMissingName: localize(
+		'message.pluginsMissingName',
+		'Missing plugin name',
+	),
+	pluginsDirectInstallDetected: localize(
+		'message.pluginsDirectInstallDetected',
+		'Direct plugin install detected.',
+	),
+	pluginsReadonlyComponents: localize(
+		'message.pluginsReadonlyComponents',
+		'Plugin components are read-only.',
+	),
+	pluginsAgentConflict: (name: string) =>
+		localize(
+			'message.pluginsAgentConflict',
+			'Agent conflict: {0}',
+			name,
+		),
+	pluginsSkillConflict: (name: string) =>
+		localize(
+			'message.pluginsSkillConflict',
+			'Skill conflict: {0}',
+			name,
+		),
+	pluginsMcpOverride: (name: string) =>
+		localize(
+			'message.pluginsMcpOverride',
+			'MCP override: {0}',
+			name,
+		),
+	pluginsSecretMasked: localize(
+		'message.pluginsSecretMasked',
+		'Secret-like value masked',
+	),
+	pluginsComponentPathNotFound: (fieldName: string, targetPath: string) =>
+		localize(
+			'message.pluginsComponentPathNotFound',
+			'Component path not found: {0} -> {1}',
+			fieldName,
+			targetPath,
+		),
+	pluginsJsonParseError: (fieldName: string, reason: string) =>
+		localize(
+			'message.pluginsJsonParseError',
+			'{0} parse error: {1}',
+			fieldName,
+			reason,
+		),
 	pluginsNone: localize('message.pluginsNone', 'None'),
+	mcpDisabled: localize('message.mcpDisabled', 'Disabled'),
+	trustedSourceUserSettings: localize(
+		'message.trustedSourceUserSettings',
+		'User Settings',
+	),
+	trustedSourceWorkspaceSettings: localize(
+		'message.trustedSourceWorkspaceSettings',
+		'Workspace Settings',
+	),
+	trustedDirectoryMissing: localize(
+		'message.trustedDirectoryMissing',
+		'Directory does not exist or cannot be accessed.',
+	),
 	hooksWarningMergedSources: (layer: string) =>
 		localize(
 			'message.hooksWarningMergedSources',

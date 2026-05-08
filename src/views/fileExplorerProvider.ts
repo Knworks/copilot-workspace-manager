@@ -88,12 +88,12 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 		if (this.kind === 'prompts') {
 			if (this.rootPathOverride) {
 				return [
-					{
-						kind: 'project',
-						label: 'Workspace Commands',
-						rootPath: this.rootPathOverride,
-						createPath: this.rootPathOverride,
-						priority: 1,
+						{
+							kind: 'project',
+							label: messages.explorerWorkspaceCommands,
+							rootPath: this.rootPathOverride,
+							createPath: this.rootPathOverride,
+							priority: 1,
 					},
 				];
 			}
@@ -101,7 +101,7 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 			if (workspaceRoot) {
 				roots.push({
 					kind: 'project',
-					label: 'Workspace Commands',
+					label: messages.explorerWorkspaceCommands,
 					rootPath: path.join(workspaceRoot, '.claude', 'commands'),
 					createPath: path.join(workspaceRoot, '.claude', 'commands'),
 					priority: 1,
@@ -114,7 +114,7 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 			return [
 				{
 					kind: 'user',
-					label: 'Templates',
+					label: messages.explorerTemplatesRoot,
 					rootPath: path.join(resolveCopilotPaths().managerDir, TEMPLATE_FOLDER_NAME),
 					createPath: path.join(resolveCopilotPaths().managerDir, TEMPLATE_FOLDER_NAME),
 					priority: 1,
@@ -261,7 +261,7 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 			fileItem.contextValue = 'workspace-file';
 			fileItem.command = {
 				command: 'copilot-workspace-manager.openFile',
-				title: 'Open file',
+				title: messages.explorerOpenFile,
 				arguments: [fileItem],
 			};
 			fileItem.iconPath = this.getFileIcon(entry.name, entry.fullPath);
@@ -367,7 +367,7 @@ function getPluginCommandLocations(): SkillLocation[] {
 				.filter((rootPath) => fs.existsSync(rootPath) && fs.statSync(rootPath).isDirectory())
 				.map((rootPath) => ({
 					kind: 'plugin' as const,
-					label: 'Plugin Commands',
+					label: messages.explorerPluginCommands,
 					rootPath,
 					priority: 2,
 				}));

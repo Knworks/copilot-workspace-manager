@@ -95,7 +95,7 @@ export class AgentExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTr
 		item.tooltip = `${location.label}: ${entry.fullPath}`;
 		item.command = {
 			command: 'copilot-workspace-manager.openFile',
-			title: 'Open agent file',
+			title: messages.explorerOpenAgentFile,
 			arguments: [item],
 		};
 		item.iconPath = new vscode.ThemeIcon('hubot');
