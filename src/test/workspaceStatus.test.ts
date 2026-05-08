@@ -51,6 +51,22 @@ suite('Workspace status', () => {
 		});
 	});
 
+	test('accepts commented config.json', () => {
+		withTempHome((homeDir) => {
+			const paths = resolveCopilotPaths(homeDir, undefined);
+			fs.mkdirSync(paths.copilotDir, { recursive: true });
+			fs.writeFileSync(
+				paths.configPath,
+				'// managed automatically\n{\n  "installedPlugins": []\n}\n',
+				'utf8',
+			);
+
+			const status = getCopilotConfigStatus(homeDir);
+			assert.strictEqual(status.isAvailable, true);
+			assert.strictEqual(status.reason, undefined);
+		});
+	});
+
 	test('core status allows invalid config.json for repair operations', () => {
 		withTempHome((homeDir) => {
 			const paths = resolveCopilotPaths(homeDir, undefined);

@@ -74,7 +74,7 @@ export function getCopilotConfigStatus(homeDir?: string): WorkspaceStatus {
 	}
 
 	try {
-		JSON.parse(configContents);
+		JSON.parse(stripJsonComments(configContents));
 	} catch {
 		return { isAvailable: false, reason: UNAVAILABLE_REASONS.configInvalid };
 	}
@@ -91,4 +91,12 @@ export function getCopilotConfigStatus(homeDir?: string): WorkspaceStatus {
 export function getCoreWorkspaceStatus(homeDir?: string): WorkspaceStatus {
 	void homeDir;
 	return { isAvailable: true };
+}
+
+function stripJsonComments(contents: string): string {
+	return contents
+		.replace(/^\uFEFF/, '')
+		.split(/\r?\n/)
+		.filter((line) => !line.trimStart().startsWith('//'))
+		.join('\n');
 }
