@@ -32,6 +32,7 @@ import {
 	getWebviewImageHref,
 } from './webviewAssets';
 import { sanitizeName } from './fileNaming';
+import { promptTextInputWithQuickPick } from './textInputQuickPick';
 
 const HISTORY_VIEW_TYPE = 'copilot-workspace-manager.coreView';
 export const HISTORY_MESSAGE_PREVIEW_MAX_CHARS = 100;
@@ -118,10 +119,6 @@ type HooksDisplayPayload = {
 type PluginsDisplayPayload = {
 	plugins: PluginRecord[];
 	emptyStateMessage?: string;
-};
-
-type HookFileQuickPickItem = vscode.QuickPickItem & {
-	fileName: string;
 };
 
 function normalizeQuery(query: string): string {
@@ -1287,9 +1284,13 @@ export class HistoryPanelManager implements vscode.Disposable {
 	}
 
 	private async addPathInstruction(workspaceRoot: string): Promise<void> {
-		const folderInput = await vscode.window.showInputBox({
-			prompt: messages.file.inputFolderName,
+		const folderInput = await promptTextInputWithQuickPick({
+			title: messages.chainPathInstructionAddFolder,
+			placeholder: messages.file.inputFolderName,
 			ignoreFocusOut: true,
+			resolvePreviewValue: (value) => sanitizeName(value.trim()),
+			formatLabel: (value) => messages.file.createFolderPreview(value),
+			description: '.github/instructions',
 		});
 		const folderName = sanitizeName((folderInput ?? '').trim());
 		if (!folderInput) {
@@ -1325,31 +1326,15 @@ export class HistoryPanelManager implements vscode.Disposable {
 	}
 
 	private async promptPathInstructionFileName(folderName: string): Promise<string | undefined> {
-		return new Promise((resolve) => {
-			const inputBox = vscode.window.createInputBox();
-			inputBox.ignoreFocusOut = true;
-			inputBox.prompt = messages.chainPathInstructionFilePrompt;
-			const updateTitle = (): void => {
-				const currentValue = sanitizeName(inputBox.value.trim() || folderName);
-				inputBox.title = messages.chainPathInstructionPreview(
-					`${currentValue}.instructions.md`,
-				);
-			};
-			let settled = false;
-			const finish = (value: string | undefined): void => {
-				if (settled) {
-					return;
-				}
-				settled = true;
-				inputBox.hide();
-				inputBox.dispose();
-				resolve(value);
-			};
-			inputBox.onDidAccept(() => finish(inputBox.value));
-			inputBox.onDidHide(() => finish(undefined));
-			inputBox.onDidChangeValue(() => updateTitle());
-			updateTitle();
-			inputBox.show();
+		return promptTextInputWithQuickPick({
+			title: messages.chainPathInstructionAddFile,
+			placeholder: messages.chainPathInstructionFilePrompt,
+			initialValue: folderName,
+			ignoreFocusOut: true,
+			resolvePreviewValue: (value) =>
+				`${sanitizeName(value.trim() || folderName)}.instructions.md`,
+			formatLabel: (value) => messages.chainPathInstructionPreview(value),
+			description: '.github/instructions',
 		});
 	}
 
@@ -1378,58 +1363,14 @@ export class HistoryPanelManager implements vscode.Disposable {
 	}
 
 	private async promptHookFileName(): Promise<string | undefined> {
-		return new Promise((resolve) => {
-			const quickPick = vscode.window.createQuickPick();
-			quickPick.title = messages.hooksAddFile;
-			quickPick.placeholder = messages.hooksFileNamePlaceholder;
-			quickPick.ignoreFocusOut = true;
-			let settled = false;
-
-			const updateItems = (): HookFileQuickPickItem[] => {
-				const value = sanitizeHookFileName(quickPick.value);
-				const items: HookFileQuickPickItem[] = value
-					? [
-						{
-							label: `$(add) ${value}.json`,
-							description: '.github/hooks',
-							fileName: value,
-						},
-					]
-					: [];
-				quickPick.items = items;
-				return items;
-			};
-
-			const finish = (value: string | undefined): void => {
-				if (settled) {
-					return;
-				}
-				settled = true;
-				quickPick.hide();
-				quickPick.dispose();
-				resolve(value);
-			};
-
-			quickPick.onDidAccept(() => {
-				const activeItem = quickPick.activeItems[0] as HookFileQuickPickItem | undefined;
-				const selectedItem = quickPick.selectedItems[0] as HookFileQuickPickItem | undefined;
-				const value = activeItem?.fileName
-					?? selectedItem?.fileName
-					?? sanitizeHookFileName(quickPick.value);
-				finish(value || undefined);
-			});
-			quickPick.onDidChangeValue(() => {
-				const items = updateItems();
-				if (items.length > 0) {
-					quickPick.activeItems = [items[0]];
-				}
-			});
-			quickPick.onDidHide(() => finish(undefined));
-			const items = updateItems();
-			if (items.length > 0) {
-				quickPick.activeItems = [items[0]];
-			}
-			quickPick.show();
+		return promptTextInputWithQuickPick({
+			title: messages.hooksAddFile,
+			placeholder: messages.hooksFileNamePlaceholder,
+			ignoreFocusOut: true,
+			resolvePreviewValue: (value) => sanitizeHookFileName(value),
+			resolveValue: (_rawValue, previewValue) => previewValue,
+			formatLabel: (value) => `$(add) ${value}.json`,
+			description: '.github/hooks',
 		});
 	}
 

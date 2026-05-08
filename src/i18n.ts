@@ -423,6 +423,14 @@ export const messages = {
 		'message.chainPathInstructionFilePrompt',
 		'Enter a file name. Leave empty to use the folder name.',
 	),
+	chainPathInstructionAddFolder: localize(
+		'message.chainPathInstructionAddFolder',
+		'Add Path Instruction folder',
+	),
+	chainPathInstructionAddFile: localize(
+		'message.chainPathInstructionAddFile',
+		'Add Path Instruction file',
+	),
 	chainPathInstructionPreview: (fileName: string) =>
 		localize(
 			'message.chainPathInstructionPreview',
@@ -739,6 +747,20 @@ export const messages = {
 	),
 	dialogOk: localize('message.dialogOk', 'OK'),
 	file: {
+		addFileTitle: localize('message.addFileTitle', 'Add file'),
+		addCommandFileTitle: localize(
+			'message.addCommandFileTitle',
+			'Add Command file',
+		),
+		addSkillFileTitle: localize(
+			'message.addSkillFileTitle',
+			'Add Skill file',
+		),
+		addFolderTitle: localize('message.addFolderTitle', 'Add folder'),
+		addSkillFolderTitle: localize(
+			'message.addSkillFolderTitle',
+			'Add Skill folder',
+		),
 		inputFileName: localize('message.inputFileName', 'Enter a file name.'),
 		inputCommandFileName: localize(
 			'message.inputCommandFileName',
@@ -764,6 +786,18 @@ export const messages = {
 			'message.inputRenameName',
 			'Enter a new name.',
 		),
+		createFilePreview: (fileName: string) =>
+			localize(
+				'message.createFilePreview',
+				'File to create: {0}',
+				fileName,
+			),
+		createFolderPreview: (folderName: string) =>
+			localize(
+				'message.createFolderPreview',
+				'Folder to create: {0}',
+				folderName,
+			),
 		invalidName: localize(
 			'message.invalidName',
 			'Please enter a valid name.',
@@ -832,6 +866,10 @@ export const messages = {
 		),
 	},
 	agent: {
+		addFileTitle: localize(
+			'message.agent.addFileTitle',
+			'Add Sub Agent file',
+		),
 		inputName: localize(
 			'message.agent.inputName',
 			'Enter a Sub Agent name.',
@@ -840,6 +878,12 @@ export const messages = {
 			'message.agent.inputDescription',
 			'Enter an agent description.',
 		),
+		createFilePreview: (fileName: string) =>
+			localize(
+				'message.agent.createFilePreview',
+				'File to create: {0}',
+				fileName,
+			),
 		invalidName: localize(
 			'message.agent.invalidName',
 			'Please enter a valid agent name.',

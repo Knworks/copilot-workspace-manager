@@ -7,6 +7,7 @@ import { getWorkspaceStatus } from '../services/workspaceStatus';
 import { messages } from '../i18n';
 import { runSafely } from '../services/errorHandling';
 import { sanitizeName } from '../services/fileNaming';
+import { promptTextInputWithQuickPick } from '../services/textInputQuickPick';
 import {
 	listTemplateCandidates,
 	readTemplateContents,
@@ -250,9 +251,16 @@ function resolveAgentSelection(
 }
 
 async function promptAgentName(defaultValue?: string): Promise<string | undefined> {
-	const value = await vscode.window.showInputBox({
-		prompt: messages.agent.inputName,
-		value: defaultValue,
+	const value = await promptTextInputWithQuickPick({
+		title: messages.agent.addFileTitle,
+		placeholder: messages.agent.inputName,
+		initialValue: defaultValue,
+		resolvePreviewValue: (input) => {
+			const sanitized = sanitizeName(input.trim());
+			const name = stripAgentExtension(sanitized);
+			return name ? toAgentFileName(name) : '';
+		},
+		formatLabel: (preview) => messages.agent.createFilePreview(preview),
 	});
 	if (value === undefined) {
 		return undefined;
@@ -304,9 +312,10 @@ function readFrontmatterValue(agentFilePath: string, key: string): string | unde
 }
 
 async function promptAgentDescription(defaultValue = ''): Promise<string | undefined> {
-	return vscode.window.showInputBox({
-		prompt: messages.agent.inputDescription,
-		value: defaultValue,
+	return promptTextInputWithQuickPick({
+		title: messages.agent.inputDescription,
+		placeholder: messages.agent.inputDescription,
+		initialValue: defaultValue,
 	});
 }
 

@@ -25,6 +25,7 @@ import {
 } from '../services/templateService';
 import { FileExplorerProvider } from '../views/fileExplorerProvider';
 import { runSafely } from '../services/errorHandling';
+import { promptTextInputWithQuickPick } from '../services/textInputQuickPick';
 import { expandParentFolder } from '../services/treeViewExpansion';
 
 type FileCommandContext = {
@@ -216,9 +217,10 @@ export function registerFileCommands(
 					}
 
 					const parentDir = path.dirname(selection.fsPath);
-					const renameInput = await vscode.window.showInputBox({
-						prompt: messages.file.inputRenameName,
-						value: path.basename(selection.fsPath),
+					const renameInput = await promptTextInputWithQuickPick({
+						title: messages.file.inputRenameName,
+						placeholder: messages.file.inputRenameName,
+						initialValue: path.basename(selection.fsPath),
 					});
 					if (!renameInput) {
 						return;
@@ -525,13 +527,28 @@ async function addFileWithSelection(
 		return;
 	}
 
-	const fileNameInput = await vscode.window.showInputBox({
-		prompt:
+	const fileNameInput = await promptTextInputWithQuickPick({
+		title:
+			selection.kind === 'prompts'
+				? messages.file.addCommandFileTitle
+				: selection.kind === 'skills'
+				? messages.file.addSkillFileTitle
+				: messages.file.addFileTitle,
+		placeholder:
 			selection.kind === 'prompts'
 				? messages.file.inputCommandFileName
 				: selection.kind === 'skills'
 				? messages.file.inputSkillFileName
 				: messages.file.inputFileName,
+		resolvePreviewValue: (value) => {
+			const normalized = sanitizeName(
+				selection.kind === 'skills' && !value.trim()
+					? SKILL_MARKDOWN_FILE_NAME
+					: value,
+			);
+			return normalized ? applyDefaultExtension(normalized) : '';
+		},
+		formatLabel: (value) => messages.file.createFilePreview(value),
 	});
 	if (fileNameInput === undefined) {
 		return;
@@ -603,11 +620,17 @@ async function addFolderWithSelection(
 		return;
 	}
 
-	const folderNameInput = await vscode.window.showInputBox({
-		prompt:
+	const folderNameInput = await promptTextInputWithQuickPick({
+		title:
+			selection.kind === 'skills' && selection.nodeType === 'root'
+				? messages.file.addSkillFolderTitle
+				: messages.file.addFolderTitle,
+		placeholder:
 			selection.kind === 'skills' && selection.nodeType === 'root'
 				? messages.file.inputSkillFolderName
 				: messages.file.inputFolderName,
+		resolvePreviewValue: (value) => sanitizeName(value.trim()),
+		formatLabel: (value) => messages.file.createFolderPreview(value),
 	});
 	if (!folderNameInput) {
 		return;
@@ -644,8 +667,9 @@ function shouldCreateSkillMarkdownTemplate(
 async function buildSkillMarkdownTemplateForSelection(
 	targetDir: string,
 ): Promise<string | null> {
-	const description = await vscode.window.showInputBox({
-		prompt: messages.file.inputSkillDescription,
+	const description = await promptTextInputWithQuickPick({
+		title: messages.file.inputSkillDescription,
+		placeholder: messages.file.inputSkillDescription,
 	});
 	if (description === undefined) {
 		return null;
