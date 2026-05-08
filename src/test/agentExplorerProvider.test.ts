@@ -46,6 +46,38 @@ suite('Agent explorer provider', () => {
 		assert.strictEqual((items[0].iconPath as vscode.ThemeIcon).id, 'hubot');
 	});
 
+	test('shows plugin markdown agents without .agent suffix', () => {
+		const provider = new AgentExplorerProvider(
+			contextStub,
+			() => ({ isAvailable: true }),
+			(agentsDir) => {
+				if (agentsDir.endsWith(path.join('root', 'plugin-agents'))) {
+					return [
+						{
+							name: 'database-admin.md',
+							fullPath: path.join('root', 'plugin-agents', 'database-admin.md'),
+							isFile: true,
+						},
+					];
+				}
+				return [];
+			},
+			() => [
+				{
+					kind: 'plugin',
+					label: 'Plugin Agents',
+					rootPath: path.join('root', 'plugin-agents'),
+					priority: 3,
+				},
+			],
+		);
+
+		const items = provider.getChildren() as vscode.TreeItem[];
+		assert.deepStrictEqual(items.map((item) => item.label), ['database-admin.md']);
+		assert.ok(items[0].iconPath instanceof vscode.ThemeIcon);
+		assert.strictEqual((items[0].iconPath as vscode.ThemeIcon).id, 'lock');
+	});
+
 	test('returns unavailable item when not available', () => {
 		const provider = new AgentExplorerProvider(
 			contextStub,

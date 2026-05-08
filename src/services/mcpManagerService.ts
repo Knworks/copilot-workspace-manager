@@ -61,7 +61,7 @@ const FILTER_MAPPINGS = new Set<McpFilterMapping>([
 export function listMcpFormModels(configPath: string, disabledConfigPath?: string): McpFormModel[] {
 	const enabledModels = readModelsFromConfig(configPath, true);
 	const disabledModels = disabledConfigPath ? readModelsFromConfig(disabledConfigPath, false) : [];
-	const pluginModels = listPluginMcpDefinitions(path.join(path.dirname(configPath), 'installed-plugins'))
+	const pluginModels = listPluginMcpDefinitions(path.join(path.dirname(configPath), 'config.json'))
 		.map((definition) => ({
 			...toModel(definition.id, definition.value),
 			entryId: definition.entryId,

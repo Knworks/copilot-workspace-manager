@@ -1,6 +1,8 @@
 import * as assert from 'assert';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as os from 'os';
 import { WorkspaceTreeItem } from '../models/treeItems';
 import { FileExplorerProvider } from '../views/fileExplorerProvider';
 import { getUnavailableLabel } from '../services/workspaceStatus';
@@ -8,6 +10,15 @@ import { getUnavailableLabel } from '../services/workspaceStatus';
 const contextStub = {
 	asAbsolutePath: (target: string) => path.join('root', target),
 } as vscode.ExtensionContext;
+
+function withTempDir(run: (root: string) => void): void {
+	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'file-explorer-'));
+	try {
+		run(tempDir);
+	} finally {
+		fs.rmSync(tempDir, { recursive: true, force: true });
+	}
+}
 
 suite('File explorer provider', () => {
 	test('returns file children when available', () => {
@@ -73,6 +84,49 @@ suite('File explorer provider', () => {
 		const children = provider.getChildren() as vscode.TreeItem[];
 		assert.ok(children[0].iconPath instanceof vscode.ThemeIcon);
 		assert.strictEqual((children[0].iconPath as vscode.ThemeIcon).id, 'terminal');
+	});
+
+	test('prompts explorer includes plugin command locations', () => {
+		withTempDir((root) => {
+			const previousCopilotHome = process.env.COPILOT_HOME;
+			process.env.COPILOT_HOME = path.join(root, '.copilot');
+			try {
+				const copilotHome = process.env.COPILOT_HOME;
+				const pluginRoot = path.join(copilotHome, 'installed-plugins', '_direct', 'plugin-a');
+				const commandsRoot = path.join(pluginRoot, 'commands');
+				fs.mkdirSync(commandsRoot, { recursive: true });
+				fs.writeFileSync(path.join(pluginRoot, 'plugin.json'), JSON.stringify({ commands: 'commands' }), 'utf8');
+				fs.writeFileSync(
+					path.join(copilotHome, 'config.json'),
+					JSON.stringify({
+						installedPlugins: [{ name: 'plugin-a', cache_path: pluginRoot, enabled: true }],
+					}),
+					'utf8',
+				);
+
+				const provider = new FileExplorerProvider(
+					'prompts',
+					contextStub,
+					() => ({ isAvailable: true }),
+					undefined,
+					(targetPath) => targetPath === commandsRoot
+						? [{
+							name: 'release-note.md',
+							fullPath: path.join(commandsRoot, 'release-note.md'),
+							isDirectory: false,
+							isFile: true,
+						}]
+						: [],
+				);
+
+				const children = provider.getChildren() as vscode.TreeItem[];
+				assert.strictEqual(children.length, 1);
+				assert.strictEqual(children[0].label, 'release-note.md');
+				assert.strictEqual(children[0].description, 'Plugin Commands');
+			} finally {
+				process.env.COPILOT_HOME = previousCopilotHome;
+			}
+		});
 	});
 
 	test('templates ignore folders and hidden entries', () => {
@@ -182,5 +236,61 @@ suite('File explorer provider', () => {
 		const skillChildren = provider.getChildren(root) as vscode.TreeItem[];
 		assert.ok(skillChildren[0].iconPath instanceof vscode.ThemeIcon);
 		assert.strictEqual((skillChildren[0].iconPath as vscode.ThemeIcon).id, 'agent');
+	});
+
+	test('skills explorer shows plugin skill root folder when manifest points directly to a skill', () => {
+		withTempDir((root) => {
+			const previousCopilotHome = process.env.COPILOT_HOME;
+			process.env.COPILOT_HOME = path.join(root, '.copilot');
+			try {
+				const copilotHome = process.env.COPILOT_HOME;
+				const pluginRoot = path.join(copilotHome, 'installed-plugins', '_direct', 'plugin-a');
+				const directSkillRoot = path.join(pluginRoot, 'skills', 'sql-review');
+				fs.mkdirSync(directSkillRoot, { recursive: true });
+				fs.writeFileSync(path.join(pluginRoot, 'plugin.json'), JSON.stringify({ skills: ['skills/sql-review'] }), 'utf8');
+				fs.writeFileSync(
+					path.join(copilotHome, 'config.json'),
+					JSON.stringify({
+						installedPlugins: [{ name: 'plugin-a', cache_path: pluginRoot, enabled: true }],
+					}),
+					'utf8',
+				);
+
+				const provider = new FileExplorerProvider(
+					'skills',
+					contextStub,
+					() => ({ isAvailable: true }),
+					undefined,
+					(targetPath) => {
+						if (targetPath === directSkillRoot) {
+							return [
+								{
+									name: 'SKILL.md',
+									fullPath: path.join(directSkillRoot, 'SKILL.md'),
+									isDirectory: false,
+									isFile: true,
+								},
+								{
+									name: 'references',
+									fullPath: path.join(directSkillRoot, 'references'),
+									isDirectory: true,
+									isFile: false,
+								},
+							];
+						}
+						return [];
+					},
+				);
+
+				const children = provider.getChildren() as vscode.TreeItem[];
+				assert.strictEqual(children.length, 1);
+				assert.strictEqual(children[0].label, 'sql-review');
+
+				const skillChildren = provider.getChildren(children[0] as WorkspaceTreeItem) as vscode.TreeItem[];
+				assert.deepStrictEqual(skillChildren.map((item) => item.label), ['references', 'SKILL.md']);
+			} finally {
+				process.env.COPILOT_HOME = previousCopilotHome;
+			}
+		});
 	});
 });

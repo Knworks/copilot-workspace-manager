@@ -41,7 +41,7 @@ export class AgentExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTr
 		}
 		const entries = this.readLocations().flatMap((location) =>
 			this.readEntries(location.rootPath)
-				.filter((entry) => entry.isFile && entry.name.toLowerCase().endsWith('.agent.md'))
+				.filter((entry) => this.isDisplayableAgentEntry(entry, location))
 				.map((entry) => ({ ...entry, location })),
 		);
 		if (entries.length === 0) {
@@ -60,6 +60,17 @@ export class AgentExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTr
 				}),
 			)
 			.map((entry) => this.toTreeItem(entry, entry.location!));
+	}
+
+	private isDisplayableAgentEntry(entry: AgentEntry, location: AgentLocation): boolean {
+		if (!entry.isFile) {
+			return false;
+		}
+		const lowerName = entry.name.toLowerCase();
+		if (lowerName.endsWith('.agent.md')) {
+			return true;
+		}
+		return location.kind === 'plugin' && lowerName.endsWith('.md');
 	}
 
 	getLocationForPath(targetPath: string): AgentLocation | undefined {
@@ -87,9 +98,7 @@ export class AgentExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTr
 			title: 'Open agent file',
 			arguments: [item],
 		};
-		item.iconPath = location.kind === 'plugin'
-			? new vscode.ThemeIcon('lock', new vscode.ThemeColor('disabledForeground'))
-			: new vscode.ThemeIcon('hubot');
+		item.iconPath = new vscode.ThemeIcon('hubot');
 		return item;
 	}
 

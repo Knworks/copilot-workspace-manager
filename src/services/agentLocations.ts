@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import * as vscode from 'vscode';
+import { listInstalledPluginsFromConfig, resolvePluginManifestPath } from './pluginConfigService';
 import { resolveCopilotPaths } from './workspaceStatus';
 
 export type AgentLocationKind = 'project' | 'user' | 'plugin';
@@ -22,7 +23,7 @@ export function getAgentLocations(
 	homeDir: string = os.homedir(),
 	projectRoot: string | undefined = getProjectRoot(),
 ): AgentLocation[] {
-	const { copilotDir } = resolveCopilotPaths(homeDir);
+	const { copilotDir, configPath } = resolveCopilotPaths(homeDir);
 	const locations: AgentLocation[] = [];
 	if (projectRoot) {
 		for (const rootPath of [
@@ -45,7 +46,7 @@ export function getAgentLocations(
 		createPath: path.join(copilotDir, 'agents'),
 		priority: 2,
 	});
-	for (const rootPath of collectPluginAgentRoots(path.join(copilotDir, 'installed-plugins'))) {
+	for (const rootPath of collectPluginAgentRoots(configPath)) {
 		locations.push({
 			kind: 'plugin',
 			label: 'Plugin Agents',
@@ -76,21 +77,21 @@ export function findAgentLocationForPath(
 	});
 }
 
-function collectPluginAgentRoots(pluginsRoot: string): string[] {
-	if (!fs.existsSync(pluginsRoot)) {
-		return [];
-	}
-	const manifestPaths = findPluginManifests(pluginsRoot);
-	return manifestPaths.flatMap((manifestPath) =>
-		resolvePluginAgentRoots(path.dirname(manifestPath)),
+function collectPluginAgentRoots(configPath: string): string[] {
+	return listInstalledPluginsFromConfig(configPath).flatMap((plugin) =>
+		resolvePluginAgentRoots(plugin.pluginRoot),
 	);
 }
 
 function resolvePluginAgentRoots(pluginRoot: string): string[] {
 	const defaultRoot = path.join(pluginRoot, 'agents');
 	try {
+		const manifestPath = resolvePluginManifestPath(pluginRoot);
+		if (!manifestPath) {
+			return [];
+		}
 		const parsed = JSON.parse(
-			fs.readFileSync(path.join(pluginRoot, 'plugin.json'), 'utf8'),
+			fs.readFileSync(manifestPath, 'utf8'),
 		) as { agents?: unknown };
 		const configuredRoots = normalizePluginAgentPaths(parsed.agents).map((agentPath) =>
 			path.resolve(pluginRoot, agentPath),
@@ -102,22 +103,6 @@ function resolvePluginAgentRoots(pluginRoot: string): string[] {
 	} catch {
 		return [];
 	}
-}
-
-function findPluginManifests(currentPath: string): string[] {
-	const results: string[] = [];
-	for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
-		const fullPath = path.join(currentPath, entry.name);
-		if (entry.isFile() && entry.name === 'plugin.json') {
-			results.push(fullPath);
-			continue;
-		}
-		if (!entry.isDirectory()) {
-			continue;
-		}
-		results.push(...findPluginManifests(fullPath));
-	}
-	return results;
 }
 
 function normalizePluginAgentPaths(value: unknown): string[] {

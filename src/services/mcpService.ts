@@ -27,7 +27,7 @@ export function readMcpServers(configPath: string, disabledConfigPath?: string):
 		const disabledServers = disabledConfigPath
 			? readServersFromConfig(disabledConfigPath, false)
 			: [];
-		const pluginServers = listPluginMcpDefinitions(path.join(path.dirname(configPath), 'installed-plugins')).map((definition, index) => ({
+		const pluginServers = listPluginMcpDefinitions(path.join(path.dirname(configPath), 'config.json')).map((definition, index) => ({
 			id: definition.id,
 			entryId: definition.entryId,
 			enabled: true,

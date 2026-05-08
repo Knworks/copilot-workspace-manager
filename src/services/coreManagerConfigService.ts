@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import * as vscode from 'vscode';
+import { listInstalledPluginsFromConfig } from './pluginConfigService';
 import { resolveCopilotPaths } from './workspaceStatus';
 
 export type HookEventName = string;
@@ -59,11 +60,11 @@ function getWorkspaceRoot(): string | undefined {
 }
 
 export function listHookDiagnostics(
-	_configPath: string = resolveCopilotPaths().configPath,
+	_configPath: string | undefined = undefined,
 	homeDir: string = os.homedir(),
 	workspaceRoot: string | undefined = getWorkspaceRoot(),
 ): HookDiagnosticsSnapshot {
-	const { copilotDir } = resolveCopilotPaths(homeDir);
+	const configPath = _configPath ?? resolveCopilotPaths(homeDir).configPath;
 	const sources: HookSourceRecord[] = [];
 	const entries: HookEntryRecord[] = [];
 
@@ -83,7 +84,7 @@ export function listHookDiagnostics(
 		);
 	}
 
-	for (const sourcePath of collectPluginHookPaths(path.join(copilotDir, 'installed-plugins'))) {
+	for (const sourcePath of collectPluginHookPaths(configPath)) {
 		const sourceId = `plugin:${sourcePath}`;
 		const groups = parseHooksJson(sourcePath);
 		sources.push({
@@ -123,12 +124,12 @@ function collectWorkspaceHookPaths(workspaceRoot: string | undefined): string[] 
 		.sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }));
 }
 
-function collectPluginHookPaths(installedPluginsDir: string): string[] {
-	if (!fs.existsSync(installedPluginsDir) || !fs.statSync(installedPluginsDir).isDirectory()) {
-		return [];
-	}
+function collectPluginHookPaths(configPath: string): string[] {
 	const results: string[] = [];
 	const visit = (currentDir: string): void => {
+		if (!fs.existsSync(currentDir) || !fs.statSync(currentDir).isDirectory()) {
+			return;
+		}
 		for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
 			const fullPath = path.join(currentDir, entry.name);
 			if (entry.isDirectory()) {
@@ -140,7 +141,9 @@ function collectPluginHookPaths(installedPluginsDir: string): string[] {
 			}
 		}
 	};
-	visit(installedPluginsDir);
+	for (const plugin of listInstalledPluginsFromConfig(configPath)) {
+		visit(plugin.pluginRoot);
+	}
 	return results.sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }));
 }
 

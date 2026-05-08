@@ -25,9 +25,9 @@ export function listAgentManagerRecords(
 	locations: AgentLocation[] = getAgentLocations(),
 ): AgentManagerRecord[] {
 	return locations.flatMap((location) =>
-		listAgentFiles(location.rootPath).map((agentPath) => {
+		listAgentFiles(location.rootPath, location.kind === 'plugin').map((agentPath) => {
 			const frontmatter = readAgentFrontmatter(agentPath);
-			const id = path.basename(agentPath).replace(/\.agent\.md$/i, '');
+			const id = path.basename(agentPath).replace(/(\.agent)?\.md$/i, '');
 			const name = frontmatter.name ?? id;
 			return {
 				id: `${location.kind}:${agentPath}`,
@@ -84,12 +84,21 @@ export function resolveAgentManagerPaths(): { copilotDir: string; configPath: st
 	return resolveCopilotPaths();
 }
 
-function listAgentFiles(rootPath: string): string[] {
+function listAgentFiles(rootPath: string, allowPlainMarkdown = false): string[] {
 	if (!fs.existsSync(rootPath)) {
 		return [];
 	}
 	return fs.readdirSync(rootPath, { withFileTypes: true })
-		.filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.agent.md'))
+		.filter((entry) => {
+			if (!entry.isFile()) {
+				return false;
+			}
+			const lowerName = entry.name.toLowerCase();
+			if (lowerName.endsWith('.agent.md')) {
+				return true;
+			}
+			return allowPlainMarkdown && lowerName.endsWith('.md');
+		})
 		.map((entry) => path.join(rootPath, entry.name))
 		.sort((left, right) =>
 			path.basename(left).localeCompare(path.basename(right), undefined, {

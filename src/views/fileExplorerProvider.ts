@@ -1,3 +1,4 @@
+import fs from 'fs';
 import * as vscode from 'vscode';
 import path from 'path';
 import { WorkspaceTreeDataProvider, WorkspaceStatusProvider } from './workspaceTreeProvider';
@@ -12,6 +13,7 @@ import {
 	getSkillLocations,
 	SkillLocation,
 } from '../services/skillLocations';
+import { listInstalledPluginsFromConfig, resolvePluginManifestPath } from '../services/pluginConfigService';
 import { messages } from '../i18n';
 
 const FILE_ICON_MAP: Record<string, string> = {
@@ -84,17 +86,29 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 	getRootOptions(): SkillLocation[] {
 		const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 		if (this.kind === 'prompts') {
-			return workspaceRoot
-				? [
+			if (this.rootPathOverride) {
+				return [
 					{
 						kind: 'project',
 						label: 'Workspace Commands',
-						rootPath: path.join(workspaceRoot, '.claude', 'commands'),
-						createPath: path.join(workspaceRoot, '.claude', 'commands'),
+						rootPath: this.rootPathOverride,
+						createPath: this.rootPathOverride,
 						priority: 1,
 					},
-				]
-				: [];
+				];
+			}
+			const roots: SkillLocation[] = [];
+			if (workspaceRoot) {
+				roots.push({
+					kind: 'project',
+					label: 'Workspace Commands',
+					rootPath: path.join(workspaceRoot, '.claude', 'commands'),
+					createPath: path.join(workspaceRoot, '.claude', 'commands'),
+					priority: 1,
+				});
+			}
+			roots.push(...getPluginCommandLocations());
+			return roots;
 		}
 		if (this.kind === 'templates') {
 			return [
@@ -129,7 +143,7 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 
 	protected getAvailableChildren(element?: WorkspaceTreeItem): vscode.ProviderResult<WorkspaceTreeItem[]> {
 		if (!element) {
-			if (this.kind === 'skills') {
+			if (this.kind === 'skills' || this.kind === 'prompts') {
 				const items = this.readSkillRoots();
 				return items.length > 0 ? items : [this.toEmptyItem()];
 			}
@@ -190,9 +204,23 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 	}
 
 	private readSkillRoots(): WorkspaceTreeItem[] {
-		return this.getRootOptions().flatMap((location) =>
-			this.readDirectory(location.rootPath, location),
-		);
+		return this.getRootOptions().flatMap((location) => {
+			if (this.kind === 'skills' && this.isSkillRootFolder(location.rootPath)) {
+				const folderItem = new WorkspaceTreeItem(
+					'root',
+					this.kind,
+					path.basename(location.rootPath),
+					vscode.TreeItemCollapsibleState.Collapsed,
+					location.rootPath,
+				);
+				folderItem.id = location.rootPath;
+				folderItem.contextValue = 'workspace-folder';
+				folderItem.iconPath = this.getFolderIcon(location.rootPath);
+				this.applyLocationMetadata(folderItem, location, location.rootPath);
+				return [folderItem];
+			}
+			return this.readDirectory(location.rootPath, location);
+		});
 	}
 
 	private readDirectory(targetPath: string, location?: SkillLocation): WorkspaceTreeItem[] {
@@ -247,7 +275,7 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 		location: SkillLocation | undefined,
 		targetPath: string,
 	): void {
-		if (!location || this.kind !== 'skills') {
+		if (!location || (this.kind !== 'skills' && this.kind !== 'prompts')) {
 			return;
 		}
 		item.tooltip = `${location.label}: ${targetPath}`;
@@ -321,4 +349,43 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 				return messages.templatesExplorerEmpty;
 		}
 	}
+}
+
+function getPluginCommandLocations(): SkillLocation[] {
+	const { configPath } = resolveCopilotPaths();
+	return listInstalledPluginsFromConfig(configPath).flatMap((plugin) => {
+		const manifestPath = plugin.manifestPath ?? resolvePluginManifestPath(plugin.pluginRoot);
+		if (!manifestPath || !fs.existsSync(manifestPath)) {
+			return [];
+		}
+		try {
+			const parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as { commands?: unknown };
+			const commandRoots = normalizePluginPaths(parsed.commands).map((commandPath) =>
+				path.resolve(plugin.pluginRoot, commandPath),
+			);
+			return commandRoots
+				.filter((rootPath) => fs.existsSync(rootPath) && fs.statSync(rootPath).isDirectory())
+				.map((rootPath) => ({
+					kind: 'plugin' as const,
+					label: 'Plugin Commands',
+					rootPath,
+					priority: 2,
+				}));
+		} catch {
+			return [];
+		}
+	});
+}
+
+function normalizePluginPaths(value: unknown): string[] {
+	if (typeof value === 'string' && value.trim()) {
+		return [value.trim()];
+	}
+	if (Array.isArray(value)) {
+		return value
+			.filter((entry): entry is string => typeof entry === 'string')
+			.map((entry) => entry.trim())
+			.filter(Boolean);
+	}
+	return [];
 }

@@ -204,6 +204,8 @@ suite('Localization keys', () => {
 			'message.pluginsLspServers',
 			'message.pluginsDiagnostics',
 			'message.pluginsState',
+			'message.pluginsToggle',
+			'message.plugin.toggleUpdated',
 			'message.pluginsInstallKind',
 			'message.pluginsPluginRoot',
 			'message.pluginsManifestPath',

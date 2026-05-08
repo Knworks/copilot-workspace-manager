@@ -20,6 +20,7 @@ import {
 	HookSourceRecord,
 	listHookDiagnostics,
 } from './coreManagerConfigService';
+import { setPluginEnabled } from './pluginConfigService';
 import { PluginRecord, listPluginDiagnostics } from './pluginDiagnosticsService';
 import { getCoreWorkspaceStatus, resolveCopilotPaths } from './workspaceStatus';
 import {
@@ -46,6 +47,7 @@ type HistoryPanelInboundMessage =
 	| { type: 'addTrustedDirectory' }
 	| { type: 'addHooksFile' }
 	| { type: 'removeTrustedDirectory'; targetPath: string; sourcePath: string }
+	| { type: 'togglePluginEnabled'; pluginSpec: string; enabled: boolean }
 	| { type: 'openPath'; targetPath: string };
 
 type CoreViewTab = 'history' | 'chain' | 'trusted' | 'hooks' | 'plugins';
@@ -434,6 +436,8 @@ function buildHistoryWebviewHtml(
 		hooksTimeoutLabel: messages.hooksTimeoutLabel,
 		hooksStatusMessageLabel: messages.hooksStatusMessageLabel,
 		open: messages.agentManagerOpen,
+		pluginsToggle: messages.pluginsToggle,
+		pluginToggleUpdated: messages.pluginToggleUpdated,
 		pluginsEmpty: messages.pluginsEmpty,
 		pluginsAgents: messages.pluginsAgents,
 		pluginsSkills: messages.pluginsSkills,
@@ -578,6 +582,14 @@ function buildHistoryWebviewHtml(
 		.plugin-block-summary .codicon-chevron-right { transition: transform 120ms ease; }
 		.plugin-block[open] .plugin-block-summary .codicon-chevron-right { transform: rotate(90deg); }
 		.plugin-overview-card { padding: 10px; }
+		.plugin-state-value { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+		.switch { display: inline-flex; align-items: center; cursor: pointer; }
+		.switch input { display: none; }
+		.switch span { display: inline-block; width: 34px; height: 18px; border-radius: 999px; background: #d85b74; position: relative; vertical-align: middle; }
+		.switch span::after { content: ""; position: absolute; width: 14px; height: 14px; top: 2px; left: 2px; border-radius: 50%; background: #6e6e6e; transition: left 0.12s ease; }
+		.switch input:checked + span { background: var(--vscode-testing-iconPassed); }
+		.switch input:checked + span::after { left: 18px; }
+		@media (prefers-color-scheme: dark) { .switch span::after { background: #ffffff; } }
 		.chain-detail-card { position: relative; display: grid; gap: 8px; padding: 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); }
 		.chain-preview-block { padding: 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editor-background); }
 		.chain-summary-warning { color: var(--vscode-editorWarning-foreground); }
@@ -804,6 +816,13 @@ function buildHistoryWebviewHtml(
 			}
 		});
 
+		document.addEventListener('change', (event) => {
+			const target = event.target instanceof HTMLInputElement ? event.target : null;
+			if (target?.dataset?.togglePluginSpec) {
+				vscode.postMessage({ type: 'togglePluginEnabled', pluginSpec: target.dataset.togglePluginSpec, enabled: target.checked });
+			}
+		});
+
 		const renderList = () => {
 			if (state.items.length === 0) {
 				treeArea.innerHTML = '<div class="preview-empty">' + labels.noResult + '</div>';
@@ -912,6 +931,11 @@ function buildHistoryWebviewHtml(
 		const renderTwoColumnGrid = (rows) =>
 			'<div class="hook-entry-detail-grid">' + rows.map((row) => '<div class="hook-entry-detail-label">' + escapeHtml(String(row[0])) + '</div><div>' + escapeHtml(String(row[1])) + '</div>').join('') + '</div>';
 
+		const renderPluginOverviewGrid = (plugin, rows) => {
+			const stateValue = '<div class="plugin-state-value"><span>' + escapeHtml(plugin.state) + '</span><label class="switch" title="' + escapeHtml(labels.pluginsToggle) + '"><input type="checkbox" data-toggle-plugin-spec="' + escapeHtml(plugin.pluginSpec) + '" ' + (plugin.state === 'Enabled' ? 'checked' : '') + ' /><span></span></label></div>';
+			return '<div class="hook-entry-detail-grid"><div class="hook-entry-detail-label">' + escapeHtml(labels.pluginsState) + '</div><div>' + stateValue + '</div>' + rows.map((row) => '<div class="hook-entry-detail-label">' + escapeHtml(String(row[0])) + '</div><div>' + escapeHtml(String(row[1])) + '</div>').join('') + '</div>';
+		};
+
 		const renderCardActionButton = (targetPath, title) =>
 			targetPath
 				? '<div class="hook-entry-card-action"><button class="icon-button" type="button" data-open-path="' + escapeHtml(targetPath) + '" title="' + escapeHtml(title) + '" aria-label="' + escapeHtml(title) + '"><span class="codicon codicon-file-text" aria-hidden="true"></span></button></div>'
@@ -936,7 +960,6 @@ function buildHistoryWebviewHtml(
 			const plugin = plugins.find((entry) => entry.id === selectedPluginId) || plugins[0];
 			const overviewRows = [
 				[labels.pluginsDescription, plugin.description],
-				[labels.pluginsState, plugin.state],
 				[labels.pluginsInstallKind, plugin.installKind],
 				[labels.pluginsVersion, plugin.version],
 				[labels.pluginsAuthor, plugin.author],
@@ -971,7 +994,7 @@ function buildHistoryWebviewHtml(
 				? plugin.diagnostics.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.message, plugin.manifestPath || plugin.pluginRoot, 'warning') + renderTwoColumnGrid([['Severity', entry.severity]]) + '</article>').join('')
 				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
 			pluginsPreview.innerHTML = '<div class="hook-entry-list">'
-				+ renderPluginOverviewBlock(renderTwoColumnGrid(overviewRows))
+				+ renderPluginOverviewBlock(renderPluginOverviewGrid(plugin, overviewRows))
 				+ renderPluginBlock(labels.pluginsAgents, 'hubot', agentItems, plugin.agents.length, false)
 				+ renderPluginBlock(labels.pluginsSkills, 'agent', skillItems, plugin.skills.length, false)
 				+ renderPluginBlock(labels.pluginsCommands, 'terminal', commandItems, plugin.commands.length, false)
@@ -1161,6 +1184,14 @@ export class HistoryPanelManager implements vscode.Disposable {
 			void this.removeTrustedDirectory(incoming.sourcePath, incoming.targetPath);
 			return;
 		}
+		if (
+			incoming.type === 'togglePluginEnabled' &&
+			typeof incoming.pluginSpec === 'string' &&
+			typeof incoming.enabled === 'boolean'
+		) {
+			void this.togglePluginEnabled(incoming.pluginSpec, incoming.enabled);
+			return;
+		}
 		if (incoming.type === 'openPath' && typeof incoming.targetPath === 'string') {
 			void this.openPath(incoming.targetPath);
 			return;
@@ -1334,6 +1365,12 @@ export class HistoryPanelManager implements vscode.Disposable {
 		removeTrustedDirectory(sourcePath, targetPath);
 		vscode.window.showInformationMessage(messages.mcpToggleUpdated);
 		this.refreshTab('trusted');
+	}
+
+	private async togglePluginEnabled(pluginSpec: string, enabled: boolean): Promise<void> {
+		setPluginEnabled(resolveCopilotPaths().configPath, pluginSpec, enabled);
+		await vscode.window.showInformationMessage(messages.pluginToggleUpdated);
+		this.refreshTab('plugins');
 	}
 
 	private async openPath(targetPath: string): Promise<void> {

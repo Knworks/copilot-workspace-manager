@@ -2,11 +2,12 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import * as vscode from 'vscode';
+import { InstalledPluginDescriptor, listInstalledPluginsFromConfig } from './pluginConfigService';
 import { readSkillMetadata } from './skillConfigService';
 import { resolveCopilotPaths } from './workspaceStatus';
 
 export type PluginInstallKind = 'Marketplace' | 'Direct' | 'Unknown';
-export type PluginState = 'Enabled' | 'Unknown';
+export type PluginState = 'Enabled' | 'Disabled' | 'Unknown';
 export type PluginComponentStatus = 'Readonly' | 'Conflict' | 'Overridden';
 export type PluginDiagnosticSeverity = 'info' | 'warning' | 'error';
 
@@ -66,6 +67,7 @@ export type PluginDiagnosticRecord = {
 
 export type PluginRecord = {
 	id: string;
+	pluginSpec: string;
 	name: string;
 	description: string;
 	version: string;
@@ -109,24 +111,11 @@ type PluginManifestShape = {
 	lspServers?: unknown;
 };
 
-type PluginRootCandidate = {
-	pluginRoot: string;
-	installKind: PluginInstallKind;
-	state: PluginState;
-};
-
 type ComponentSource = {
 	relativeSource: string;
 	fullPath?: string;
 	inlineValue?: Record<string, unknown>;
 };
-
-const PLUGIN_MANIFEST_CANDIDATES = [
-	path.join('.plugin', 'plugin.json'),
-	'plugin.json',
-	path.join('.github', 'plugin', 'plugin.json'),
-	path.join('.claude-plugin', 'plugin.json'),
-];
 
 const DEFAULT_HOOK_CANDIDATES = ['hooks.json', path.join('hooks', 'hooks.json')];
 const DEFAULT_MCP_CANDIDATES = ['.mcp.json', path.join('.github', 'mcp.json')];
@@ -140,8 +129,8 @@ export function listPluginDiagnostics(
 	homeDir: string = os.homedir(),
 	workspaceRoot: string | undefined = getWorkspaceRoot(),
 ): PluginRecord[] {
-	const { copilotDir, mcpConfigPath } = resolveCopilotPaths(homeDir);
-	const pluginRoots = collectPluginRoots(copilotDir);
+	const { configPath, mcpConfigPath } = resolveCopilotPaths(homeDir);
+	const pluginRoots = collectPluginRoots(configPath);
 	const agentConflicts = collectExistingAgentIds(homeDir, workspaceRoot);
 	const skillConflicts = collectExistingSkillNames(homeDir, workspaceRoot);
 	const mcpConflicts = collectExistingMcpIds(mcpConfigPath, workspaceRoot);
@@ -153,95 +142,18 @@ export function listPluginDiagnostics(
 		);
 }
 
-function collectPluginRoots(copilotDir: string): PluginRootCandidate[] {
-	const candidates: PluginRootCandidate[] = [];
-	const primaryRoot = path.join(copilotDir, 'installed-plugins');
-	const fallbackRoot = path.join(copilotDir, 'state', 'installed-plugins');
-	candidates.push(...scanPluginRoots(primaryRoot, false));
-	candidates.push(...scanPluginRoots(fallbackRoot, true));
-	return dedupePluginRoots(candidates);
-}
-
-function scanPluginRoots(rootPath: string, isFallback: boolean): PluginRootCandidate[] {
-	if (!fs.existsSync(rootPath) || !fs.statSync(rootPath).isDirectory()) {
-		return [];
-	}
-	const results: PluginRootCandidate[] = [];
-	for (const entry of fs.readdirSync(rootPath, { withFileTypes: true })) {
-		if (!entry.isDirectory()) {
-			continue;
-		}
-		const fullPath = path.join(rootPath, entry.name);
-		if (entry.name === '_direct') {
-			for (const child of fs.readdirSync(fullPath, { withFileTypes: true })) {
-				if (!child.isDirectory()) {
-					continue;
-				}
-				results.push({
-					pluginRoot: path.join(fullPath, child.name),
-					installKind: 'Direct',
-					state: isFallback ? 'Unknown' : 'Enabled',
-				});
-			}
-			continue;
-		}
-		if (containsManifestCandidate(fullPath)) {
-			results.push({
-				pluginRoot: fullPath,
-				installKind: isFallback ? 'Unknown' : 'Direct',
-				state: isFallback ? 'Unknown' : 'Enabled',
-			});
-			continue;
-		}
-		let addedChild = false;
-		for (const child of fs.readdirSync(fullPath, { withFileTypes: true })) {
-			if (!child.isDirectory()) {
-				continue;
-			}
-			addedChild = true;
-			results.push({
-				pluginRoot: path.join(fullPath, child.name),
-				installKind: 'Marketplace',
-				state: isFallback ? 'Unknown' : 'Enabled',
-			});
-		}
-		if (isFallback && !addedChild) {
-			results.push({
-				pluginRoot: fullPath,
-				installKind: 'Unknown',
-				state: 'Unknown',
-			});
-		}
-	}
-	return results;
-}
-
-function dedupePluginRoots(candidates: PluginRootCandidate[]): PluginRootCandidate[] {
-	const seen = new Set<string>();
-	return candidates.filter((candidate) => {
-		const key = path.resolve(candidate.pluginRoot).toLowerCase();
-		if (seen.has(key)) {
-			return false;
-		}
-		seen.add(key);
-		return true;
-	});
-}
-
-function containsManifestCandidate(pluginRoot: string): boolean {
-	return PLUGIN_MANIFEST_CANDIDATES.some((relativePath) =>
-		fs.existsSync(path.join(pluginRoot, relativePath)),
-	);
+function collectPluginRoots(configPath: string): InstalledPluginDescriptor[] {
+	return listInstalledPluginsFromConfig(configPath);
 }
 
 function readPluginRecord(
-	candidate: PluginRootCandidate,
+	candidate: InstalledPluginDescriptor,
 	agentConflicts: Set<string>,
 	skillConflicts: Set<string>,
 	mcpConflicts: Set<string>,
 ): PluginRecord {
 	const diagnostics: PluginDiagnosticRecord[] = [];
-	const manifestPath = resolvePluginManifestPath(candidate.pluginRoot);
+	const manifestPath = candidate.manifestPath;
 	if (!manifestPath) {
 		diagnostics.push({ severity: 'error', message: 'Manifest not found' });
 		return buildPluginRecord(candidate, diagnostics, undefined, undefined, agentConflicts, skillConflicts, mcpConflicts);
@@ -260,7 +172,7 @@ function readPluginRecord(
 }
 
 function buildPluginRecord(
-	candidate: PluginRootCandidate,
+	candidate: InstalledPluginDescriptor,
 	diagnostics: PluginDiagnosticRecord[],
 	manifestPath: string | undefined,
 	manifest: PluginManifestShape | undefined,
@@ -305,6 +217,7 @@ function buildPluginRecord(
 	}
 	return {
 		id: candidate.pluginRoot,
+		pluginSpec: candidate.pluginSpec,
 		name,
 		description: readNonEmptyString(manifest?.description) ?? '',
 		version: readNonEmptyString(manifest?.version) ?? '',
@@ -315,7 +228,7 @@ function buildPluginRecord(
 		keywords: readStringArray(manifest?.keywords),
 		category: readNonEmptyString(manifest?.category) ?? '',
 		tags: readStringArray(manifest?.tags),
-		state: candidate.state,
+		state: candidate.enabled ? 'Enabled' : 'Disabled',
 		installKind: candidate.installKind,
 		pluginRoot: candidate.pluginRoot,
 		manifestPath,
@@ -328,16 +241,6 @@ function buildPluginRecord(
 		lspServers,
 		diagnostics: dedupeDiagnostics(diagnostics),
 	};
-}
-
-function resolvePluginManifestPath(pluginRoot: string): string | undefined {
-	for (const relativePath of PLUGIN_MANIFEST_CANDIDATES) {
-		const fullPath = path.join(pluginRoot, relativePath);
-		if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
-			return fullPath;
-		}
-	}
-	return undefined;
 }
 
 function readPluginAgents(

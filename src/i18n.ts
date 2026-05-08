@@ -626,6 +626,11 @@ export const messages = {
 	pluginsLspServers: localize('message.pluginsLspServers', 'LSP Servers'),
 	pluginsDiagnostics: localize('message.pluginsDiagnostics', 'Diagnostics'),
 	pluginsState: localize('message.pluginsState', 'State'),
+	pluginsToggle: localize('message.pluginsToggle', 'Enable plugin'),
+	pluginToggleUpdated: localize(
+		'message.plugin.toggleUpdated',
+		'Plugin settings updated. Please restart GitHub Copilot CLI to apply changes.',
+	),
 	pluginsInstallKind: localize('message.pluginsInstallKind', 'Install kind'),
 	pluginsPluginRoot: localize('message.pluginsPluginRoot', 'Plugin root'),
 	pluginsManifestPath: localize('message.pluginsManifestPath', 'Manifest'),

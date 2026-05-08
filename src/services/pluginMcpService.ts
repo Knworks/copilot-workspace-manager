@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { listInstalledPluginsFromConfig } from './pluginConfigService';
 
 export type PluginMcpDefinition = {
 	id: string;
@@ -20,18 +21,14 @@ const DEFAULT_PLUGIN_MCP_CANDIDATES = [
 	'mcp-config.json',
 ];
 
-export function listPluginMcpDefinitions(pluginsRoot: string): PluginMcpDefinition[] {
-	if (!fs.existsSync(pluginsRoot)) {
-		return [];
-	}
-
-	const manifestPaths = findPluginManifests(pluginsRoot);
-	return manifestPaths.flatMap((manifestPath) => readPluginMcpDefinitions(manifestPath));
+export function listPluginMcpDefinitions(configPath: string): PluginMcpDefinition[] {
+	return listInstalledPluginsFromConfig(configPath).flatMap((plugin) =>
+		plugin.manifestPath ? readPluginMcpDefinitions(plugin.pluginRoot, plugin.manifestPath) : [],
+	);
 }
 
-function readPluginMcpDefinitions(manifestPath: string): PluginMcpDefinition[] {
+function readPluginMcpDefinitions(pluginRoot: string, manifestPath: string): PluginMcpDefinition[] {
 	try {
-		const pluginRoot = path.dirname(manifestPath);
 		const parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as PluginManifestShape;
 		const pluginName = typeof parsed.name === 'string' && parsed.name.trim()
 			? parsed.name.trim()
@@ -94,20 +91,4 @@ function toPluginDefinitions(
 			pluginRoot,
 			value: value as Record<string, unknown>,
 		}));
-}
-
-function findPluginManifests(currentPath: string): string[] {
-	const results: string[] = [];
-	for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
-		const fullPath = path.join(currentPath, entry.name);
-		if (entry.isFile() && entry.name === 'plugin.json') {
-			results.push(fullPath);
-			continue;
-		}
-		if (!entry.isDirectory()) {
-			continue;
-		}
-		results.push(...findPluginManifests(fullPath));
-	}
-	return results;
 }

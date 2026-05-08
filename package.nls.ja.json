@@ -251,6 +251,8 @@
   "message.pluginsLspServers": "LSP Servers",
   "message.pluginsDiagnostics": "Diagnostics",
   "message.pluginsState": "状態",
+  "message.pluginsToggle": "Pluginを有効化",
+  "message.plugin.toggleUpdated": "Plugin設定を更新しました。変更を反映するには GitHub Copilot CLI を再起動してください。",
   "message.pluginsInstallKind": "インストール種別",
   "message.pluginsPluginRoot": "Pluginルート",
   "message.pluginsManifestPath": "Manifest",

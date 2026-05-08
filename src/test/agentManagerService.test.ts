@@ -128,6 +128,7 @@ suite('Agent manager service', () => {
 			const agentsDir = path.join(root, '.copilot', 'installed-plugins', 'plugin', 'agents');
 			fs.mkdirSync(agentsDir, { recursive: true });
 			fs.writeFileSync(path.join(agentsDir, 'plugin.agent.md'), '---\nname: plugin\n---\n', 'utf8');
+			fs.writeFileSync(path.join(agentsDir, 'database-admin.md'), '---\nname: database-admin\n---\n', 'utf8');
 			const location: AgentLocation = {
 				kind: 'plugin',
 				label: 'Plugin Agents',
@@ -137,8 +138,9 @@ suite('Agent manager service', () => {
 
 			const records = listAgentManagerRecords('', [location]);
 
-			assert.strictEqual(records.length, 1);
+			assert.strictEqual(records.length, 2);
 			assert.strictEqual(records[0].readonly, true);
+			assert.ok(records.some((record) => record.agentPath.endsWith('database-admin.md')));
 		});
 	});
 

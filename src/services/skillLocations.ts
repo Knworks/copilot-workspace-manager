@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import * as vscode from 'vscode';
+import { listInstalledPluginsFromConfig, resolvePluginManifestPath } from './pluginConfigService';
 import { resolveCopilotPaths } from './workspaceStatus';
 
 export type SkillLocationKind = 'project' | 'user' | 'plugin';
@@ -25,7 +26,7 @@ export function getSkillLocations(
 	homeDir: string = os.homedir(),
 	projectRoot: string | undefined = getProjectRoot(),
 ): SkillLocation[] {
-	const { copilotDir } = resolveCopilotPaths(homeDir);
+	const { copilotDir, configPath } = resolveCopilotPaths(homeDir);
 	const locations: SkillLocation[] = [];
 	if (projectRoot) {
 		for (const rootPath of [
@@ -55,7 +56,7 @@ export function getSkillLocations(
 			priority: 2,
 		});
 	}
-	for (const rootPath of collectPluginSkillRoots(path.join(copilotDir, 'installed-plugins'))) {
+	for (const rootPath of collectPluginSkillRoots(configPath)) {
 		locations.push({
 			kind: 'plugin',
 			label: 'Plugin Skills',
@@ -86,18 +87,20 @@ export function findSkillLocationForPath(
 	});
 }
 
-function collectPluginSkillRoots(pluginsRoot: string): string[] {
-	if (!fs.existsSync(pluginsRoot)) {
-		return [];
-	}
-	const manifestPaths = findPluginManifests(pluginsRoot);
-	return manifestPaths.flatMap((manifestPath) => resolvePluginSkillRoots(path.dirname(manifestPath)));
+function collectPluginSkillRoots(configPath: string): string[] {
+	return listInstalledPluginsFromConfig(configPath).flatMap((plugin) =>
+		resolvePluginSkillRoots(plugin.pluginRoot),
+	);
 }
 
 function resolvePluginSkillRoots(pluginRoot: string): string[] {
 	const defaultRoot = path.join(pluginRoot, 'skills');
 	try {
-		const parsed = JSON.parse(fs.readFileSync(path.join(pluginRoot, 'plugin.json'), 'utf8')) as { skills?: unknown };
+		const manifestPath = resolvePluginManifestPath(pluginRoot);
+		if (!manifestPath) {
+			return [];
+		}
+		const parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as { skills?: unknown };
 		const configuredRoots = normalizePluginSkillPaths(parsed.skills).map((skillPath) =>
 			path.resolve(pluginRoot, skillPath),
 		);
@@ -108,22 +111,6 @@ function resolvePluginSkillRoots(pluginRoot: string): string[] {
 	} catch {
 		return [];
 	}
-}
-
-function findPluginManifests(currentPath: string): string[] {
-	const results: string[] = [];
-	for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
-		const fullPath = path.join(currentPath, entry.name);
-		if (entry.isFile() && entry.name === 'plugin.json') {
-			results.push(fullPath);
-			continue;
-		}
-		if (!entry.isDirectory()) {
-			continue;
-		}
-		results.push(...findPluginManifests(fullPath));
-	}
-	return results;
 }
 
 function normalizePluginSkillPaths(value: unknown): string[] {
