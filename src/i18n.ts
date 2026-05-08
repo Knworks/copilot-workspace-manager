@@ -841,7 +841,7 @@ export const messages = {
 	hooksWarningMergedSources: (layer: string) =>
 		localize(
 			'message.hooksWarningMergedSources',
-			'{0} layer has both hooks.json and inline hooks. Codex merges them and warns at startup.',
+			'{0} layer has both hooks.json and inline hooks. GitHub Copilot CLI merges them and warns at startup.',
 			layer,
 		),
 	hooksWarningFeatureDisabled: localize(
@@ -854,7 +854,7 @@ export const messages = {
 	),
 	hooksWarningUnsupportedHandler: localize(
 		'message.hooksWarningUnsupportedHandler',
-		'Only command hook handlers are currently executed by Codex.',
+		'Only command hook handlers are currently executed by GitHub Copilot CLI.',
 	),
 	trustedDirectoryDeleteConfirm: (targetPath: string) =>
 		localize(
@@ -922,10 +922,6 @@ export const messages = {
 	historyRawEventsHelp: localize(
 		'message.historyRawEventsHelp',
 		'Shown only as fallback details when parsing was incomplete.',
-	),
-	helloWorld: localize(
-		'message.helloWorld',
-		'Hello World from Copilot Workspace Manager!',
 	),
 	dialogOk: localize('message.dialogOk', 'OK'),
 	file: {
@@ -1090,7 +1086,7 @@ export const messages = {
 			),
 		toggleUpdated: localize(
 			'message.agent.toggleUpdated',
-			'Agent settings updated. Please restart Codex to apply changes.',
+			'Agent settings updated. Please restart GitHub Copilot CLI to apply changes.',
 		),
 		frontmatterManaged: localize(
 			'message.agent.frontmatterManaged',

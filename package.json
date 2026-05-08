@@ -77,10 +77,6 @@
     },
     "commands": [
       {
-        "command": "copilot-workspace-manager.helloWorld",
-        "title": "%command.helloWorld%"
-      },
-      {
         "command": "copilot-workspace-manager.openFile",
         "title": "%command.openFile%"
       },

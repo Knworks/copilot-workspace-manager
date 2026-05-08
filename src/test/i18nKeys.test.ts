@@ -20,7 +20,6 @@ suite('Localization keys', () => {
 			'message.selectionRequired',
 			'message.unavailablePrefix',
 			'message.unavailableUnknown',
-			'message.reason.codexMissing',
 			'message.reason.configMissing',
 			'message.reason.configUnreadable',
 			'message.reason.configInvalid',
@@ -344,7 +343,6 @@ suite('Localization keys', () => {
 			'message.agent.userAgentsDeleteWarning',
 			'message.agent.selectionNotSupported',
 			'message.selectionNotSupported',
-			'message.helloWorld',
 		];
 
 		for (const key of keys) {
