@@ -117,6 +117,13 @@ suite('History panel manager', () => {
 		assert.ok(fakePanel.panel.webview.html.includes('agents_dark.png'));
 		assert.ok(fakePanel.panel.webview.html.includes('addInstructionFile'));
 		assert.ok(fakePanel.panel.webview.html.includes('codicon-plug'));
+		assert.ok(fakePanel.panel.webview.html.includes('plugin-block-summary'));
+		assert.ok(fakePanel.panel.webview.html.includes('codicon-hubot'));
+		assert.ok(fakePanel.panel.webview.html.includes('codicon-agent'));
+		assert.ok(fakePanel.panel.webview.html.includes('codicon-tools'));
+		assert.ok(fakePanel.panel.webview.html.includes('codicon-mcp'));
+		assert.ok(fakePanel.panel.webview.html.includes('codicon-terminal'));
+		assert.ok(fakePanel.panel.webview.html.includes('codicon-warning'));
 		assert.ok(!fakePanel.panel.webview.html.includes('chainDetailsToggle'));
 		assert.ok(!fakePanel.panel.webview.html.includes('featuresTab'));
 		manager.dispose();

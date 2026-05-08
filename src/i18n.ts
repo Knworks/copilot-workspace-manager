@@ -618,11 +618,6 @@ export const messages = {
 		'message.pluginsEmpty',
 		'No installed plugins were found.',
 	),
-	pluginsOverview: localize('message.pluginsOverview', 'Plugin Overview'),
-	pluginsFeatureSummary: localize(
-		'message.pluginsFeatureSummary',
-		'Feature Summary',
-	),
 	pluginsAgents: localize('message.pluginsAgents', 'Agents'),
 	pluginsSkills: localize('message.pluginsSkills', 'Skills'),
 	pluginsCommands: localize('message.pluginsCommands', 'Commands'),

@@ -243,8 +243,6 @@
   "message.hooksEntriesHeading": "Hook entries",
   "message.hooksNoEntries": "No hook entries were found in the active layers.",
   "message.pluginsEmpty": "No installed plugins were found.",
-  "message.pluginsOverview": "Plugin Overview",
-  "message.pluginsFeatureSummary": "Feature Summary",
   "message.pluginsAgents": "Agents",
   "message.pluginsSkills": "Skills",
   "message.pluginsCommands": "Commands",

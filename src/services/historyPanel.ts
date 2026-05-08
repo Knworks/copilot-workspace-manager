@@ -434,8 +434,6 @@ function buildHistoryWebviewHtml(
 		hooksTimeoutLabel: messages.hooksTimeoutLabel,
 		hooksStatusMessageLabel: messages.hooksStatusMessageLabel,
 		pluginsEmpty: messages.pluginsEmpty,
-		pluginsOverview: messages.pluginsOverview,
-		pluginsFeatureSummary: messages.pluginsFeatureSummary,
 		pluginsAgents: messages.pluginsAgents,
 		pluginsSkills: messages.pluginsSkills,
 		pluginsCommands: messages.pluginsCommands,
@@ -564,7 +562,18 @@ function buildHistoryWebviewHtml(
 		.hook-entry-list { display: grid; gap: 6px; }
 		.hook-entry-card { display: grid; gap: 8px; }
 		.hook-entry-heading { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+		.hook-entry-heading-label { min-width: 0; word-break: break-word; }
 		.hook-entry-detail-grid { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; }
+		.plugin-block { padding: 0; overflow: hidden; }
+		.plugin-block-body { display: grid; gap: 8px; padding: 10px; }
+		.plugin-block-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px; cursor: pointer; list-style: none; }
+		.plugin-block-summary::-webkit-details-marker { display: none; }
+		.plugin-block-summary:hover { background: var(--vscode-list-hoverBackground); }
+		.plugin-block-summary-main { display: inline-flex; align-items: center; gap: 8px; min-width: 0; font-weight: 600; }
+		.plugin-block-summary-meta { display: inline-flex; align-items: center; gap: 8px; color: var(--vscode-descriptionForeground); font-size: 12px; white-space: nowrap; }
+		.plugin-block-summary .codicon-chevron-right { transition: transform 120ms ease; }
+		.plugin-block[open] .plugin-block-summary .codicon-chevron-right { transform: rotate(90deg); }
+		.plugin-overview-card { padding: 10px; }
 		.chain-detail-card { position: relative; display: grid; gap: 8px; padding: 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); }
 		.chain-preview-block { padding: 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editor-background); }
 		.chain-summary-warning { color: var(--vscode-editorWarning-foreground); }
@@ -890,8 +899,11 @@ function buildHistoryWebviewHtml(
 			).join('') + '</div>';
 		};
 
-		const renderPluginBlock = (title, itemsHtml, count, open) =>
-			'<details class="hook-entry-card"' + (open ? ' open' : '') + '><summary class="hook-entry-heading"><span>' + escapeHtml(title) + ' (' + count + ')</span></summary><div class="hook-entry-list">' + itemsHtml + '</div></details>';
+		const renderPluginOverviewBlock = (itemsHtml) =>
+			'<article class="hook-entry-card plugin-overview-card">' + itemsHtml + '</article>';
+
+		const renderPluginBlock = (title, icon, itemsHtml, count, open) =>
+			'<details class="hook-entry-card plugin-block"' + (open ? ' open' : '') + '><summary class="plugin-block-summary"><span class="plugin-block-summary-main"><span class="codicon codicon-' + escapeHtml(icon) + '" aria-hidden="true"></span><span class="hook-entry-heading-label">' + escapeHtml(title) + '</span></span><span class="plugin-block-summary-meta">' + escapeHtml(String(count)) + '<span class="codicon codicon-chevron-right" aria-hidden="true"></span></span></summary><div class="plugin-block-body">' + itemsHtml + '</div></details>';
 
 		const renderTwoColumnGrid = (rows) =>
 			'<div class="hook-entry-detail-grid">' + rows.map((row) => '<div class="hook-entry-detail-label">' + escapeHtml(String(row[0])) + '</div><div>' + escapeHtml(String(row[1])) + '</div>').join('') + '</div>';
@@ -925,14 +937,6 @@ function buildHistoryWebviewHtml(
 				[labels.pluginsPluginRoot, plugin.pluginRoot],
 				[labels.pluginsManifestPath, plugin.manifestPath || ''],
 			].filter((row) => row[1]);
-			const summaryRows = [
-				[labels.pluginsAgents, plugin.agents.length],
-				[labels.pluginsSkills, plugin.skills.length],
-				[labels.pluginsCommands, plugin.commands.length],
-				[labels.pluginsHooks, plugin.hooks.length],
-				[labels.pluginsMcpServers, plugin.mcpServers.length],
-				[labels.pluginsLspServers, plugin.lspServers.length],
-			];
 			const agentItems = plugin.agents.length
 				? plugin.agents.map((entry) => '<article class="hook-entry-card"><div class="hook-entry-heading"><span>' + escapeHtml(entry.id) + '</span></div>' + renderTwoColumnGrid([[labels.pluginsDescription, entry.description || labels.pluginsNone], [labels.pluginsPath, entry.relativePath], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
 				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
@@ -955,15 +959,14 @@ function buildHistoryWebviewHtml(
 				? plugin.diagnostics.map((entry) => '<article class="hook-entry-card"><div class="hook-entry-heading"><span>' + escapeHtml(entry.message) + '</span></div>' + renderTwoColumnGrid([['Severity', entry.severity]]) + '</article>').join('')
 				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
 			pluginsPreview.innerHTML = '<div class="hook-entry-list">'
-				+ renderPluginBlock(labels.pluginsOverview, renderTwoColumnGrid(overviewRows), overviewRows.length, true)
-				+ renderPluginBlock(labels.pluginsFeatureSummary, renderTwoColumnGrid(summaryRows), summaryRows.length, true)
-				+ renderPluginBlock(labels.pluginsAgents, agentItems, plugin.agents.length, plugin.agents.length > 0)
-				+ renderPluginBlock(labels.pluginsSkills, skillItems, plugin.skills.length, plugin.skills.length > 0)
-				+ renderPluginBlock(labels.pluginsCommands, commandItems, plugin.commands.length, plugin.commands.length > 0)
-				+ renderPluginBlock(labels.pluginsHooks, hookItems, plugin.hooks.length, false)
-				+ renderPluginBlock(labels.pluginsMcpServers, mcpItems, plugin.mcpServers.length, plugin.mcpServers.length > 0)
-				+ renderPluginBlock(labels.pluginsLspServers, lspItems, plugin.lspServers.length, false)
-				+ renderPluginBlock(labels.pluginsDiagnostics, diagnosticItems, plugin.diagnostics.length, plugin.diagnostics.length > 0)
+				+ renderPluginOverviewBlock(renderTwoColumnGrid(overviewRows))
+				+ renderPluginBlock(labels.pluginsAgents, 'hubot', agentItems, plugin.agents.length, false)
+				+ renderPluginBlock(labels.pluginsSkills, 'agent', skillItems, plugin.skills.length, false)
+				+ renderPluginBlock(labels.pluginsCommands, 'terminal', commandItems, plugin.commands.length, false)
+				+ renderPluginBlock(labels.pluginsHooks, 'symbol-event', hookItems, plugin.hooks.length, false)
+				+ renderPluginBlock(labels.pluginsMcpServers, 'mcp', mcpItems, plugin.mcpServers.length, false)
+				+ renderPluginBlock(labels.pluginsLspServers, 'server', lspItems, plugin.lspServers.length, false)
+				+ renderPluginBlock(labels.pluginsDiagnostics, 'warning', diagnosticItems, plugin.diagnostics.length, false)
 				+ '</div>';
 		};
 

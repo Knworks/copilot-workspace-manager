@@ -243,8 +243,6 @@
   "message.hooksEntriesHeading": "Hook entries",
   "message.hooksNoEntries": "有効レイヤーに hook entry がありません。",
   "message.pluginsEmpty": "インストール済み Plugin は見つかりませんでした。",
-  "message.pluginsOverview": "Plugin概要",
-  "message.pluginsFeatureSummary": "提供機能サマリー",
   "message.pluginsAgents": "Agents",
   "message.pluginsSkills": "Skills",
   "message.pluginsCommands": "Commands",

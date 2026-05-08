@@ -196,8 +196,6 @@ suite('Localization keys', () => {
 			'message.hooksEntriesHeading',
 			'message.hooksNoEntries',
 			'message.pluginsEmpty',
-			'message.pluginsOverview',
-			'message.pluginsFeatureSummary',
 			'message.pluginsAgents',
 			'message.pluginsSkills',
 			'message.pluginsCommands',
