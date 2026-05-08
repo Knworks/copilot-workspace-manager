@@ -156,6 +156,31 @@ suite('History service', () => {
 		});
 	});
 
+	test('buildHistoryIndex skips skill-context wrapper messages', () => {
+		withTempDir((root) => {
+			const copilotHome = path.join(root, '.copilot');
+			const sessionsRoot = resolveSessionsRoot(copilotHome);
+			writeJsonl(path.join(sessionsRoot, 'session-skill-context', 'events.jsonl'), [
+				{
+					type: 'user.message',
+					timestamp: '2026-05-06T11:00:00.000Z',
+					data: {
+						content: '<skill-context name="tool-serena">\n\nBase directory for this skill: C:\\Users\\Kaz\\.copilot\\skills\\tool-serena\n</skill-context>',
+					},
+				},
+				{
+					type: 'user.message',
+					timestamp: '2026-05-06T11:01:00.000Z',
+					data: { content: 'real question' },
+				},
+			]);
+
+			const index = buildHistoryIndex(copilotHome);
+
+			assert.deepStrictEqual(index.turns.map((turn) => turn.userMessage), ['real question']);
+		});
+	});
+
 	test('buildHistoryIndex ignores logs directory under session-state', () => {
 		withTempDir((root) => {
 			const copilotHome = path.join(root, '.copilot');

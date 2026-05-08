@@ -181,6 +181,9 @@ function isDisplayableUserMessage(message: string): boolean {
 	if (!trimmed) {
 		return false;
 	}
+	if (/^<skill-context\b[\s\S]*<\/skill-context>$/i.test(trimmed)) {
+		return false;
+	}
 	return !/^\/[A-Za-z0-9-]+$/.test(trimmed);
 }
 
