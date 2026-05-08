@@ -380,5 +380,5 @@
   "message.agent.locationPickPlaceholder": "Select an Agent location.",
   "message.agent.userAgentsDeleteWarning": "Deleting User Agents may affect other projects.",
   "message.agent.selectionNotSupported": "Select an agent file in the Agents view.",
-  "message.selectionNotSupported": "Select a target in prompts, skills, or templates.",
+  "message.selectionNotSupported": "Select a target in prompts, skills, or templates."
 }
