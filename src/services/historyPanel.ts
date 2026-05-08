@@ -433,6 +433,7 @@ function buildHistoryWebviewHtml(
 		hooksPromptLabel: messages.hooksPromptLabel,
 		hooksTimeoutLabel: messages.hooksTimeoutLabel,
 		hooksStatusMessageLabel: messages.hooksStatusMessageLabel,
+		open: messages.agentManagerOpen,
 		pluginsEmpty: messages.pluginsEmpty,
 		pluginsAgents: messages.pluginsAgents,
 		pluginsSkills: messages.pluginsSkills,
@@ -552,17 +553,20 @@ function buildHistoryWebviewHtml(
 		.trusted-title { font-weight: 600; }
 		.trusted-path { color: var(--vscode-descriptionForeground); font-size: 12px; word-break: break-all; }
 		.trusted-actions { display: flex; align-items: center; gap: 10px; }
-		.hook-source-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); cursor: pointer; }
+		.hook-source-row { width: 100%; display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editorWidget-background); color: var(--vscode-foreground); font: inherit; text-align: left; cursor: pointer; }
 		.hook-source-row.active { border-color: var(--vscode-focusBorder); background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
 		.hook-source-main { display: grid; gap: 4px; min-width: 0; }
 		.hook-source-title { font-weight: 600; }
 		.hook-source-path, .hook-source-meta, .hook-entry-meta, .hook-entry-detail-label { color: var(--vscode-descriptionForeground); font-size: 12px; }
+		.hook-source-row.active .hook-source-path, .hook-source-row.active .hook-source-meta { color: inherit; opacity: 0.85; }
 		.hook-source-path { word-break: break-all; }
 		.hook-source-actions { display: flex; align-items: center; gap: 10px; }
 		.hook-entry-list { display: grid; gap: 6px; }
 		.hook-entry-card { display: grid; gap: 8px; }
-		.hook-entry-heading { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+		.hook-entry-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+		.hook-entry-heading-main { display: inline-flex; align-items: center; gap: 8px; min-width: 0; font-weight: 600; }
 		.hook-entry-heading-label { min-width: 0; word-break: break-word; }
+		.hook-entry-card-action { display: flex; align-items: center; flex-shrink: 0; }
 		.hook-entry-detail-grid { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; }
 		.plugin-block { padding: 0; overflow: hidden; }
 		.plugin-block-body { display: grid; gap: 8px; padding: 10px; }
@@ -908,6 +912,14 @@ function buildHistoryWebviewHtml(
 		const renderTwoColumnGrid = (rows) =>
 			'<div class="hook-entry-detail-grid">' + rows.map((row) => '<div class="hook-entry-detail-label">' + escapeHtml(String(row[0])) + '</div><div>' + escapeHtml(String(row[1])) + '</div>').join('') + '</div>';
 
+		const renderCardActionButton = (targetPath, title) =>
+			targetPath
+				? '<div class="hook-entry-card-action"><button class="icon-button" type="button" data-open-path="' + escapeHtml(targetPath) + '" title="' + escapeHtml(title) + '" aria-label="' + escapeHtml(title) + '"><span class="codicon codicon-file-text" aria-hidden="true"></span></button></div>'
+				: '';
+
+		const renderCardHeading = (title, openPath, icon) =>
+			'<div class="hook-entry-heading"><div class="hook-entry-heading-main">' + (icon ? '<span class="codicon codicon-' + escapeHtml(icon) + '" aria-hidden="true"></span>' : '') + '<span class="hook-entry-heading-label">' + escapeHtml(title) + '</span></div>' + renderCardActionButton(openPath, labels.open) + '</div>';
+
 		const renderPlugins = () => {
 			const plugins = pluginsPayload.plugins || [];
 			if (plugins.length === 0) {
@@ -938,25 +950,25 @@ function buildHistoryWebviewHtml(
 				[labels.pluginsManifestPath, plugin.manifestPath || ''],
 			].filter((row) => row[1]);
 			const agentItems = plugin.agents.length
-				? plugin.agents.map((entry) => '<article class="hook-entry-card"><div class="hook-entry-heading"><span>' + escapeHtml(entry.id) + '</span></div>' + renderTwoColumnGrid([[labels.pluginsDescription, entry.description || labels.pluginsNone], [labels.pluginsPath, entry.relativePath], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				? plugin.agents.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.id, entry.fullPath, 'hubot') + renderTwoColumnGrid([[labels.pluginsDescription, entry.description || labels.pluginsNone], [labels.pluginsPath, entry.relativePath], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
 				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
 			const skillItems = plugin.skills.length
-				? plugin.skills.map((entry) => '<article class="hook-entry-card"><div class="hook-entry-heading"><span>' + escapeHtml(entry.name) + '</span></div>' + renderTwoColumnGrid([[labels.pluginsDescription, entry.description || labels.pluginsNone], [labels.pluginsPath, entry.relativePath], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				? plugin.skills.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.name, entry.fullPath, 'agent') + renderTwoColumnGrid([[labels.pluginsDescription, entry.description || labels.pluginsNone], [labels.pluginsPath, entry.relativePath], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
 				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
 			const commandItems = plugin.commands.length
-				? plugin.commands.map((entry) => '<article class="hook-entry-card"><div class="hook-entry-heading"><span>' + escapeHtml(entry.name) + '</span></div>' + renderTwoColumnGrid([[labels.pluginsDescription, entry.description || labels.pluginsNone], [labels.pluginsPath, entry.relativePath], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				? plugin.commands.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.name, entry.fullPath, 'terminal') + renderTwoColumnGrid([[labels.pluginsDescription, entry.description || labels.pluginsNone], [labels.pluginsPath, entry.relativePath], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
 				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
 			const hookItems = plugin.hooks.length
-				? plugin.hooks.map((entry) => '<article class="hook-entry-card"><div class="hook-entry-heading"><span>' + escapeHtml(entry.event) + '</span></div>' + renderTwoColumnGrid([[labels.pluginsCount, entry.count], [labels.pluginsSource, entry.source], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				? plugin.hooks.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.event, entry.sourcePath || plugin.manifestPath || plugin.pluginRoot, 'symbol-event') + renderTwoColumnGrid([[labels.pluginsCount, entry.count], [labels.pluginsSource, entry.source], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
 				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
 			const mcpItems = plugin.mcpServers.length
-				? plugin.mcpServers.map((entry) => '<article class="hook-entry-card"><div class="hook-entry-heading"><span>' + escapeHtml(entry.id) + '</span></div>' + renderTwoColumnGrid([['type', entry.type], ['tools', entry.tools], [labels.pluginsSource, entry.source], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				? plugin.mcpServers.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.id, entry.sourcePath || plugin.manifestPath || plugin.pluginRoot, 'mcp') + renderTwoColumnGrid([['type', entry.type], ['tools', entry.tools], [labels.pluginsSource, entry.source], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
 				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
 			const lspItems = plugin.lspServers.length
-				? plugin.lspServers.map((entry) => '<article class="hook-entry-card"><div class="hook-entry-heading"><span>' + escapeHtml(entry.id) + '</span></div>' + renderTwoColumnGrid([[labels.pluginsSource, entry.source], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
+				? plugin.lspServers.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.id, entry.sourcePath || plugin.manifestPath || plugin.pluginRoot, 'server') + renderTwoColumnGrid([[labels.pluginsSource, entry.source], [labels.pluginsStatus, entry.status]]) + '</article>').join('')
 				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
 			const diagnosticItems = plugin.diagnostics.length
-				? plugin.diagnostics.map((entry) => '<article class="hook-entry-card"><div class="hook-entry-heading"><span>' + escapeHtml(entry.message) + '</span></div>' + renderTwoColumnGrid([['Severity', entry.severity]]) + '</article>').join('')
+				? plugin.diagnostics.map((entry) => '<article class="hook-entry-card">' + renderCardHeading(entry.message, plugin.manifestPath || plugin.pluginRoot, 'warning') + renderTwoColumnGrid([['Severity', entry.severity]]) + '</article>').join('')
 				: '<div class="preview-empty">' + escapeHtml(labels.pluginsNone) + '</div>';
 			pluginsPreview.innerHTML = '<div class="hook-entry-list">'
 				+ renderPluginOverviewBlock(renderTwoColumnGrid(overviewRows))

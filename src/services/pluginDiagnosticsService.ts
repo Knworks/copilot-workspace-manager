@@ -15,6 +15,7 @@ export type PluginAgentRecord = {
 	name: string;
 	description: string;
 	relativePath: string;
+	fullPath: string;
 	status: PluginComponentStatus;
 };
 
@@ -22,6 +23,7 @@ export type PluginSkillRecord = {
 	name: string;
 	description: string;
 	relativePath: string;
+	fullPath: string;
 	status: PluginComponentStatus;
 };
 
@@ -29,6 +31,7 @@ export type PluginCommandRecord = {
 	name: string;
 	description: string;
 	relativePath: string;
+	fullPath: string;
 	status: PluginComponentStatus;
 };
 
@@ -36,6 +39,7 @@ export type PluginHookRecord = {
 	event: string;
 	count: number;
 	source: string;
+	sourcePath?: string;
 	status: PluginComponentStatus;
 };
 
@@ -44,12 +48,14 @@ export type PluginMcpRecord = {
 	type: string;
 	tools: string;
 	source: string;
+	sourcePath?: string;
 	status: PluginComponentStatus;
 };
 
 export type PluginLspRecord = {
 	id: string;
 	source: string;
+	sourcePath?: string;
 	status: PluginComponentStatus;
 };
 
@@ -354,6 +360,7 @@ function readPluginAgents(
 				name: frontmatter.name || id,
 				description: frontmatter.description || '',
 				relativePath: toRelativePath(pluginRoot, agentPath),
+				fullPath: agentPath,
 				status: conflict ? 'Conflict' : 'Readonly',
 			};
 		}),
@@ -379,6 +386,7 @@ function readPluginSkills(
 				name: skillName,
 				description: metadata.description,
 				relativePath: toRelativePath(pluginRoot, skillPath),
+				fullPath: skillPath,
 				status: conflict ? 'Conflict' : 'Readonly',
 			};
 		}),
@@ -398,6 +406,7 @@ function readPluginCommands(
 				name: path.basename(commandPath, '.md'),
 				description: frontmatter.description || '',
 				relativePath: toRelativePath(pluginRoot, commandPath),
+				fullPath: commandPath,
 				status: 'Readonly',
 			};
 		}),
@@ -424,6 +433,7 @@ function readPluginHooks(
 				event,
 				count: entries.length,
 				source: source.relativeSource,
+				sourcePath: source.fullPath,
 				status: 'Readonly' as PluginComponentStatus,
 			}];
 		});
@@ -462,6 +472,7 @@ function readPluginMcpServers(
 				type,
 				tools: formatTools(toolsValue),
 				source: source.relativeSource,
+				sourcePath: source.fullPath,
 				status: overridden ? 'Overridden' as PluginComponentStatus : 'Readonly' as PluginComponentStatus,
 			}];
 		});
@@ -486,6 +497,7 @@ function readPluginLspServers(
 				? [{
 					id,
 					source: source.relativeSource,
+					sourcePath: source.fullPath,
 					status: 'Readonly' as PluginComponentStatus,
 				}]
 				: [],
