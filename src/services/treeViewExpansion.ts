@@ -9,7 +9,7 @@ export async function expandParentFolder(
 		return;
 	}
 	if (
-		selection.kind !== 'prompts' &&
+		selection.kind !== 'commands' &&
 		selection.kind !== 'skills' &&
 		selection.kind !== 'templates'
 	) {

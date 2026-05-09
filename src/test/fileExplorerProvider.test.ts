@@ -23,7 +23,7 @@ function withTempDir(run: (root: string) => void): void {
 suite('File explorer provider', () => {
 	test('returns file children when available', () => {
 		const provider = new FileExplorerProvider(
-			'prompts',
+			'commands',
 			contextStub,
 			() => ({ isAvailable: true }),
 			'root',
@@ -43,7 +43,7 @@ suite('File explorer provider', () => {
 
 	test('returns unavailable item when not available', () => {
 		const provider = new FileExplorerProvider(
-			'prompts',
+			'commands',
 			contextStub,
 			() => ({ isAvailable: false, reason: 'missing' }),
 			'root',
@@ -53,9 +53,9 @@ suite('File explorer provider', () => {
 		assert.strictEqual(items[0].label, getUnavailableLabel('missing'));
 	});
 
-	test('returns prompts empty item when no entries exist', () => {
+	test('returns commands empty item when no entries exist', () => {
 		const provider = new FileExplorerProvider(
-			'prompts',
+			'commands',
 			contextStub,
 			() => ({ isAvailable: true }),
 			'root',
@@ -68,7 +68,7 @@ suite('File explorer provider', () => {
 
 	test('prompt files use terminal icon', () => {
 		const provider = new FileExplorerProvider(
-			'prompts',
+			'commands',
 			contextStub,
 			() => ({ isAvailable: true }),
 			'root',
@@ -86,7 +86,7 @@ suite('File explorer provider', () => {
 		assert.strictEqual((children[0].iconPath as vscode.ThemeIcon).id, 'terminal');
 	});
 
-	test('prompts explorer includes plugin command locations', () => {
+	test('commands explorer includes plugin command locations', () => {
 		withTempDir((root) => {
 			const previousCopilotHome = process.env.COPILOT_HOME;
 			process.env.COPILOT_HOME = path.join(root, '.copilot');
@@ -105,7 +105,7 @@ suite('File explorer provider', () => {
 				);
 
 				const provider = new FileExplorerProvider(
-					'prompts',
+					'commands',
 					contextStub,
 					() => ({ isAvailable: true }),
 					undefined,

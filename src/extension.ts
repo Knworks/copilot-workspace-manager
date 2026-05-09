@@ -37,7 +37,7 @@ import {
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
 	const coreProvider = new CoreExplorerProvider(context);
-	const promptsProvider = new FileExplorerProvider('prompts', context);
+	const commandsProvider = new FileExplorerProvider('commands', context);
 	const skillsProvider = new FileExplorerProvider('skills', context);
 	const templatesProvider = new FileExplorerProvider('templates', context);
 	const mcpProvider = new McpExplorerProvider(context);
@@ -59,8 +59,8 @@ export function activate(context: vscode.ExtensionContext) {
 	const coreView = vscode.window.createTreeView('copilot-workspace-manager.core', {
 		treeDataProvider: coreProvider,
 	});
-	const promptsView = vscode.window.createTreeView('copilot-workspace-manager.prompts', {
-		treeDataProvider: promptsProvider,
+	const commandsView = vscode.window.createTreeView('copilot-workspace-manager.prompts', {
+		treeDataProvider: commandsProvider,
 	});
 	const skillsView = vscode.window.createTreeView('copilot-workspace-manager.skills', {
 		treeDataProvider: skillsProvider,
@@ -79,7 +79,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	const trackExpansion = (
-		kind: 'prompts' | 'skills' | 'templates',
+		kind: 'commands' | 'skills' | 'templates',
 		view: vscode.TreeView<WorkspaceTreeItem>,
 	) => [
 		view.onDidExpandElement((event) =>
@@ -92,7 +92,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const trackSelection = (
 		view: vscode.TreeView<WorkspaceTreeItem>,
-		kind?: 'prompts' | 'skills' | 'templates',
+		kind?: 'commands' | 'skills' | 'templates',
 	) =>
 		view.onDidChangeSelection((event) => {
 			selectionContext.setSelection(event.selection[0]);
@@ -105,18 +105,18 @@ export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(
 		coreView,
-		promptsView,
+		commandsView,
 		skillsView,
 		templatesView,
 		mcpView,
 		agentsView,
 		trackSelection(coreView),
-		trackSelection(promptsView, 'prompts'),
+		trackSelection(commandsView, 'commands'),
 		trackSelection(skillsView, 'skills'),
 		trackSelection(templatesView, 'templates'),
 		trackSelection(mcpView),
 		trackSelection(agentsView),
-		...trackExpansion('prompts', promptsView),
+		...trackExpansion('commands', commandsView),
 		...trackExpansion('skills', skillsView),
 		...trackExpansion('templates', templatesView),
 		coreManagerPanelManager,
@@ -185,7 +185,7 @@ export function activate(context: vscode.ExtensionContext) {
 				if (!getWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const selection = promptsView.selection[0];
+				const selection = commandsView.selection[0];
 				if (selection?.fsPath) {
 					const targetDir =
 						selection.nodeType === 'file'
@@ -452,7 +452,7 @@ export function activate(context: vscode.ExtensionContext) {
 					return;
 				}
 				coreProvider.refresh();
-				promptsProvider.refresh();
+				commandsProvider.refresh();
 				skillsProvider.refresh();
 				templatesProvider.refresh();
 				mcpProvider.refresh();
@@ -481,12 +481,12 @@ export function activate(context: vscode.ExtensionContext) {
 	registerFileCommands(context, {
 		getSelection: () => selectionContext.getSelection(),
 		providers: {
-			prompts: promptsProvider,
+			commands: commandsProvider,
 			skills: skillsProvider,
 			templates: templatesProvider,
 		},
 		views: {
-			prompts: promptsView,
+			commands: commandsView,
 			skills: skillsView,
 			templates: templatesView,
 		},

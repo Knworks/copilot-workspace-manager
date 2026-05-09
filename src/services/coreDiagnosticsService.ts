@@ -19,7 +19,7 @@ export type InstructionsChainStatus =
 	| 'invalidApplyTo'
 	| 'error';
 
-export type AgentsChainNode = {
+export type InstructionsChainNode = {
 	status: InstructionsChainStatus;
 	kind: InstructionsChainKind;
 	fileName: string;
@@ -38,14 +38,14 @@ export type TrustedDirectory = {
 	sourcePath: string;
 };
 
-export function buildAgentsLoadingChain(
+export function buildInstructionsChain(
 	workspaceRoot: string | undefined = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
 	homeDir: string = os.homedir(),
 	customInstructionsDirs: string | undefined = process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS,
 	currentFilePath: string | undefined = vscode.window.activeTextEditor?.document.uri.fsPath,
-): AgentsChainNode[] {
+): InstructionsChainNode[] {
 	const { copilotDir } = resolveCopilotPaths(homeDir);
-	const nodes: AgentsChainNode[] = [];
+	const nodes: InstructionsChainNode[] = [];
 	pushIfExists(nodes, readInstructionFile(path.join(copilotDir, 'copilot-instructions.md'), 'user'));
 	if (workspaceRoot) {
 		pushIfExists(
@@ -114,7 +114,7 @@ export function removeTrustedDirectory(settingsPath: string, projectPath: string
 	return true;
 }
 
-function pushIfExists(nodes: AgentsChainNode[], node: AgentsChainNode | undefined): void {
+function pushIfExists(nodes: InstructionsChainNode[], node: InstructionsChainNode | undefined): void {
 	if (node) {
 		nodes.push(node);
 	}
@@ -130,7 +130,7 @@ function buildInstructionTemplate(kind: 'user' | 'workspace' | 'path'): string {
 function readInstructionFile(
 	targetPath: string,
 	kind: InstructionsChainKind,
-): AgentsChainNode | undefined {
+): InstructionsChainNode | undefined {
 	if (!fs.existsSync(targetPath)) {
 		return undefined;
 	}
@@ -160,7 +160,7 @@ function readPathInstructionFile(
 	targetPath: string,
 	workspaceRoot: string,
 	currentFilePath: string | undefined,
-): AgentsChainNode | undefined {
+): InstructionsChainNode | undefined {
 	const node = readInstructionFile(targetPath, 'path');
 	if (!node || node.status === 'error') {
 		return node;
@@ -300,7 +300,7 @@ function globToRegExp(pattern: string): RegExp {
 	return new RegExp(source);
 }
 
-function compareInstructionNodes(left: AgentsChainNode, right: AgentsChainNode): number {
+function compareInstructionNodes(left: InstructionsChainNode, right: InstructionsChainNode): number {
 	const rank = (kind: InstructionsChainKind): number => {
 		switch (kind) {
 			case 'user':

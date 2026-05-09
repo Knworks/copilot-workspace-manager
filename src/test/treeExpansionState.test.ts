@@ -10,20 +10,20 @@ suite('Tree expansion state', () => {
 		const rootPath = path.join('root', 'docs');
 		const childPath = path.join(rootPath, 'child');
 		state.registerExpanded(
-			'prompts',
+			'commands',
 			new WorkspaceTreeItem(
 				'folder',
-				'prompts',
+				'commands',
 				'docs',
 				vscode.TreeItemCollapsibleState.Collapsed,
 				rootPath,
 			),
 		);
 		state.registerExpanded(
-			'prompts',
+			'commands',
 			new WorkspaceTreeItem(
 				'folder',
-				'prompts',
+				'commands',
 				'child',
 				vscode.TreeItemCollapsibleState.Collapsed,
 				childPath,
@@ -31,9 +31,9 @@ suite('Tree expansion state', () => {
 		);
 
 		const renamedRoot = path.join('root', 'docs-renamed');
-		state.renamePaths('prompts', rootPath, renamedRoot);
+		state.renamePaths('commands', rootPath, renamedRoot);
 
-		const expanded = state.listExpanded('prompts').sort();
+		const expanded = state.listExpanded('commands').sort();
 		assert.deepStrictEqual(expanded, [renamedRoot, path.join(renamedRoot, 'child')].sort());
 	});
 
@@ -42,14 +42,14 @@ suite('Tree expansion state', () => {
 		const rootPath = path.join('root', 'docs');
 		const item = new WorkspaceTreeItem(
 			'folder',
-			'prompts',
+			'commands',
 			'docs',
 			vscode.TreeItemCollapsibleState.Collapsed,
 			rootPath,
 		);
-		state.registerExpanded('prompts', item);
-		state.registerCollapsed('prompts', item);
+		state.registerExpanded('commands', item);
+		state.registerCollapsed('commands', item);
 
-		assert.deepStrictEqual(state.listExpanded('prompts'), []);
+		assert.deepStrictEqual(state.listExpanded('commands'), []);
 	});
 });

@@ -185,10 +185,10 @@ export function registerFileCommands(
 		),
 	);
 
-	registerAddFolderForView('copilot-workspace-manager.addPromptsFolder', 'prompts');
+	registerAddFolderForView('copilot-workspace-manager.addPromptsFolder', 'commands');
 	registerAddFolderForView('copilot-workspace-manager.addSkillsFolder', 'skills');
 	registerAddFolderForView('copilot-workspace-manager.addTemplatesFolder', 'templates');
-	registerAddFileForView('copilot-workspace-manager.addPromptsFile', 'prompts');
+	registerAddFileForView('copilot-workspace-manager.addPromptsFile', 'commands');
 	registerAddFileForView('copilot-workspace-manager.addSkillsFile', 'skills');
 	registerAddFileForView('copilot-workspace-manager.addTemplatesFile', 'templates');
 
@@ -334,7 +334,7 @@ export function isRootNode(item: WorkspaceTreeItem): boolean {
 	return item.nodeType === 'root';
 }
 
-const FILE_VIEW_KINDS: FileViewKind[] = ['prompts', 'skills', 'templates'];
+const FILE_VIEW_KINDS: FileViewKind[] = ['commands', 'skills', 'templates'];
 const SKILL_SUBFOLDER_OPTIONS = ['references', 'scripts', 'assets'] as const;
 const SKILL_MARKDOWN_FILE_NAME = 'SKILL.md';
 
@@ -529,13 +529,13 @@ async function addFileWithSelection(
 
 	const fileNameInput = await promptTextInputWithQuickPick({
 		title:
-			selection.kind === 'prompts'
+			selection.kind === 'commands'
 				? messages.file.addCommandFileTitle
 				: selection.kind === 'skills'
 				? messages.file.addSkillFileTitle
 				: messages.file.addFileTitle,
 		placeholder:
-			selection.kind === 'prompts'
+			selection.kind === 'commands'
 				? messages.file.inputCommandFileName
 				: selection.kind === 'skills'
 				? messages.file.inputSkillFileName

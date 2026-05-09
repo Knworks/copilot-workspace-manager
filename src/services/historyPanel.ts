@@ -11,8 +11,8 @@ import { setPluginEnabled } from './pluginConfigService';
 import { resolveCopilotPaths } from './workspaceStatus';
 import { buildHistoryIndex, HistoryIndex } from './historyService';
 import {
-	buildAgentsChainPayload,
-	AgentsChainDisplayPayload,
+	buildInstructionsChainPayload,
+	InstructionsChainDisplayPayload,
 	buildHooksPayload,
 	buildPluginsPayload,
 	buildTrustedDirectoriesHtml,
@@ -86,7 +86,7 @@ function buildRefreshButtonHtml(tab: CoreViewTab): string {
 	return `<button class="icon-button" type="button" data-refresh-tab="${tab}" title="${escapeHtml(messages.commandRefresh)}" aria-label="${escapeHtml(messages.commandRefresh)}"><span class="codicon codicon-refresh" aria-hidden="true"></span></button>`;
 }
 
-function serializeAgentsChain(payload: AgentsChainDisplayPayload): string {
+function serializeAgentsChain(payload: InstructionsChainDisplayPayload): string {
 	return JSON.stringify(payload);
 }
 
@@ -320,7 +320,7 @@ function buildHistoryWebviewHtml(
 	<div class="root">
 		<nav class="tabs" aria-label="${escapeHtml(messages.coreViewTabsAriaLabel)}">
 			<button class="tab active" data-tab="history" type="button"><span class="codicon codicon-history" aria-hidden="true"></span><span>${messages.coreViewConversationHistoryTab}</span></button>
-			<button class="tab" data-tab="chain" type="button"><span class="codicon codicon-copilot" aria-hidden="true"></span><span>${messages.coreViewAgentsChainTab}</span></button>
+			<button class="tab" data-tab="chain" type="button"><span class="codicon codicon-copilot" aria-hidden="true"></span><span>${messages.coreViewInstructionsChainTab}</span></button>
 			<button class="tab" data-tab="trusted" type="button"><span class="codicon codicon-workspace-trusted" aria-hidden="true"></span><span>${messages.coreViewTrustedDirectoriesTab}</span></button>
 			<button class="tab" data-tab="hooks" type="button"><span class="codicon codicon-symbol-event" aria-hidden="true"></span><span>${messages.coreViewHooksTab}</span></button>
 			<button class="tab" data-tab="plugins" type="button"><span class="codicon codicon-plug" aria-hidden="true"></span><span>${messages.coreViewPluginsTab}</span></button>
@@ -1127,7 +1127,7 @@ export class HistoryPanelManager implements vscode.Disposable {
 			void this.panel.webview.postMessage({
 				type: 'tabContent',
 				tab,
-				payload: buildAgentsChainPayload(),
+				payload: buildInstructionsChainPayload(),
 			});
 			return;
 		}

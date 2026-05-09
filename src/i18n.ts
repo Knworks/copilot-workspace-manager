@@ -174,8 +174,8 @@ export const messages = {
 		'message.coreWorkspaceLocalSettingsDescription',
 		'Workspace Local Settings',
 	),
-	promptsExplorerEmpty: localize(
-		'message.promptsExplorerEmpty',
+	commandsExplorerEmpty: localize(
+		'message.commandsExplorerEmpty',
 		'No commands to display.',
 	),
 	skillsExplorerEmpty: localize(
@@ -434,8 +434,8 @@ export const messages = {
 		'message.mcpValidationFilterMappingInvalid',
 		'Filter Mapping must be none, markdown, or hidden_characters.',
 	),
-	coreViewAgentsChainTab: localize(
-		'message.coreViewAgentsChainTab',
+	coreViewInstructionsChainTab: localize(
+		'message.coreViewInstructionsChainTab',
 		'Instructions Chain',
 	),
 	chainSummaryFound: localize('message.chainSummaryFound', 'Found'),
@@ -1040,7 +1040,7 @@ export const messages = {
 		),
 		selectionNotSupported: localize(
 			'message.selectionNotSupported',
-			'Select a target in prompts, skills, or templates.',
+			'Select a target in commands, skills, or templates.',
 		),
 	},
 	agent: {

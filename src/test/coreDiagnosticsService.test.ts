@@ -4,7 +4,7 @@ import os from 'os';
 import path from 'path';
 import {
 	addTrustedDirectory,
-	buildAgentsLoadingChain,
+	buildInstructionsChain,
 	listTrustedDirectories,
 	removeTrustedDirectory,
 } from '../services/coreDiagnosticsService';
@@ -20,7 +20,7 @@ function withTempDir(run: (root: string) => void): void {
 }
 
 suite('Core diagnostics service', () => {
-	test('buildAgentsLoadingChain lists only existing instruction files', () => {
+	test('buildInstructionsChain lists only existing instruction files', () => {
 		withTempDir((root) => {
 			const homeDir = path.join(root, 'home');
 			const copilotDir = path.join(homeDir, '.copilot');
@@ -43,7 +43,7 @@ suite('Core diagnostics service', () => {
 			);
 			fs.writeFileSync(path.join(workspaceRoot, 'AGENTS.md'), 'agent', 'utf8');
 
-			const nodes = buildAgentsLoadingChain(workspaceRoot, homeDir);
+			const nodes = buildInstructionsChain(workspaceRoot, homeDir);
 
 			assert.deepStrictEqual(
 				nodes.map((node) => ({
@@ -65,7 +65,7 @@ suite('Core diagnostics service', () => {
 		});
 	});
 
-	test('buildAgentsLoadingChain detects path instructions and current file matches', () => {
+	test('buildInstructionsChain detects path instructions and current file matches', () => {
 		withTempDir((root) => {
 			const homeDir = path.join(root, 'home');
 			const workspaceRoot = path.join(root, 'workspace');
@@ -81,7 +81,7 @@ suite('Core diagnostics service', () => {
 			);
 			fs.writeFileSync(currentFilePath, 'export {};\n', 'utf8');
 
-			const nodes = buildAgentsLoadingChain(
+			const nodes = buildInstructionsChain(
 				workspaceRoot,
 				homeDir,
 				undefined,
@@ -96,7 +96,7 @@ suite('Core diagnostics service', () => {
 		});
 	});
 
-	test('buildAgentsLoadingChain marks invalid applyTo for path instructions', () => {
+	test('buildInstructionsChain marks invalid applyTo for path instructions', () => {
 		withTempDir((root) => {
 			const homeDir = path.join(root, 'home');
 			const workspaceRoot = path.join(root, 'workspace');
@@ -108,14 +108,14 @@ suite('Core diagnostics service', () => {
 				'utf8',
 			);
 
-			const nodes = buildAgentsLoadingChain(workspaceRoot, homeDir);
+			const nodes = buildInstructionsChain(workspaceRoot, homeDir);
 
 			assert.strictEqual(nodes.length, 1);
 			assert.strictEqual(nodes[0].status, 'invalidApplyTo');
 		});
 	});
 
-	test('buildAgentsLoadingChain includes custom instruction directories', () => {
+	test('buildInstructionsChain includes custom instruction directories', () => {
 		withTempDir((root) => {
 			const homeDir = path.join(root, 'home');
 			const workspaceRoot = path.join(root, 'workspace');
@@ -123,7 +123,7 @@ suite('Core diagnostics service', () => {
 			fs.mkdirSync(customDir, { recursive: true });
 			fs.writeFileSync(path.join(customDir, 'AGENTS.md'), 'custom', 'utf8');
 
-			const nodes = buildAgentsLoadingChain(
+			const nodes = buildInstructionsChain(
 				workspaceRoot,
 				homeDir,
 				customDir,
@@ -135,7 +135,7 @@ suite('Core diagnostics service', () => {
 		});
 	});
 
-	test('buildAgentsLoadingChain ignores nested workspace AGENTS.md files', () => {
+	test('buildInstructionsChain ignores nested workspace AGENTS.md files', () => {
 		withTempDir((root) => {
 			const homeDir = path.join(root, 'home');
 			const workspaceRoot = path.join(root, 'workspace');
@@ -143,7 +143,7 @@ suite('Core diagnostics service', () => {
 			fs.mkdirSync(nestedDir, { recursive: true });
 			fs.writeFileSync(path.join(nestedDir, 'AGENTS.md'), 'nested agent', 'utf8');
 
-			const nodes = buildAgentsLoadingChain(workspaceRoot, homeDir);
+			const nodes = buildInstructionsChain(workspaceRoot, homeDir);
 
 			assert.strictEqual(nodes.length, 0);
 		});

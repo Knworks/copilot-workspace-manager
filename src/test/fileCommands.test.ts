@@ -31,14 +31,14 @@ suite('File commands', () => {
 test('resolveAddViewSelection ignores inactive selection', () => {
 	const selection = new WorkspaceTreeItem(
 		'folder',
-		'prompts',
+		'commands',
 		'docs',
 		0,
 		path.join('root', 'docs'),
 	);
 	const item = new WorkspaceTreeItem(
 		'folder',
-		'prompts',
+		'commands',
 		'docs-2',
 		0,
 		path.join('root', 'docs-2'),
@@ -52,7 +52,7 @@ test('resolveAddViewSelection ignores inactive selection', () => {
 	test('resolveAddViewSelection returns selection when active', () => {
 		const selection = new WorkspaceTreeItem(
 			'folder',
-			'prompts',
+			'commands',
 			'docs',
 			0,
 			path.join('root', 'docs'),
@@ -63,14 +63,14 @@ test('resolveAddViewSelection ignores inactive selection', () => {
 test('resolveAddViewSelection prefers item over selection', () => {
 	const selection = new WorkspaceTreeItem(
 		'folder',
-		'prompts',
+		'commands',
 		'docs',
 		0,
 		path.join('root', 'docs'),
 	);
 	const item = new WorkspaceTreeItem(
 		'folder',
-		'prompts',
+		'commands',
 		'docs-2',
 		0,
 		path.join('root', 'docs-2'),
@@ -163,10 +163,10 @@ test('resolveAddViewSelection prefers item over selection', () => {
 		);
 		const promptFolder = new WorkspaceTreeItem(
 			'folder',
-			'prompts',
+			'commands',
 			'docs',
 			0,
-			path.join('root', 'prompts', 'docs'),
+			path.join('root', 'commands', 'docs'),
 		);
 
 		assert.strictEqual(requiresFolderSelectionForFileAdd(root), true);
@@ -175,7 +175,7 @@ test('resolveAddViewSelection prefers item over selection', () => {
 	assert.strictEqual(requiresFolderSelectionForFileAdd(promptFolder), false);
 	});
 
-	test('shouldPickSkillLocationForAdd only prompts at skills root', () => {
+	test('shouldPickSkillLocationForAdd only blocks commands at skills root', () => {
 		const root = new WorkspaceTreeItem(
 			'root',
 			'skills',
@@ -199,10 +199,10 @@ test('resolveAddViewSelection prefers item over selection', () => {
 		);
 		const promptRoot = new WorkspaceTreeItem(
 			'root',
-			'prompts',
-			'prompts',
+			'commands',
+			'commands',
 			0,
-			path.join('root', 'prompts'),
+			path.join('root', 'commands'),
 		);
 
 		assert.strictEqual(shouldPickSkillLocationForAdd(root), true);

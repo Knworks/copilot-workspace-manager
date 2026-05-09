@@ -3,7 +3,7 @@
   "description": "VS Code 内で GitHub Copilot CLI のカスタマイズファイルを閲覧・編集します。",
   "viewContainer.copilotWorkspaceManager.title": "Copilot Workspace Manager",
   "view.core.name": "Copilot Manager",
-  "view.prompts.name": "Commands",
+  "view.commands.name": "Commands",
   "view.skills.name": "Skills",
   "view.templates.name": "Templates",
   "view.mcp.name": "MCP Server",
@@ -66,7 +66,7 @@
   "message.coreUserSettingsDescription": "ユーザー設定",
   "message.coreWorkspaceSettingsDescription": "ワークスペース設定",
   "message.coreWorkspaceLocalSettingsDescription": "ワークスペースローカル設定",
-  "message.promptsExplorerEmpty": "表示するCommandはありません。",
+  "message.commandsExplorerEmpty": "表示するCommandはありません。",
   "message.skillsExplorerEmpty": "表示するSkillはありません。",
   "message.templatesExplorerEmpty": "表示するTemplateはありません。",
   "message.mcpExplorerEmpty": "表示するMCP Serverはありません。",
@@ -152,7 +152,7 @@
   "message.mcpValidationHeadersKeyRequired": "値を入力した Header 行にはキーも必要です。",
   "message.mcpValidationEnvKeyRequired": "値を入力した Env 行にはキーも必要です。",
   "message.mcpValidationFilterMappingInvalid": "Filter Mapping は none / markdown / hidden_characters のいずれかを指定してください。",
-  "message.coreViewAgentsChainTab": "Instructions Chain",
+  "message.coreViewInstructionsChainTab": "Instructions Chain",
   "message.chainSummaryFound": "検出数",
   "message.chainSummaryPotentialConflict": "複数のInstructionsに競合する指示が含まれる可能性があります。",
   "message.chainWorkspaceRootLabel": "基準ワークスペース",
@@ -380,5 +380,5 @@
   "message.agent.locationPickPlaceholder": "Agentの保存場所を選択してください。",
   "message.agent.userAgentsDeleteWarning": "User Agentsを削除すると他のプロジェクトにも影響する可能性があります。",
   "message.agent.selectionNotSupported": "Agentsビューで対象エージェントファイルを選択してください。",
-  "message.selectionNotSupported": "prompts/skills/templates の対象を選択してください。"
+  "message.selectionNotSupported": "commands/skills/templates の対象を選択してください。"
 }

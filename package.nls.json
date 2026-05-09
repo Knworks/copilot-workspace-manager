@@ -3,7 +3,7 @@
   "description": "Explore and edit GitHub Copilot CLI customization files in VS Code.",
   "viewContainer.copilotWorkspaceManager.title": "Copilot Workspace Manager",
   "view.core.name": "Copilot Manager",
-  "view.prompts.name": "Commands",
+  "view.commands.name": "Commands",
   "view.skills.name": "Skills",
   "view.templates.name": "Templates",
   "view.mcp.name": "MCP Server",
@@ -66,7 +66,7 @@
   "message.coreUserSettingsDescription": "User Settings",
   "message.coreWorkspaceSettingsDescription": "Workspace Settings",
   "message.coreWorkspaceLocalSettingsDescription": "Workspace Local Settings",
-  "message.promptsExplorerEmpty": "No commands to display.",
+  "message.commandsExplorerEmpty": "No commands to display.",
   "message.skillsExplorerEmpty": "No skills to display.",
   "message.templatesExplorerEmpty": "No templates to display.",
   "message.mcpExplorerEmpty": "No MCP servers to display.",
@@ -152,7 +152,7 @@
   "message.mcpValidationHeadersKeyRequired": "Header rows with a value must also have a key.",
   "message.mcpValidationEnvKeyRequired": "Env rows with a value must also have a key.",
   "message.mcpValidationFilterMappingInvalid": "Filter Mapping must be none, markdown, or hidden_characters.",
-  "message.coreViewAgentsChainTab": "Instructions Chain",
+  "message.coreViewInstructionsChainTab": "Instructions Chain",
   "message.chainSummaryFound": "Found",
   "message.chainSummaryPotentialConflict": "Multiple instruction files may contain conflicting guidance.",
   "message.chainWorkspaceRootLabel": "Workspace root",
@@ -380,5 +380,5 @@
   "message.agent.locationPickPlaceholder": "Select an Agent location.",
   "message.agent.userAgentsDeleteWarning": "Deleting User Agents may affect other projects.",
   "message.agent.selectionNotSupported": "Select an agent file in the Agents view.",
-  "message.selectionNotSupported": "Select a target in prompts, skills, or templates."
+  "message.selectionNotSupported": "Select a target in commands, skills, or templates."
 }

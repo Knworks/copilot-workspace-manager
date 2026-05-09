@@ -27,23 +27,23 @@ function setMtime(targetPath: string, mtimeMs: number): void {
 suite('Sync service', () => {
 	test('syncDirectoryBidirectional copies newer file to older side', () => {
 		withTempDir((root) => {
-			const codexRoot = path.join(root, '.codex');
-			const codexDir = path.join(codexRoot, 'prompts');
+			const copilotRoot = path.join(root, '.copilot');
+			const commandsDir = path.join(copilotRoot, 'commands');
 			const targetDir = path.join(root, 'sync');
-			fs.mkdirSync(codexDir, { recursive: true });
+			fs.mkdirSync(commandsDir, { recursive: true });
 			fs.mkdirSync(targetDir, { recursive: true });
 
-			const codexFile = path.join(codexDir, 'note.md');
+			const sourceFile = path.join(commandsDir, 'note.md');
 			const targetFile = path.join(targetDir, 'note.md');
-			fs.writeFileSync(codexFile, 'from-codex', 'utf8');
+			fs.writeFileSync(sourceFile, 'from-source', 'utf8');
 			fs.writeFileSync(targetFile, 'from-target', 'utf8');
 
-			setMtime(codexFile, 2_000);
+			setMtime(sourceFile, 2_000);
 			setMtime(targetFile, 1_000);
 
-			syncDirectoryBidirectional('prompts', codexRoot, codexDir, targetDir);
+			syncDirectoryBidirectional('commands', copilotRoot, commandsDir, targetDir);
 
-			assert.strictEqual(fs.readFileSync(targetFile, 'utf8'), 'from-codex');
+			assert.strictEqual(fs.readFileSync(targetFile, 'utf8'), 'from-source');
 		});
 	});
 
@@ -119,14 +119,14 @@ suite('Sync service', () => {
 
 	test('syncDirectoryBidirectional skips hidden paths', () => {
 		withTempDir((root) => {
-			const codexRoot = path.join(root, '.codex');
-			const codexDir = path.join(codexRoot, 'prompts');
+			const copilotRoot = path.join(root, '.copilot');
+			const commandsDir = path.join(copilotRoot, 'commands');
 			const targetDir = path.join(root, 'sync');
-			const hiddenDir = path.join(codexDir, '.hidden');
+			const hiddenDir = path.join(commandsDir, '.hidden');
 			fs.mkdirSync(hiddenDir, { recursive: true });
 			fs.writeFileSync(path.join(hiddenDir, 'secret.md'), 'secret', 'utf8');
 
-			syncDirectoryBidirectional('prompts', codexRoot, codexDir, targetDir);
+			syncDirectoryBidirectional('commands', copilotRoot, commandsDir, targetDir);
 
 			assert.ok(!fs.existsSync(path.join(targetDir, '.hidden', 'secret.md')));
 		});
@@ -134,14 +134,14 @@ suite('Sync service', () => {
 
 	test('syncDirectoryBidirectional excludes .copilot-workspace-manager paths', () => {
 		withTempDir((root) => {
-			const codexRoot = path.join(root, '.codex');
-			const codexDir = path.join(codexRoot, 'prompts');
+			const copilotRoot = path.join(root, '.copilot');
+			const commandsDir = path.join(copilotRoot, 'commands');
 			const targetDir = path.join(root, 'sync');
-			const metaDir = path.join(codexDir, '.copilot-workspace-manager');
+			const metaDir = path.join(commandsDir, '.copilot-workspace-manager');
 			fs.mkdirSync(metaDir, { recursive: true });
 			fs.writeFileSync(path.join(metaDir, 'meta.json'), 'meta', 'utf8');
 
-			syncDirectoryBidirectional('prompts', codexRoot, codexDir, targetDir);
+			syncDirectoryBidirectional('commands', copilotRoot, commandsDir, targetDir);
 			assert.ok(
 				!fs.existsSync(path.join(targetDir, '.copilot-workspace-manager', 'meta.json')),
 			);
@@ -150,20 +150,20 @@ suite('Sync service', () => {
 
 	test('syncDirectoryBidirectional records skipped files on copy error', () => {
 		withTempDir((root) => {
-			const codexRoot = path.join(root, '.codex');
-			const codexDir = path.join(codexRoot, 'prompts');
+			const copilotRoot = path.join(root, '.copilot');
+			const commandsDir = path.join(copilotRoot, 'commands');
 			const targetDir = path.join(root, 'sync');
-			fs.mkdirSync(codexDir, { recursive: true });
+			fs.mkdirSync(commandsDir, { recursive: true });
 			fs.mkdirSync(targetDir, { recursive: true });
 
-			const codexFile = path.join(codexDir, 'blocked.md');
-			fs.writeFileSync(codexFile, 'blocked', 'utf8');
+			const sourceFile = path.join(commandsDir, 'blocked.md');
+			fs.writeFileSync(sourceFile, 'blocked', 'utf8');
 			fs.mkdirSync(path.join(targetDir, 'blocked.md'));
 
 			const result = syncDirectoryBidirectional(
-				'prompts',
-				codexRoot,
-				codexDir,
+				'commands',
+				copilotRoot,
+				commandsDir,
 				targetDir,
 			);
 

@@ -14,11 +14,13 @@
   ],
   "keywords": [
     "copilot",
+    "cli",
     "workspace",
-    "prompts",
+    "commands",
     "skills",
     "templates",
     "mcp",
+    "plugin",
     "agents",
     "config",
     "json",
@@ -63,7 +65,7 @@
         },
         {
           "id": "copilot-workspace-manager.prompts",
-          "name": "%view.prompts.name%"
+          "name": "%view.commands.name%"
         },
         {
           "id": "copilot-workspace-manager.mcp",

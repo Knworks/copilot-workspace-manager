@@ -25,16 +25,16 @@ suite('Tree view expansion', () => {
 			},
 		} as unknown as vscode.TreeView<WorkspaceTreeItem>;
 		const views = {
-			prompts: viewStub,
+			commands: viewStub,
 			skills: viewStub,
 			templates: viewStub,
 		};
 		const selection = new WorkspaceTreeItem(
 			'root',
-			'prompts',
-			'prompts',
+			'commands',
+			'commands',
 			vscode.TreeItemCollapsibleState.Expanded,
-			'/root/prompts',
+			'/root/commands',
 		);
 
 		// Act
@@ -59,16 +59,16 @@ suite('Tree view expansion', () => {
 			},
 		} as unknown as vscode.TreeView<WorkspaceTreeItem>;
 		const views = {
-			prompts: viewStub,
+			commands: viewStub,
 			skills: viewStub,
 			templates: viewStub,
 		};
 		const selection = new WorkspaceTreeItem(
 			'folder',
-			'prompts',
-			'prompts',
+			'commands',
+			'commands',
 			vscode.TreeItemCollapsibleState.Collapsed,
-			'/root/prompts',
+			'/root/commands',
 		);
 
 		// Act
@@ -99,16 +99,16 @@ suite('Tree view expansion', () => {
 			},
 		} as unknown as vscode.TreeView<WorkspaceTreeItem>;
 		const views = {
-			prompts: viewStub,
+			commands: viewStub,
 			skills: viewStub,
 			templates: viewStub,
 		};
 		const selection = new WorkspaceTreeItem(
 			'file',
-			'prompts',
+			'commands',
 			'note.md',
 			vscode.TreeItemCollapsibleState.None,
-			'/root/prompts/note.md',
+			'/root/commands/note.md',
 		);
 
 		// Act

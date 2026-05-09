@@ -76,7 +76,7 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 		if (this.kind === 'templates') {
 			return path.join(resolveCopilotPaths().managerDir, TEMPLATE_FOLDER_NAME);
 		}
-		if (this.kind === 'prompts') {
+		if (this.kind === 'commands') {
 			const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 			return workspaceRoot ? path.join(workspaceRoot, '.claude', 'commands') : '';
 		}
@@ -85,7 +85,7 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 
 	getRootOptions(): SkillLocation[] {
 		const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-		if (this.kind === 'prompts') {
+		if (this.kind === 'commands') {
 			if (this.rootPathOverride) {
 				return [
 						{
@@ -143,7 +143,7 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 
 	protected getAvailableChildren(element?: WorkspaceTreeItem): vscode.ProviderResult<WorkspaceTreeItem[]> {
 		if (!element) {
-			if (this.kind === 'skills' || this.kind === 'prompts') {
+			if (this.kind === 'skills' || this.kind === 'commands') {
 				const items = this.readSkillRoots();
 				return items.length > 0 ? items : [this.toEmptyItem()];
 			}
@@ -162,7 +162,7 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 		if (this.kind === 'templates') {
 			return path.join(resolveCopilotPaths().managerDir, TEMPLATE_FOLDER_NAME);
 		}
-		if (this.kind === 'prompts') {
+		if (this.kind === 'commands') {
 			const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 			return workspaceRoot ? path.join(workspaceRoot, '.claude', 'commands') : '';
 		}
@@ -275,7 +275,7 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 		location: SkillLocation | undefined,
 		targetPath: string,
 	): void {
-		if (!location || (this.kind !== 'skills' && this.kind !== 'prompts')) {
+		if (!location || (this.kind !== 'skills' && this.kind !== 'commands')) {
 			return;
 		}
 		item.tooltip = `${location.label}: ${targetPath}`;
@@ -302,7 +302,7 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 		fileName: string,
 		filePath?: string,
 	): vscode.ThemeIcon | { light: vscode.Uri; dark: vscode.Uri } | undefined {
-		if (this.kind === 'prompts') {
+		if (this.kind === 'commands') {
 			return new vscode.ThemeIcon('terminal');
 		}
 
@@ -341,8 +341,8 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 
 	private getEmptyLabel(): string {
 		switch (this.kind) {
-			case 'prompts':
-				return messages.promptsExplorerEmpty;
+			case 'commands':
+				return messages.commandsExplorerEmpty;
 			case 'skills':
 				return messages.skillsExplorerEmpty;
 			case 'templates':

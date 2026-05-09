@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 suite('View title menus', () => {
-	test('Common actions are contributed to prompts/skills/templates view titles', () => {
+	test('Common actions are contributed to commands/skills/templates view titles', () => {
 		const packageJsonPath = path.resolve(__dirname, '..', '..', 'package.json');
 		const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
@@ -196,7 +196,7 @@ suite('View title menus', () => {
 			const when = entry.when ?? '';
 			assert.ok(
 				!when.includes("view == 'copilot-workspace-manager.prompts'"),
-				`${command} should not target prompts view`,
+				`${command} should not target commands view`,
 			);
 			assert.ok(
 				!when.includes("view == 'copilot-workspace-manager.templates'"),

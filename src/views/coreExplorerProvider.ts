@@ -8,7 +8,7 @@ import {
 	getCopilotConfigStatus,
 	resolveCopilotPaths,
 } from '../services/workspaceStatus';
-import { AgentsChainNode, buildAgentsLoadingChain } from '../services/coreDiagnosticsService';
+import { InstructionsChainNode, buildInstructionsChain } from '../services/coreDiagnosticsService';
 import { messages } from '../i18n';
 
 type CoreEntry = {
@@ -84,10 +84,10 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 	}
 
 	private collectInstructionEntries(workspaceRoot: string): CoreEntry[] {
-		return buildAgentsLoadingChain(workspaceRoot).map((entry) => this.toInstructionEntry(entry));
+		return buildInstructionsChain(workspaceRoot).map((entry) => this.toInstructionEntry(entry));
 	}
 
-	private toInstructionEntry(entry: AgentsChainNode): CoreEntry {
+	private toInstructionEntry(entry: InstructionsChainNode): CoreEntry {
 		return {
 			label: entry.fileName,
 			fsPath: entry.absolutePath,
@@ -98,7 +98,7 @@ export class CoreExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 		};
 	}
 
-	private toInstructionDescription(entry: AgentsChainNode): string {
+	private toInstructionDescription(entry: InstructionsChainNode): string {
 		switch (entry.kind) {
 			case 'user':
 				return messages.chainClassificationUser;

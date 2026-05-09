@@ -2,7 +2,7 @@ import path from 'path';
 import * as vscode from 'vscode';
 import { messages } from '../i18n';
 import { HistoryIndex, HistoryTurnRecord } from './historyService';
-import { AgentsChainNode, buildAgentsLoadingChain, listTrustedDirectories } from './coreDiagnosticsService';
+import { InstructionsChainNode, buildInstructionsChain, listTrustedDirectories } from './coreDiagnosticsService';
 import { HookEntryRecord, HookSourceRecord, listHookDiagnostics } from './coreManagerConfigService';
 import { PluginRecord, listPluginDiagnostics } from './pluginDiagnosticsService';
 import { getCoreWorkspaceStatus, resolveCopilotPaths } from './workspaceStatus';
@@ -43,7 +43,7 @@ export type HistoryPanelState = {
 	appliedQuery: string;
 };
 
-type AgentsChainDisplayEntry = {
+type InstructionsChainDisplayEntry = {
 	id: string;
 	title: string;
 	subtitle: string;
@@ -57,8 +57,8 @@ type AgentsChainDisplayEntry = {
 	applyTo?: string;
 };
 
-export type AgentsChainDisplayPayload = {
-	entries: AgentsChainDisplayEntry[];
+export type InstructionsChainDisplayPayload = {
+	entries: InstructionsChainDisplayEntry[];
 	summary: {
 		foundCount: number;
 		hasPotentialConflict: boolean;
@@ -170,7 +170,7 @@ function buildRefreshButtonHtml(tab: CoreViewTab): string {
 	return `<button class="icon-button" type="button" data-refresh-tab="${tab}" title="${escapeHtml(messages.commandRefresh)}" aria-label="${escapeHtml(messages.commandRefresh)}"><span class="codicon codicon-refresh" aria-hidden="true"></span></button>`;
 }
 
-function toClassificationLabel(node: AgentsChainNode): string {
+function toClassificationLabel(node: InstructionsChainNode): string {
 	switch (node.kind) {
 		case 'user':
 			return messages.chainClassificationUser;
@@ -185,7 +185,7 @@ function toClassificationLabel(node: AgentsChainNode): string {
 	}
 }
 
-function toScopeLabel(node: AgentsChainNode): string {
+function toScopeLabel(node: InstructionsChainNode): string {
 	switch (node.kind) {
 		case 'user':
 			return messages.chainScopeUser;
@@ -200,7 +200,7 @@ function toScopeLabel(node: AgentsChainNode): string {
 	}
 }
 
-function toExplanation(node: AgentsChainNode): string {
+function toExplanation(node: InstructionsChainNode): string {
 	switch (node.kind) {
 		case 'user':
 			return messages.chainExplainUser;
@@ -219,9 +219,9 @@ function toExplanation(node: AgentsChainNode): string {
 }
 
 function toDisplayEntry(
-	node: AgentsChainNode,
+	node: InstructionsChainNode,
 	index: number,
-): AgentsChainDisplayEntry {
+): InstructionsChainDisplayEntry {
 	const classification = toClassificationLabel(node);
 	const scope = toScopeLabel(node);
 	return {
@@ -239,11 +239,11 @@ function toDisplayEntry(
 	};
 }
 
-export function buildAgentsChainPayload(
+export function buildInstructionsChainPayload(
 	workspaceRoot: string | undefined = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
-): AgentsChainDisplayPayload {
+): InstructionsChainDisplayPayload {
 	const activeFilePath = vscode.window.activeTextEditor?.document.uri.fsPath;
-	const nodes = buildAgentsLoadingChain(
+	const nodes = buildInstructionsChain(
 		workspaceRoot,
 		undefined,
 		process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS,
