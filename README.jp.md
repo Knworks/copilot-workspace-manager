@@ -1,7 +1,5 @@
 # 🧰 Copilot Workspace Manager
 
-[English README](./README.md)
-
 Copilot Workspace Manager は、GitHub Copilot CLI / IDE の設定やカスタマイズ資産を VS Code からまとめて見渡し、すばやく管理できる拡張機能です。`~/.copilot`、ワークスペース配下、installed plugin 配下に散らばりがちな `config.json`、`settings.json`、`copilot-instructions.md`、Commands、Skills、Sub Agents、MCP、Templates、会話履歴、Hooks、Plugin diagnostics を ひとつの導線に集約し、迷わず確認・管理できます。
 
 ![alt text](images/view_main.png)
