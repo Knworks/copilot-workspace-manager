@@ -169,19 +169,11 @@
       },
       {
         "command": "copilot-workspace-manager.enableAgent",
-        "title": "%command.enableAgent%",
-        "icon": {
-          "light": "images/agent_on.png",
-          "dark": "images/agent_on.png"
-        }
+        "title": "%command.enableAgent%"
       },
       {
         "command": "copilot-workspace-manager.disableAgent",
-        "title": "%command.disableAgent%",
-        "icon": {
-          "light": "images/agent_off.png",
-          "dark": "images/agent_off.png"
-        }
+        "title": "%command.disableAgent%"
       },
       {
         "command": "copilot-workspace-manager.addFile",
