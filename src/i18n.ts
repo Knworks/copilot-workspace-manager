@@ -84,6 +84,10 @@ export const messages = {
 		'message.openFolderMissing',
 		'Target folder does not exist.',
 	),
+	openFolderSelectionRequired: localize(
+		'message.openFolderSelectionRequired',
+		'Please select a target folder to open.',
+	),
 	unexpectedError: localize(
 		'message.unexpectedError',
 		'An unexpected error occurred.',

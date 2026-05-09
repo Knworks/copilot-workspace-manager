@@ -45,6 +45,7 @@
   "message.reason.configUnreadable": "config.json cannot be read.",
   "message.reason.configInvalid": "config.json cannot be parsed.",
   "message.openFolderMissing": "Target folder does not exist.",
+  "message.openFolderSelectionRequired": "Please select a target folder to open.",
   "message.unexpectedError": "An unexpected error occurred.",
   "message.mcpToggleUpdated": "Settings updated. Reload Copilot CLI or the extension to apply changes.",
   "message.configTomlOrganized": "config.toml was organized. Backup saved to {0}.",

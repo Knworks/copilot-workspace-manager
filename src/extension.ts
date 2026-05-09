@@ -161,6 +161,20 @@ export function activate(context: vscode.ExtensionContext) {
 		await vscode.env.openExternal(vscode.Uri.file(targetDir));
 	};
 
+	const revealSelectedFolder = async (
+		selection: WorkspaceTreeItem | undefined,
+	): Promise<void> => {
+		if (!selection?.fsPath) {
+			vscode.window.showErrorMessage(messages.openFolderSelectionRequired);
+			return;
+		}
+		const targetDir =
+			selection.nodeType === 'file'
+				? path.dirname(selection.fsPath)
+				: selection.fsPath;
+		await revealFolder(targetDir);
+	};
+
 	const openCopilotFolderDisposable = vscode.commands.registerCommand(
 		'copilot-workspace-manager.openCopilotFolder',
 		() =>
@@ -180,78 +194,45 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const openPromptsFolderDisposable = vscode.commands.registerCommand(
 		'copilot-workspace-manager.openPromptsFolder',
-		() =>
+		(item?: WorkspaceTreeItem) =>
 			runSafely(async () => {
 				if (!getWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const selection = commandsView.selection[0];
-				if (selection?.fsPath) {
-					const targetDir =
-						selection.nodeType === 'file'
-							? path.dirname(selection.fsPath)
-							: selection.fsPath;
-					await revealFolder(targetDir);
-					return;
-				}
-				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-				if (workspaceRoot) {
-					await revealFolder(path.join(workspaceRoot, '.claude', 'commands'));
-				}
+				await revealSelectedFolder(item ?? commandsView.selection[0]);
 			}),
 	);
 
 	const openSkillsFolderDisposable = vscode.commands.registerCommand(
 		'copilot-workspace-manager.openSkillsFolder',
-		() =>
+		(item?: WorkspaceTreeItem) =>
 			runSafely(async () => {
 				if (!getWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const selection = skillsView.selection[0];
-				if (selection?.fsPath) {
-					const targetDir =
-						selection.nodeType === 'file'
-							? path.dirname(selection.fsPath)
-							: selection.fsPath;
-					await revealFolder(targetDir);
-					return;
-				}
-				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-				if (workspaceRoot) {
-					await revealFolder(path.join(workspaceRoot, '.github', 'skills'));
-				}
+				await revealSelectedFolder(item ?? skillsView.selection[0]);
 			}),
 	);
 
 	const openTemplatesFolderDisposable = vscode.commands.registerCommand(
 		'copilot-workspace-manager.openTemplatesFolder',
-		() =>
+		(item?: WorkspaceTreeItem) =>
 			runSafely(async () => {
 				if (!getWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-				await revealFolder(path.join(resolveCopilotPaths().managerDir, TEMPLATE_FOLDER_NAME));
+				await revealSelectedFolder(item ?? templatesView.selection[0]);
 			}),
 	);
 
 	const openAgentsFolderDisposable = vscode.commands.registerCommand(
 		'copilot-workspace-manager.openAgentsFolder',
-		() =>
+		(item?: WorkspaceTreeItem) =>
 			runSafely(async () => {
 				if (!getWorkspaceStatus().isAvailable) {
 					return;
 				}
-				const selection = agentsView.selection[0];
-				if (selection?.fsPath) {
-					await revealFolder(path.dirname(selection.fsPath));
-					return;
-				}
-				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-				if (workspaceRoot) {
-					await revealFolder(path.join(workspaceRoot, '.github', 'agents'));
-				}
+				await revealSelectedFolder(item ?? agentsView.selection[0]);
 			}),
 	);
 

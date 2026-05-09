@@ -24,6 +24,7 @@ suite('Localization keys', () => {
 			'message.reason.configUnreadable',
 			'message.reason.configInvalid',
 			'message.openFolderMissing',
+			'message.openFolderSelectionRequired',
 			'message.unexpectedError',
 			'message.mcpToggleUpdated',
 			'message.configTomlOrganized',

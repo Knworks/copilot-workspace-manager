@@ -119,14 +119,56 @@ suite('Extension Test Suite', () => {
 					return true;
 				};
 			try {
-				await vscode.commands.executeCommand('copilot-workspace-manager.openPromptsFolder');
+				await vscode.commands.executeCommand(
+					'copilot-workspace-manager.openPromptsFolder',
+					{
+						fsPath: path.join(commandsDir, 'example.md'),
+						nodeType: 'file',
+					},
+				);
 			} finally {
 				(vscode.env as unknown as { openExternal: typeof originalOpenExternal }).openExternal =
 					originalOpenExternal;
 			}
 
 			assert.ok(openedUri);
-			assert.strictEqual(openedUri?.fsPath, commandsDir);
+			assert.strictEqual(
+				path.normalize(openedUri?.fsPath ?? '').toLowerCase(),
+				path.normalize(commandsDir).toLowerCase(),
+			);
+		});
+	});
+
+	test('openPromptsFolder shows a selection error when nothing is selected', async () => {
+		await withTempWorkspace(async (homeDir) => {
+			fs.mkdirSync(path.join(homeDir, '.copilot'), { recursive: true });
+			fs.writeFileSync(path.join(homeDir, '.copilot', 'config.json'), '{}', 'utf8');
+			await activateExtension();
+
+			const originalShowErrorMessage = vscode.window.showErrorMessage;
+			let shownMessage: string | undefined;
+			(
+				vscode.window as unknown as {
+					showErrorMessage: typeof originalShowErrorMessage;
+				}
+			).showErrorMessage = async (message: string) => {
+				shownMessage = message;
+				return undefined;
+			};
+			try {
+				await vscode.commands.executeCommand('copilot-workspace-manager.openPromptsFolder');
+			} finally {
+				(
+					vscode.window as unknown as {
+						showErrorMessage: typeof originalShowErrorMessage;
+					}
+				).showErrorMessage = originalShowErrorMessage;
+			}
+
+			assert.strictEqual(
+				shownMessage,
+				'Please select a target folder to open.',
+			);
 		});
 	});
 });
