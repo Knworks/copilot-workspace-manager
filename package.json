@@ -5,7 +5,7 @@
   "publisher": "Knworks",
   "icon": "images/copilot-workspace-manager.png",
   "repository": "https://github.com/Knworks/copilot-workspace-manager",
-  "version": "0.9.0",
+  "version": "1.0.0",
   "engines": {
     "vscode": "^1.107.0"
   },
