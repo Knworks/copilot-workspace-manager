@@ -1,587 +1,320 @@
-# 🧾Copilot Workspace Manager 要件定義書
+# 🧾 Copilot Workspace Manager 要件定義書
 
-## 1. 🎯背景と目的
+## 1. 🎯 背景と目的
 
-* Codex のグローバル設定ディレクトリ（`~/.codex`）配下にある設定・プロンプト・スキル・テンプレート・エージェント・MCP 設定を、VS Code 内で一元的に閲覧・編集できるようにする。
-* ターミナルや OS のファイラーで設定ファイルを探して編集する手間を削減し、運用の効率と作業の一貫性を高める。
-* MCP サーバーの有効/無効（`enabled`）切り替えを VS Code UI から行えるようにし、設定変更の手間を下げる（反映には再起動が必要である旨を通知）。
-
----
-
-## 2. 👥利用者とステークホルダー
-
-* 利用者
-
-  * Codex を利用し、`~/.codex` の設定（`config.toml`, `AGENTS.md`）、プロンプト、スキル、テンプレート、エージェント、MCP サーバー設定を日常的に編集する開発者
-* ステークホルダー
-
-  * 拡張機能開発者（作者）
-  * 拡張機能利用者（Codex ユーザー）
+- GitHub Copilot CLI / GitHub Copilot IDE まわりの設定ファイル、instructions、commands、skills、agents、MCP 設定、plugin 情報を VS Code 内から確認・編集しやすくする。
+- `~/.copilot`、ワークスペース配下の `.github` / `.claude` / `.agents`、installed plugin 配下に分散するファイルの参照導線をまとめる。
+- 特に Explore と Manager View で、Workspace / User / Plugin のスコープ差、readonly 状態、enabled 状態、競合診断を視覚的に確認できるようにする。
 
 ---
 
-## 3. 📚用語・ドメイン定義
+## 2. 👥 利用者とステークホルダー
 
-| 用語            | 定義                                                      | 備考                                             |
-| ------------- | ------------------------------------------------------- | ---------------------------------------------- |
-| `.codex`      | Codex のグローバル設定ディレクトリ。各 OS のホームディレクトリ直下の `~/.codex` を指す。 | Windows/macOS/Linux でホームパスは異なる                 |
-| `config.toml` | Codex の設定ファイル（TOML形式）。MCP、skills、agents、feature flags、trusted directories などを含む。 | 破損時も一部の閲覧系機能は利用可能 |
-| `AGENTS.md`   | Codex のエージェント設定/説明用ファイル（Markdown）。                      | 直接エディタで編集可能                                    |
-| `AGENTS.override.md` | `AGENTS.md` より優先される上書き用のエージェント設定/説明ファイル。 | 存在時のみ対象 |
-| `prompts`     | プロンプトファイル/フォルダを格納するフォルダ（`.codex/prompts`）。階層は自由。        | ルートフォルダ名は固定／リネーム不可                             |
-| `skills`      | スキルファイル/フォルダを格納するフォルダ（`.codex/skills`）。階層は自由。           | ルートフォルダ名は固定／リネーム不可                             |
-| `codex-templates`   | テンプレートファイル/フォルダを格納するフォルダ（`.codex/codex-templates`）。           | 固定パス／ルートフォルダ名は固定／リネーム不可                        |
-| `agents`      | エージェント定義ファイルを格納するフォルダ（`.codex/agents`）。                     | 固定パス／`*.toml` を対象／ルートフォルダ名は固定／リネーム不可          |
-| `.copilot-workspace-manager` | 拡張機能が生成するメタファイルの管理フォルダ（`.codex/.copilot-workspace-manager`）。          | 拡張機能管理領域                                       |
-| `config.toml.bk` | `config.toml` 整理コマンド実行前の退避ファイル。 | 保存先は `.codex/.copilot-workspace-manager/config.toml.bk`、常に1世代のみ |
-| `agents-disabled.json` | 無効化したエージェントの退避情報を保持するファイル。                       | 保存先は `.codex/.copilot-workspace-manager/agents-disabled.json` |
-| `codex-sync.json` | 同期の削除判定に使うメタ情報を保持するファイル。                           | 保存先は `.codex/.copilot-workspace-manager/codex-sync.json`      |
-| MCP           | Model Context Protocol のサーバー設定群。                        | `[mcp_servers.<id>]` テーブルとして `config.toml` に定義 |
-| MCP サーバー      | `config.toml` の `[mcp_servers.<id>]` ブロック1つを指す。         | `<id>` がサーバー表示名                                |
-| `enabled`     | MCP サーバーの有効/無効を表す設定値。                                   | 省略時は ON 扱い                                     |
-| `rollout-*.jsonl` | Codex CLI のセッション履歴ファイル。                            | `$CODEX_HOME/sessions/年/月/日/` 配下に保存される |
-| `user_message` | 履歴イベントのうち、ユーザーの発話本文。                                 | `type:"event_msg"` かつ `payload.type:"user_message"` |
-| `task_started / task_complete` | 履歴タスクの開始/終了イベント。                            | `type:"event_msg"` かつ `payload.type:"task_started"` / `payload.type:"task_complete"` |
-| `agent_message` | 履歴イベントのうち、AI の回答本文。                            | `type:"event_msg"` かつ `payload.type:"agent_message"` |
-| `response_item(reasoning)` | 履歴イベントのうち、思考過程本文。                            | `type:"response_item"` かつ `payload.type:"reasoning"` |
-| `turn_id` | 1タスクを識別する ID。                            | `task_started`〜`task_complete` を同一 `turn_id` で関連付ける |
-| `maxHistoryCount` | 履歴一覧の最大表示件数設定。                            | 明示設定時のみ適用。未設定時は全件表示 |
-| `incrudeReasoningMessage` | 思考過程表示の ON/OFF 設定。                            | 既定値 `false` |
-| `Codex Manager` | Core 系の診断・管理をまとめた WebviewPanel。 | 会話履歴、AGENTS Loading Chain、Trusted Directory、Feature Flags、Hooks をタブ表示 |
-| `Feature Flags` | `config.toml` の `[features]` に定義される Codex の機能フラグ。 | 主要フラグのみ UI 表示対象 |
-| `Hooks` | Codex hook source と hook entry の診断対象。 | `hooks.json` と `config.toml` 内 inline hooks を含む |
-| `Trusted Directory` | `config.toml` の `[projects.\"<path>\"]` に登録された trusted project。 | `trust_level = \"trusted\"` のみ初期表示対象 |
+- 利用者
+  - GitHub Copilot CLI / IDE の設定や instructions、commands、skills、agents、MCP を編集する開発者
+  - installed plugin が提供する commands / skills / agents / hooks / MCP / LSP を確認したい開発者
+- ステークホルダー
+  - 拡張機能開発者
+  - GitHub Copilot CLI / IDE を運用する利用者
 
 ---
 
-## 4. 🎭ユースケース / ユーザーストーリー
+## 3. 📚 用語・ドメイン定義
 
-* ユーザーは VS Code の専用 Explorer（複数ビュー）から `config.toml` / `AGENTS.md` を開き、エディタで編集できる。
-* ユーザーは Prompts Explorer からプロンプトファイル/フォルダを作成・編集・リネーム・削除できる。
-* ユーザーは Skills Explorer からスキルファイル/フォルダを作成・編集・リネーム・削除できる。
-* ユーザーは Template Explorer からテンプレートファイル/フォルダを閲覧し、テンプレートファイルを開いて編集できる。
-* ユーザーはファイル作成時に `.codex/codex-templates` 配下にテンプレートファイルが存在する場合、テンプレートを選択して雛形を適用できる。
-* ユーザーは Agent Explorer で `.codex/agents` 配下の `*.toml` を一覧し、選択して編集できる。
-* ユーザーは Agent Explorer からエージェントを追加し、追加時にテンプレート適用の有無を選択できる。
-* ユーザーはエージェント追加時に `config.toml` へ `[agents.<agent>]` が自動追記される。
-* ユーザーは Agent Explorer のコンテキストメニューからエージェントを有効化/無効化できる。
-* ユーザーは Agent Explorer の「フォルダを開く」ボタンで `.codex/agents` を OS のエクスプローラ/Finder で開ける。
-* ユーザーは MCP Explorer で MCP サーバー一覧を閲覧し、スイッチ風 UI で `enabled` を ON/OFF 切り替えできる。
-* ユーザーは Prompts/Skills/Template Explorer の「フォルダを開く」ボタンで各ルートフォルダを OS のエクスプローラ/Finder で開ける。
-* ユーザーは Codex Core の「フォルダを開く」ボタンで `.codex` を OS のエクスプローラ/Finder で開ける。
-* ユーザーは Refresh 操作により全ビューを更新できる。
-* `.codex` や `config.toml` が存在しない/壊れている場合、ユーザーは「拡張が利用できない」ことを UI 上で確認できる。
-* ユーザーは VS Code の表示言語に応じて、日本語または英語で拡張の表示（ラベル/メッセージ）を利用できる。
-* ユーザーは Codex Core の同期ボタンを押下することで、`.codex` と同期フォルダの間で最終更新日時が新しいファイルを正として相互同期できる。
-* ユーザーは Prompts Explorer の同期ボタンを押下することで、`.codex/prompts` と同期フォルダの間で最終更新日時が新しいファイルを正として相互同期できる。
-* ユーザーは Skills Explorer の同期ボタンを押下することで、`.codex/skills` と同期フォルダの間で最終更新日時が新しいファイルを正として相互同期できる。
-* ユーザーは Template Explorer の同期ボタンを押下することで、`.codex/codex-templates` と同期フォルダの間で最終更新日時が新しいファイルを正として相互同期できる。
-* ユーザーは Agent Explorer の同期ボタンを押下することで、`.codex/agents` と同期フォルダの間で最終更新日時が新しいファイルを正として相互同期できる。
-* ユーザーは Agent 同期で `.codex/agents` から削除されたエージェントについて、`config.toml` の `[agents.<agent>]` エントリと `.codex/.copilot-workspace-manager/agents-disabled.json` の退避エントリが自動削除される。
-* ユーザーは Agent 同期で追加されたエージェントについて、`config.toml` に最小構成の `[agents.<agent>]` エントリが自動追記される。
-* 既存ユーザーはアップデート後も旧同期メタ（`.codex/.codex-sync/state.json`）から新同期メタ（`.codex/.copilot-workspace-manager/codex-sync.json`）へ移行され、同期機能を継続利用できる。
-* 既存ユーザーはアップデート後も `.codex/codex-templates` の運用を変更せず、テンプレート選択を継続利用できる。
-* ユーザーは Codex Core Explorer のボタン、またはコマンドパレットから、エディタ領域に `Codex Manager` を開ける。
-* ユーザーは `Codex Manager` の会話履歴タブで、従来どおり会話履歴を閲覧・検索・コピーできる。
-* ユーザーは `Codex Manager` の AGENTS Loading Chain タブで、現在有効な AGENTS 系ファイル、無視された候補、要確認項目を確認できる。
-* ユーザーは `Codex Manager` の Trusted Directory タブで、信頼済みディレクトリの一覧、追加、削除ができる。
-* ユーザーは `Codex Manager` の Feature Flags タブで、主要な feature flag の説明、成熟度、既定値、現在値を確認し、ON/OFF を切り替えられる。
-* ユーザーは `Codex Manager` の Hooks タブで、Hooks 機能状態、Project Hooks 状態、hook source ごとの entry 一覧、warning を確認できる。
-* ユーザーは `Codex Manager` の Hooks タブから、存在する `hooks.json` / `config.toml` を開ける。
-* ユーザーは `Codex Manager` の Hooks タブから、存在しない `hooks.json` / `config.toml` を作成して開ける。
-* ユーザーはコマンドパレットから `config.toml` 整理コマンドを実行し、管理対象セクションの分断を解消できる。
-* ユーザーは `config.toml` 整理コマンド実行時、書き換え前の内容を `.codex/.copilot-workspace-manager/config.toml.bk` に退避できる。
-* ユーザーは左ペインの日付フォルダ（`yyyy/mm/dd`）とタスクカードを使い、履歴を新しい順に閲覧できる。
-* ユーザーはセッションカードを選択し、右ペインでユーザーメッセージ全文と AI メッセージ/思考過程を時系列で確認できる。
-* ユーザーはユーザーメッセージ全文を対象に検索し、部分一致で一覧を絞り込み、カード表示で一致箇所をハイライト表示できる。
-* ユーザーは検索クリアで全件表示へ戻せる。
+| 用語 | 定義 | 備考 |
+| --- | --- | --- |
+| `~/.copilot` | GitHub Copilot のユーザースコープ設定ルート | `COPILOT_HOME` が設定されている場合はその値を優先する |
+| `config.json` | ユーザースコープの Copilot 設定ファイル | installed plugin 情報の一次情報でもある |
+| `settings.json` | ユーザースコープ設定ファイル | `disabledSkills`、`enabledPlugins` などの上書き状態を保持する |
+| `mcp-config.json` | 有効な MCP 定義を保持する JSON | `mcpServers` または `servers` を読む |
+| `.copilot-workspace-manager/mcp-config.disabled.json` | 無効な MCP 定義を保持する JSON | ON/OFF 切替時に `mcp-config.json` と相互移送する |
+| `.copilot-workspace-manager/templates/` | Templates Explorer の保存先 | `~/.copilot/.copilot-workspace-manager/templates/` |
+| `.copilot-workspace-manager/copilot-workspace-sync.json` | 相互同期用の状態ファイル | Core / Skills / Templates / Agents 同期の削除判定に使用する |
+| `.claude/commands/` | `Commands` View が扱う workspace commands ルート | 現実装では user prompts や IDE prompts は扱わない |
+| `.github/skills/` | workspace skills の代表ルート | `.agents/skills/`、`.claude/skills/` も併読する |
+| `.github/agents/` | workspace agents の代表ルート | `.claude/agents/` も併読する |
+| installed plugin | `config.json.installedPlugins` に列挙された plugin | `settings.json.enabledPlugins` による有効状態上書きを受ける |
+| plugin manifest | plugin の定義ファイル | 探索順は `.plugin/plugin.json` → `plugin.json` → `.github/plugin/plugin.json` → `.claude-plugin/plugin.json` |
+| Core Explorer | Core 設定ファイル群を開く Tree View | `config.json`、`settings.json`、workspace settings、`mcp-config.json`、instruction files を表示する |
+| Core View | エディタ領域に開く WebviewPanel | タブは `History` / `Instructions Chain` / `Trusted` / `Hooks` / `Plugins` |
+| Skill Manager | skills 一覧と有効状態を確認する WebviewPanel | `settings.json.disabledSkills` を編集する |
+| Agent Manager | agents 一覧と frontmatter を確認する WebviewPanel | `user-invocable` / `disable-model-invocation` を編集する |
+| MCP Manager | MCP 一覧と詳細編集フォームを提供する WebviewPanel | local / stdio / http / sse を扱う |
+| `session-state/<session>/events.jsonl` | History タブが読む会話履歴ファイル | `~/.copilot/session-state/` 配下を新しい順に走査する |
 
 ---
 
-## 5. ✅機能要件
-
-### 5.1 ビュー（Explorer）構成
-
-* 次のビューを提供する（同一 View Container 配下に配置）
-
-  * Prompts Explorer
-  * Skills Explorer
-  * Template Explorer
-  * Agent Explorer
-  * MCP Explorer
-  * Codex Core（`config.toml` / `AGENTS.md`）
-  * Codex Manager（WebviewPanel）
-* 各 Explorer は以下の固定ルートフォルダを持つ（UI ではルート直下の階層を表示し、ルート自体は表示しない）。
-
-  * Prompts Explorer：`prompts`（`.codex/prompts`）
-  * Skills Explorer：`skills`（`.codex/skills`）
-  * Template Explorer：`codex-templates`（`.codex/codex-templates`）
-  * Agent Explorer：`agents`（`.codex/agents`）
-* 上記の固定ルートフォルダは **リネーム不可**とする。
-
-### 5.2 利用可否判定（共通）
-
-* 以下のいずれかに該当する場合、拡張機能全体を「利用不可」とする。
-
-  * `~/.codex` が存在しない
-  * `~/.codex/config.toml` が存在しない
-  * `config.toml` が読み取れない
-* `config.toml` が TOML として parse できない場合は、拡張全体を利用不可にはしない。
-  * Core ファイルを開く操作
-  * `Codex Manager` の会話履歴タブ
-  * `Codex Manager` の AGENTS Loading Chain タブ
-  * `Codex Manager` の Hooks タブの source ファイル導線
-  は利用可能とする。
-* `config.toml` が TOML として parse できない場合は、設定解析に依存する更新操作を無効化する。
-  * Skill / Agent / MCP / Feature Flags の設定更新
-  * Trusted Directory の追加 / 削除
-  * config 解析を前提にした一覧更新
-* 利用不可の場合、各ビューには同一の 1 アイテムのみ表示する。
-
-  * 表示：`⚠ Copilot Workspace Manager を開けません: <理由>`
-* 利用不可の場合、全コマンド操作は実行不可とする。
-* ただし `config.toml` の parse 失敗時は全停止ではなく、閲覧系と修復導線を残した部分利用不可とする。
-
-### 5.3 選択必須（共通）
-
-* 削除/リネームなどの操作は対象選択が必須。
-* 対象が未選択の場合は操作を実行せず、右下に簡易メッセージを表示する。
-
-  * `showInformationMessage("操作する対象を選択してください。")`（英語環境では英語表示）
-
-### 5.4 アイコン表示（共通）
-
-* 以下の対象にはアイコンを設定する。
-  * プロンプトファイル：`markdown32.png`
-  * プロンプトフォルダ：`folder32.png`
-  * エージェント（有効）：`agent_on.png`
-  * エージェント（無効）：`agent_off.png`
-  * MCP サーバー：`ThemeIcon('mcp')`
-* MCP の ON/OFF はスイッチ風 UI として視認できること（アイコン表現を含む）。
-
-### 5.5 ファイル/フォルダ操作（prompts / skills / codex-templates）
-
-* フォルダ階層は自由。
-* ファイルを選択した場合は、通常の VS Code Explorer と同様にエディタで開く（テキスト編集）。
-
-#### 5.5.1 初回作成時のルートフォルダ自動作成
-
-* ファイル追加/フォルダ追加の実行時に、対象 Explorer のルートフォルダ（`.codex/prompts` / `.codex/skills` / `.codex/codex-templates`）が存在しない場合は、拡張が自動で作成する。
-
-#### 5.5.2 追加（ファイル/フォルダ）
-
-* 作成先ルール
-
-  * 選択対象がフォルダ：そのフォルダ配下に作成
-  * 選択対象がファイル：そのファイルの親フォルダ配下に作成
-  * 未選択：対象 Explorer のルートフォルダ配下に作成
-* ファイル作成時の拡張子
-
-  * 入力が拡張子なし：`.md` を付与
-  * 入力が拡張子あり：入力を優先
-* 命名重複時
-
-  * ファイル：`_1`, `_2`… の連番候補を提示し、OK で連番名を採用して作成
-  * フォルダ：同名が存在する場合はエラー表示で中止
-* 入力名のバリデーション
-
-  * ファイル名/フォルダ名に使用できない文字列は `_` に置換する
-
-#### 5.5.3 編集（Open）
-
-* 対象がファイルの場合、エディタで開く。
-* 対象がフォルダの場合、編集操作は行わない（もしくは無効）。
-
-#### 5.5.4 削除（物理削除）
-
-* 対象：ファイル/フォルダ
-* フォルダは再帰削除する（配下をすべて削除）
-* 確認ダイアログは必須。文言例：
-
-  * フォルダ：`このフォルダ以下をすべて削除してもよろしいですか？`
-  * ファイル：`このファイルを削除してもよろしいですか？`
-* 確認ダイアログには対象パス/名称を表示する。
-
-#### 5.5.5 リネーム（Rename）
-
-* 対象：ファイル/フォルダ
-* ファイルは拡張子込みでリネーム対象とする。
-* 固定ルートフォルダ（`prompts` / `skills` / `codex-templates`）は常にリネーム不可とする。
-
-**ファイル**
-
-* 目標名が存在しない場合：そのままリネーム
-* 目標名が存在する場合：`_1`, `_2`… の連番候補を提示し、OK で連番名を採用してリネーム（キャンセルで中止）
-* 大文字小文字のみの変更は許可する
-
-**フォルダ**
-
-* 目標名が存在する場合：リネーム不可（エラー表示）
-* 大文字小文字のみの変更は許可する
-
-### 5.6 テンプレート機能（`.codex/codex-templates` 固定）
-
-* テンプレートフォルダは `.codex/codex-templates` に固定する（設定値は存在しない）。
-* `.codex/codex-templates` 配下にテンプレートファイルが存在する場合のみ、ファイル作成時にテンプレート選択を可能とする。
-* テンプレート選択対象は「ファイルのみ」とし、隠しファイル（`.` 始まり）は除外する。
-* 選択したテンプレートファイルの内容を新規作成ファイルに適用する。
-* Template Explorer ではテンプレートファイルを開いて編集できる。
-
-### 5.7 MCP Explorer
-
-#### 5.7.1 一覧抽出
-
-* `config.toml` 内の `[mcp_servers.<id>]` を MCP サーバー定義として抽出する。
-* `<id>` をサーバー名として表示する。
-* 並び順は `config.toml` に出現した順（設定値順）とする。
-
-#### 5.7.2 トグル UI（スイッチ風）
-
-* MCP サーバーの ON/OFF は、Tree 上でスイッチ風に見える UI として提供する。
-
-  * クリック操作で ON/OFF が切り替わる。
-  * ON/OFF の状態はスイッチ表現（アイコンや装飾）で明確に視認できる。
-
-#### 5.7.3 トグル仕様（enabled パッチ）
-
-* ブロック内の `enabled` 行を検出し、値を `true/false` 反転する。
-* `enabled` 行の検出はスペース有無を許容する（例：`enabled=true`, `enabled = true`）。
-* 末尾コメント（例：`enabled = true # comment`）が存在する場合、コメントは保持する。
-* `enabled` が無い場合は ON 扱いとし、トグル操作で OFF にするため、ヘッダ直下に `enabled = false` を挿入する。
-* トグル成功後は通知を表示する。
-
-  * `設定を更新しました。反映には Codex の再起動が必要です。`（英語環境では英語表示）
-
-### 5.8 フォルダを開く
-
-* Prompts/Skills/Template Explorer の「フォルダを開く」ボタンは、それぞれ `.codex/prompts` / `.codex/skills` / `.codex/codex-templates` を開く。
-* Agent Explorer の「フォルダを開く」ボタンは `.codex/agents` を開く。
-* Codex Core の「フォルダを開く」ボタンは `.codex` を開く。
-
-### 5.9 Refresh
-
-* Refresh 操作は Prompts / Skills / Template / Agent / MCP / Core の **全ビューを更新**する。
-
-### 5.10 多言語対応（日本語・英語）
-
-* 拡張機能のラベル/メッセージは **日本語・英語**を提供する。
-* VS Code の表示言語が **日本語（ja）**の場合は日本語を表示する。
-* VS Code の表示言語が **日本語以外**の場合はすべて英語を表示する。
-
-### 5.11 同期（Sync）
-
-* 同期先フォルダ設定を追加する（既定値はブランク）。
-  * Codex Core Sync Folder（キー：`codexFolder`）
-  * Prompts Sync Folder（キー：`promptsFolder`）
-  * Skills Sync Folder（キー：`skillsFolder`）
-  * Template Sync Folder（キー：`templatesFolder`）
-  * Agent Sync Folder（キー：`agentFolder`）
-* 拡張機能が作成するメタファイルの固定ルートは `.codex/.copilot-workspace-manager/` とする。
-* 同期メタの保存先は `.codex/.copilot-workspace-manager/codex-sync.json` とする。
-* 互換読み取りの優先順は `.codex/.copilot-workspace-manager/codex-sync.json` → `.codex/.codex-sync/state.json` とする。
-* 新保存先が存在せず旧保存先が存在する場合、旧内容を新保存先へ原子的に移行し、移行後に旧 `state.json` を削除する。
-* 移行に失敗した場合は旧保存先を保持し、処理を中断してエラー通知する。
-* Codex Core
-  * 同期ボタン（codicon: `sync`）を追加する。
-  * `codexFolder` が未設定の場合は同期ボタンを非表示にする。
-  * 押下時に確認メッセージを表示し、OK の場合に `.codex/AGENTS.md` と `.codex/config.toml` を `codexFolder` と相互同期する。
-    * `.codex` と `codexFolder` の同名ファイルは最終更新日時が新しい方を正として古い方を上書きする。
-    * いずれかで削除されたファイルは両方から削除する。
-    * 削除同期の判定に必要なメタ情報は `.codex/.copilot-workspace-manager/codex-sync.json` に保存し、削除が両方に反映された時点で対象エントリを削除する。
-    * `.codex/.copilot-workspace-manager` 配下は隠しフォルダとして同期対象外とする。
-    * 隠しフォルダ/隠しファイルは対象外とする。
-    * 上書き中にエラーが発生した場合は該当ファイルのみスキップし、スキップした旨を簡易ダイアログで通知する。
-    * 文言：`<パス> のファイルを上書きしますがよろしいですか？`
-* Prompts Explorer
-  * 同期ボタン（codicon: `sync`）を追加する。
-  * `promptsFolder` が未設定の場合は同期ボタンを非表示にする。
-  * 押下時に確認メッセージを表示し、OK の場合に `.codex/prompts` と `promptsFolder` を相互同期する。
-    * `.codex/prompts` と `promptsFolder` の同名ファイルは最終更新日時が新しい方を正として古い方を上書きする。
-    * いずれかで削除されたファイルは両方から削除する。
-    * 削除同期の判定に必要なメタ情報は `.codex/.copilot-workspace-manager/codex-sync.json` に保存し、削除が両方に反映された時点で対象エントリを削除する。
-    * `.codex/.copilot-workspace-manager` 配下は隠しフォルダとして同期対象外とする。
-    * 隠しフォルダ/隠しファイルは対象外とする。
-    * 上書き中にエラーが発生した場合は該当ファイルのみスキップし、スキップした旨を簡易ダイアログで通知する。
-    * 文言：`<パス> のファイルを上書きしますがよろしいですか？`
-* Skills Explorer
-  * 同期ボタン（codicon: `sync`）を追加する。
-  * `skillsFolder` が未設定の場合は同期ボタンを非表示にする。
-  * 押下時に確認メッセージを表示し、OK の場合に `.codex/skills` と `skillsFolder` を相互同期する。
-    * `.codex/skills` と `skillsFolder` の同名ファイルは最終更新日時が新しい方を正として古い方を上書きする。
-    * いずれかで削除されたファイルは両方から削除する。
-    * 削除同期の判定に必要なメタ情報は `.codex/.copilot-workspace-manager/codex-sync.json` に保存し、削除が両方に反映された時点で対象エントリを削除する。
-    * `.codex/.copilot-workspace-manager` 配下は隠しフォルダとして同期対象外とする。
-    * 隠しフォルダ/隠しファイルは対象外とする。
-    * 上書き中にエラーが発生した場合は該当ファイルのみスキップし、スキップした旨を簡易ダイアログで通知する。
-    * 文言：`<パス> のファイルを上書きしますがよろしいですか？`
-* Template Explorer
-  * 同期ボタン（codicon: `sync`）を追加する。
-  * `templatesFolder` が未設定の場合は同期ボタンを非表示にする。
-  * 押下時に確認メッセージを表示し、OK の場合に `.codex/codex-templates` と `templatesFolder` を相互同期する。
-    * `.codex/codex-templates` と `templatesFolder` の同名ファイルは最終更新日時が新しい方を正として古い方を上書きする。
-    * いずれかで削除されたファイルは両方から削除する。
-    * 削除同期の判定に必要なメタ情報は `.codex/.copilot-workspace-manager/codex-sync.json` に保存し、削除が両方に反映された時点で対象エントリを削除する。
-    * `.codex/.copilot-workspace-manager` 配下は隠しフォルダとして同期対象外とする。
-    * 隠しフォルダ/隠しファイルは対象外とする。
-    * 上書き中にエラーが発生した場合は該当ファイルのみスキップし、スキップした旨を簡易ダイアログで通知する。
-    * 文言：`<パス> のファイルを上書きしますがよろしいですか？`
-* Agent Explorer
-  * 同期ボタン（codicon: `sync`）を追加する。
-  * `agentFolder` が未設定の場合は同期ボタンを非表示にする。
-  * 押下時に確認メッセージを表示し、OK の場合に `.codex/agents` と `agentFolder` を相互同期する。
-    * `.codex/agents` と `agentFolder` の同名ファイルは最終更新日時が新しい方を正として古い方を上書きする。
-    * いずれかで削除されたファイルは両方から削除する。
-    * 削除同期の判定に必要なメタ情報は `.codex/.copilot-workspace-manager/codex-sync.json` に保存し、削除が両方に反映された時点で対象エントリを削除する。
-    * `.codex/.copilot-workspace-manager` 配下は隠しフォルダとして同期対象外とする。
-    * 隠しフォルダ/隠しファイルは対象外とする。
-    * 上書き中にエラーが発生した場合は該当ファイルのみスキップし、スキップした旨を簡易ダイアログで通知する。
-    * 文言：`<パス> のファイルを上書きしますがよろしいですか？`
-    * 同期結果でエージェントファイルが削除された場合、対応する `[agents.<agent>]` を `config.toml` から削除する。
-    * 同期結果でエージェントファイルが削除された場合、`.codex/.copilot-workspace-manager/agents-disabled.json` の対応エントリも削除する。
-    * 同期結果でエージェントファイルが新規追加された場合、`config.toml` に最小構成の `[agents.<agent>]` を追記する。
-
-### 5.12 Agent Explorer
-
-#### 5.12.1 一覧表示と基本操作
-
-* 固定ルート `.codex/agents` 配下の `*.toml` を一覧表示する。
-* 一覧アイテム選択時は該当 `*.toml` をエディタで開く。
-* 以下の操作を提供する。
-  * 新規作成
-  * リネーム
-  * 削除
-  * エディタで開く（選択時）
-
-#### 5.12.2 追加・編集・削除フロー
-
-* 追加フローは以下の順序で実施する。
-  1. エージェント名入力
-  2. 説明入力
-  3. テンプレート選択（「空のファイル」を含む）
-* 作成先は `.codex/agents/<agent>.toml` とする。
-* 同名ファイルが既に存在する場合は作成を中断し、衝突通知する。
-* 編集フローはエージェント名と説明の編集を提供する。
-* 削除フローは確認ダイアログを表示し、OK 時のみ物理削除する。
-
-#### 5.12.3 `config.toml` 連携
-
-* `.codex/agents/<agent>.toml` 作成成功後に `config.toml` へ `[agents.<agent>]` を自動追記する。
-* 自動追記の最小構成は以下とする。
-  * `description`（空文字許可）
-  * `config_file = "agents/<agent>.toml"`
-* 既に `[agents.<agent>]` が存在する場合は上書きせず、通知する。
-
-#### 5.12.4 有効/無効切り替え
-
-* Agent Explorer のコンテキストメニューに `Agentを有効化` / `Agentを無効化` を追加する。
-* Agent Explorer のインライン操作は文字列ではなくアイコンで表現し、有効化は `images/agent_on.png`、無効化は `images/agent_off.png` を使用する。
-* 有効/無効の実体は `config.toml` の `[agents.<agent>]` の有無で表現する。
-  * Enable：`[agents.<agent>]` を追加
-  * Disable：`[agents.<agent>]` を削除
-* Disable 時は削除ブロック（コメント含む）を `.codex/.copilot-workspace-manager/agents-disabled.json` に退避する。
-* Enable 時は退避ブロックがあれば復元し、なければ最小構成ブロックを追加する。
-* 切り替え後は再起動が必要な旨を通知する。
-
-### 5.13 Codex Manager
-
-* 呼び出し導線
-  * Codex Core Explorer の上部ボタンから `Codex Manager` を開けるようにする。
-  * コマンドを追加し、コマンドパレットから `Codex Manager` を開けるようにする。
-  * 表示先は WebviewPanel を利用した **エディタ領域**とする。
-  * `Codex Manager` は単一インスタンスとし、既に開いている場合は再利用し、前面表示する。
-* タブ構成
-  * 会話履歴
-  * AGENTS Loading Chain
-  * Trusted Directory
-  * Feature Flags
-  * Hooks
-* 各タブには個別 Refresh を提供し、現在開いているタブのみ再読み込みする。
-* コマンドパレットから `Copilot Workspace Manager: Organize config.toml` を実行できる。
-
-#### 5.13.1 会話履歴タブ
-
-* データソース / 解析対象
-  * 履歴データは `$CODEX_HOME/sessions/.../rollout-*.jsonl` を正とする。
-  * フォルダ階層は `年/月/日` を前提とする。
-  * 新形式イベントのみを解析対象とする（旧形式ログは対象外）。
-  * 1 タスクは `type:"event_msg"` かつ `payload.type:"task_started"`〜`payload.type:"task_complete"` の同一 `turn_id` 区間で定義する。
-  * 1 タスク内の抽出対象は以下とする。
-    * ユーザー: `type:"event_msg"` かつ `payload.type:"user_message"`（最初の 1 件）
-    * AI回答: `type:"event_msg"` かつ `payload.type:"agent_message"`（複数件）
-    * 思考過程: `type:"response_item"` かつ `payload.type:"reasoning"`（複数件）
-  * `turn_id` が欠落したイベントは、`turn_context.turn_id` または単一アクティブタスクにフォールバックして紐づける。
-  * `task_complete` が欠落する場合でも、ファイル末尾時点のアクティブタスクを確定する。
-* 画面構成
-  * 上部に検索エリア、下部に左右 2 ペイン（左 30% / 右 70%）を表示する。
-  * 左ペインは日付フォルダ（`yyyy/mm/dd`）とタスクカード一覧を表示する。
-  * 右ペインは選択タスクの会話プレビュー（Markdown レンダリング）を表示する。
-* 左ペイン（ツリー＋カード）
-  * 日付フォルダは `yyyy/mm/dd` 単位で表示する。
-  * タスクカードは新しい順で表示する。
-  * カードタイトルは `user_message` の全文を検索対象とし、表示は最大 100 文字で省略する。
-  * カード先頭にローカル時刻 `[H:mm:ss]` を表示する。
-  * 表示件数は「全体の最新タスク件数」を `maxHistoryCount`（=1タスク=1ユーザーメッセージ）で制限する。
-    * 明示設定時のみ適用し、未設定時は全件表示する。
-* 右ペイン（会話プレビュー）
-  * タスク選択時に `user_message` 全文を表示する。
-  * AI回答（`agent_message`）と思考過程（`response_item.reasoning`）は同一タイムラインで時系列表示する。
-  * 思考過程は折りたたみ表示（chevron）とする。
-  * `incrudeReasoningMessage=false` の場合、思考過程は表示しない。
-  * ユーザーメッセージと AI回答にコピー操作（codicon `copy`）を提供する。
-* 検索
-  * 対象は `user_message` 全文とする。
-  * 一致ルールは大文字小文字を区別しない部分一致とする。
-  * 検索は入力時および Enter で実行する。
-  * 結果はツリー絞り込み状態で表示し、一致語をハイライトする。
-  * クリア操作で絞り込みを解除する。
-  * 検索一致箇所への自動スクロールは実装しない。
-
-#### 5.13.2 AGENTS Loading Chain タブ
-
-* Codex の実行結果そのものではなく、Copilot Workspace Manager による推定診断を表示する。
-* 基準ディレクトリは VS Code ワークスペースルートとし、画面上で変更する操作は提供しない。
-* 左ペインは `現在有効` / `無視された候補` / `要確認` / `詳細候補` のセクションで表示する。
-* `詳細候補` は既定で非表示とし、トグル ON 時のみ表示する。
-* 右ペインは選択項目の状態、分類、パス、説明、本文プレビューを表示する。
-* ワークスペースが未オープンの場合は、候補一覧の代わりにワークスペースが必要である旨を表示する。
-
-#### 5.13.3 Trusted Directory タブ
-
-* `config.toml` の `[projects."<path>"]` のうち、`trust_level = "trusted"` のエントリのみ一覧表示する。
-* 一覧には、ディレクトリパス、状態アイコン、削除操作を表示する。
-* 追加はフォルダ選択ダイアログから行い、削除は確認ダイアログ後に `config.toml` の trust 設定のみを削除する。
-* ディレクトリが存在しない場合は warning 表示する。
-
-#### 5.13.4 Feature Flags タブ
-
-* `config.toml` の `[features]` を対象に、主要な feature flag 一覧を表示する。
-* 一覧には、feature 名、説明、成熟度、既定値、現在値、設定有無を表示する。
-* 初期リリースで対象とする主要 feature flag は以下とする。
-  * `apps`
-  * `codex_hooks`
-  * `fast_mode`
-  * `memories`
-  * `multi_agent`
-  * `personality`
-  * `shell_snapshot`
-  * `shell_tool`
-  * `unified_exec`
-  * `undo`
-  * `web_search`
-  * `web_search_cached`
-  * `web_search_request`
-* `config.toml` が解析可能な場合は、各 feature flag をトグルで ON/OFF 更新できる。
-* `codex_hooks` 更新時は Hooks タブも再描画して状態を同期する。
-
-#### 5.13.5 Hooks タブ
-
-* ヘッダには、Hooks 機能の有効状態、Project Hooks 機能の有効状態、基準ワークスペースパスを表示する。
-* 対象 source は以下とする。
-  * `~/.codex/hooks.json`
-  * `~/.codex/config.toml` 内の inline hooks
-  * `project/.codex/hooks.json`
-  * `project/.codex/config.toml` 内の inline hooks
-* 左ペインに source 一覧を表示し、選択した source 配下の hook entry のみを右ペインに表示する。
-* source 一覧には、layer、format、パス、active/inactive 状態、entry 件数を表示する。
-* project layer は trusted workspace の場合のみ active とする。
-* Hooks タブでは warning として以下を表示できる。
-  * `codex_hooks` 無効
-  * project-local hooks が trusted になるまで無効
-  * 同一 layer に `hooks.json` と inline hooks が共存
-  * command handler 以外の hook が含まれる
-* source ファイルが存在する場合は Open 操作を提供する。
-* `hooks.json` が存在しない場合は最小構成ファイルを作成して開く。
-* `config.toml` が存在しない場合は空ファイルを作成して開く。
-* 初期リリースでは、Hooks タブ上で hook entry の追加、削除、構造化編集は提供しない。
-
-#### 5.13.6 `Organize config.toml` コマンド
-
-* 明示コマンド `Copilot Workspace Manager: Organize config.toml` を提供する。
-* 対象は `~/.codex/config.toml` とする。
-* コマンド実行時のみ、書き換え直前の内容を `.codex/.copilot-workspace-manager/config.toml.bk` へバックアップする。
-* バックアップは常に 1 世代のみ保持し、既存 `config.toml.bk` は上書きする。
-* `config.toml` が存在しない場合はコマンドを実行しない。
-* バックアップ作成に失敗した場合は整理処理を中止し、`config.toml` は書き換えない。
-* 整理対象は次の管理対象セクションのみとする。
-  * `[features]`
-  * `[[skills.config]]`
-  * `[agents.<name>]`
-  * `[mcp_servers.<id>]`
-  * `[mcp_servers.<id>.env]`
-  * `[projects."<path>"]`
-* 整理ルールは次のとおりとする。
-  * ファイル全体の大まかなセクション順は変更しない
-  * 同種セクションが分断されている場合は、その種類が最初に現れた位置へ集約する
-  * 集約後の同種セクション内順は元の出現順を維持する
-  * `[mcp_servers.<id>.env]` は必ず親 `[mcp_servers.<id>]` の直後へ配置する
-  * 管理対象外のセクションは並び替えない
-  * ブロック本文は変更しない
-  * コメントは可能な限り既存位置関係を維持する
+## 4. 🎭 ユースケース / ユーザーストーリー
+
+- ユーザーは Core Explorer から `config.json`、`settings.json`、workspace settings、`mcp-config.json`、instructions を開ける。
+- ユーザーは `Commands` View から workspace commands と plugin commands を一覧し、workspace commands を編集できる。
+- ユーザーは Skills Explorer から Workspace / User / Plugin の skills を一覧し、Skill Manager で有効状態を確認・切替できる。
+- ユーザーは Agents Explorer から Workspace / User / Plugin の agents を一覧し、Agent Manager で frontmatter の主要項目を確認できる。
+- ユーザーは MCP Explorer から enabled / disabled / plugin MCP を一覧し、MCP Manager で追加・更新・削除・有効化切替を行える。
+- ユーザーは Core View で会話履歴、instruction chain、trusted folders、hooks、plugins を横断確認できる。
+- ユーザーは plugin が提供する commands / skills / agents / hooks / MCP / LSP の取得元と readonly 状態、既存定義との競合診断を確認できる。
+- ユーザーは Core / Skills / Templates / Agents について、設定済み同期フォルダとの相互同期を行える。
 
 ---
 
-## 6. 🛡️非機能要件
+## 5. ✅ 機能要件
 
-* ユーザビリティ（操作性、UI/UX要件）
+### 5.1 ビュー構成
 
-  * UI 最上部のボタン操作により、InputBox を順に入力して各操作（追加/編集/削除/更新/フォルダを開く）を行えること。
-  * ボタンは codicon を使用し、`new-folder` / `new-file` / `trash` / `edit` / `refresh` / `folder-opened` / `sync` を表示する。
-  * 操作対象が未選択の場合は右下にメッセージを表示し、選択を促すこと。
-  * MCP の ON/OFF はスイッチ風 UI で直感的に切り替えられること。
-  * アイコンにより、プロンプトファイル/フォルダ、エージェント状態および MCP の視認性が高いこと。
-  * ファイルを選択した場合は通常の Explorer と同等にエディタで開いて編集できること。
-  * 会話履歴ビューは左右 2 ペイン（左 30% / 右 70%）で表示されること。
-  * `Codex Manager` はタブ切り替え形式で Core 関連画面を表示し、Hooks タブは左ペイン source 選択と右ペイン entry 表示を維持すること。
-  * 会話履歴の時刻表示はローカル時刻で自然な表記になること。
-  * 検索ハイライトは VS Code テーマ色に追従し、可読性を維持すること。
-* ブランド要件（製品名、ブランド、アイコン、メタ情報など）
+- Activity Bar 配下に次の Tree View を提供する。
+  - `Core`
+  - `Agents`
+  - `Skills`
+  - `Commands`
+  - `MCP`
+  - `Templates`
+- 追加の Manager View / Panel として次を提供する。
+  - `Core View`
+  - `Skill Manager`
+  - `Agent Manager`
+  - `MCP Manager`
+- `Commands Manager` と `Template Manager` は現実装では提供しない。
 
-  * 拡張名：Copilot Workspace Manager
-  * タグライン：Explore and edit your .Copilot Workspace Manager (config.toml, AGENTS.md, prompts, skill, mcp) in VS Code.
-  * Keywords：`codex`, `.codex`, `codex-cli`, `workspace`, `config`, `config.toml`, `toml`, `agent`, `AGENTS.md`, `prompts`, `prompt`, `skills`, `mcp`, `mcp server`, `explorer`, `tree view`, `editor`
-* 保守性（拡張性、コード品質、ドキュメント）
+### 5.2 利用可否判定と設定破損時の扱い
 
-  * ビュー（prompts/skills/templates/agents/mcp/core）ごとに責務を分離し、将来拡張（再起動支援等）を追加しやすい構造とすること。
-  * UI とファイル操作ロジックを分離し、テスト容易性を確保すること。
+- `getWorkspaceStatus()` と `getCoreWorkspaceStatus()` は現実装では常に利用可を返す。
+- そのため、`config.json` が不正でも拡張全体を停止しない。
+- `config.json` の存在確認・JSON 妥当性確認は `getCopilotConfigStatus()` で別途行い、Core Explorer の `config.json` 項目に warning 表示を付ける。
+- `Core View` は `openCoreManager` コマンドから常に開ける。
+- `Skill Manager`、`Agent Manager`、`MCP Manager`、各 Tree View コマンドは現実装の availability guard を持つが、guard 自体は常に通る。
 
----
+### 5.3 Core Explorer
 
-## 7. 🔒制約条件
+- 表示対象は、存在するファイルのみとする。
+- データ取得元は次のとおり。
 
-* 開発環境や言語、フレームワークに制約はありますか？
+| 項目 | 取得元 | 備考 |
+| --- | --- | --- |
+| `config.json` | `~/.copilot/config.json` | 不正 JSON の場合は warning 表示 |
+| `settings.json` | `~/.copilot/settings.json` | user scope settings |
+| `settings.json` | `<workspace>/.github/copilot/settings.json` | workspace settings |
+| `settings.local.json` | `<workspace>/.github/copilot/settings.local.json` | workspace local settings |
+| `mcp-config.json` | `~/.copilot/mcp-config.json` | user MCP |
+| `copilot-instructions.md` | `~/.copilot/copilot-instructions.md` | user instructions |
+| `copilot-instructions.md` | `<workspace>/.github/copilot-instructions.md` | workspace instructions |
+| `*.instructions.md` | `<workspace>/.github/instructions/` 以下 | path instructions |
+| `AGENTS.md` | `<workspace>/AGENTS.md` | workspace agent instructions |
+| `AGENTS.md` | `COPILOT_CUSTOM_INSTRUCTIONS_DIRS` 各ディレクトリ | custom agent instructions |
 
-  * VS Code 拡張機能として開発する（TypeScript/Node.js および VS Code Extension API を想定）。
-  * `.codex` はホームディレクトリ直下の `~/.codex` を基本対象とする。
-  * ただし、現在仕様では project-local の `workspace/.codex` および一部 `workspace/.agents` を、Skills / Sub Agents / Hooks / Trusted Directory 判定のため参照する。
-  * 拡張のユーザー設定項目（設定値）は同期先フォルダ設定に加え、履歴表示設定（`maxHistoryCount` / `incrudeReasoningMessage`）を提供する。
-  * 拡張機能メタファイルは `.codex/.copilot-workspace-manager/` に保存する。
-  * 会話履歴データの参照先は `$CODEX_HOME/sessions/.../rollout-*.jsonl` のみとする。
-* 外部システムとの連携は必要ですか？
+- `openCopilotFolder` は選択中ファイルの親、未選択時は `~/.copilot` を OS のファイラーで開く。
 
-  * Codex CLI の起動/終了/再起動などのプロセス制御は行わない（将来拡張で検討）。
-  * MCP の切替は `config.toml` の編集により実施し、反映には再起動が必要である旨を通知する。
-  * 会話履歴ビューは WebView を用いてエディタ領域に表示し、WebviewView は採用しない。
+### 5.4 Core View
 
----
+- タブは次の 5 つとする。
+  - `History`
+  - `Instructions Chain`
+  - `Trusted`
+  - `Hooks`
+  - `Plugins`
+- タブごとの再読込は現在タブのみを対象にする。
 
-## 8. ⚠️リスクと課題
+#### 5.4.1 History
 
-* 想定されるリスクや懸念点
+- データ取得元は `~/.copilot/session-state/<session>/events.jsonl` とする。
+- `session-state` 直下のディレクトリを走査し、`logs` ディレクトリは除外する。
+- 履歴一覧は新しい順に並べる。
+- 1 ターンは `user_message` を起点に、assistant message と tool usage を紐付けて表示する。
+- 検索対象はユーザーメッセージ全文で、部分一致・大文字小文字非区別とする。
+- 表示件数上限は設定 `copilot-workspace-manager.maxSessionHistoryCount` に従い、既定値は `100` とする。
+- reasoning 表示を切り替える設定は現実装には存在しない。
 
-  * `config.toml` のフォーマットや MCP 設定の仕様変更により、`[mcp_servers.<id>]` 抽出や `enabled` 行のパッチが将来的に動作しなくなる可能性。
-  * `config.toml` の feature flag や trusted directory、inline hooks の仕様変更により、`Codex Manager` の診断や更新が将来的に動作しなくなる可能性。
-  * `hooks.json` と inline hooks の共存ルール変更により、Hooks タブの warning や active/inactive 判定が将来的に実態とずれる可能性。
-  * ファイル/フォルダの物理削除や上書き削除を伴う操作により、ユーザーが意図せずデータを失うリスク（確認ダイアログで緩和）。
-  * OS 依存のファイル名禁則（特に Windows）による作成/リネーム失敗（禁止文字 `_` 置換で緩和）。
-  * `.codex/prompts` / `.codex/skills` / `.codex/codex-templates` の初回自動作成により、ユーザーの意図しないディレクトリ生成が発生する可能性（初回操作時に限定）。
-  * `[agents.<agent>]` ブロックの追加/削除時に `config.toml` の構造を壊すと、エージェント有効/無効切替が失敗する可能性。
-  * 旧同期メタ（`.codex/.codex-sync/state.json`）から新同期メタ（`.codex/.copilot-workspace-manager/codex-sync.json`）への移行失敗により、同期が中断される可能性。
-  * 多言語対応により、文言の更新や追加時に翻訳漏れが発生する可能性。
-  * `rollout-*.jsonl` のイベント形式変化により、`task_started/task_complete` 境界や `turn_id` 紐づけの抽出に失敗する可能性。
-  * 会話履歴件数が多い日の一覧描画で、表示性能が低下する可能性。
-* 解決すべき前提条件や依存関係
+#### 5.4.2 Instructions Chain
 
-  * `enabled = true/false` が Codex 側で MCP の有効/無効として解釈されること（前提）。
-  * `.codex/codex-templates` 配下にテンプレートファイルが存在する場合のみテンプレ選択が可能であること。
-  * VS Code の表示言語判定（日本語か否か）に基づき表示言語を切り替えられること。
-  * `$CODEX_HOME/sessions` が年/月/日ディレクトリ構成であり、`rollout-*.jsonl` が配置されること。
+- データ取得元は次の instruction sources とする。
+  - `~/.copilot/copilot-instructions.md`
+  - `<workspace>/.github/copilot-instructions.md`
+  - `<workspace>/.github/instructions/*.instructions.md`
+  - `<workspace>/AGENTS.md`
+  - `COPILOT_CUSTOM_INSTRUCTIONS_DIRS/*/AGENTS.md`
+- path instructions は `applyTo` とアクティブファイルの一致判定を行う。
+- 表示は kind ごとに `user` / `workspace` / `path` / `agent` / `customAgent` を識別する。
+
+#### 5.4.3 Trusted
+
+- データ取得元は次の `settings.json` とする。
+  - `~/.copilot/settings.json`
+  - `<workspace>/.github/copilot/settings.json`
+- trusted folders は各 settings の trusted folder 配列から読む。
+- 一覧には source と path を表示し、削除ボタンを提供する。
+
+#### 5.4.4 Hooks
+
+- データ取得元は次の 2 系統とする。
+  - workspace hooks: `<workspace>/.github/hooks/*.json`
+  - plugin hooks: installed plugin 配下の `hooks.json`
+- user hooks や inline hooks は現実装では扱わない。
+- 表示は左ペインに source、右ペインに source ごとの entries を出す。
+- source ごとに `Workspace Hooks` / `Plugin Hooks` を区別する。
+
+#### 5.4.5 Plugins
+
+- 一次情報は `~/.copilot/config.json` の `installedPlugins` とする。
+- enabled 状態の上書きは `~/.copilot/settings.json` の `enabledPlugins` から読む。
+- plugin manifest 探索順は次のとおり。
+  1. `.plugin/plugin.json`
+  2. `plugin.json`
+  3. `.github/plugin/plugin.json`
+  4. `.claude-plugin/plugin.json`
+- 表示対象は plugin metadata と次の component blocks とする。
+  - `Agents`
+  - `Skills`
+  - `Commands`
+  - `Hooks`
+  - `MCP Servers`
+  - `LSP Servers`
+  - `Diagnostics`
+- 表示仕様は次のとおり。
+  - plugin ごとに enabled / disabled、install kind、manifest path、plugin root、各 component 件数を表示する
+  - component は readonly として表示する
+  - 既存 Workspace / User 定義との競合は diagnostics に反映する
+  - plugin enabled 切替は `settings.json.enabledPlugins` を更新し、再起動案内を表示する
+- 仕様変更が入りやすい箇所として、`installedPlugins` の shape、`enabledPlugins` の key、manifest 内 component の配置を明記して追跡する。
+
+### 5.5 Commands View
+
+- データ取得元は次のとおり。
+
+| 種別 | 取得元 | 表示ラベル |
+| --- | --- | --- |
+| Workspace Commands | `<workspace>/.claude/commands` | `Workspace Commands` |
+| Plugin Commands | installed plugin 配下の commands roots | `Plugin Commands` |
+
+- user scope prompts、IDE prompts、`.github/prompts` は現実装では扱わない。
+- 未選択時の `openPromptsFolder` は `<workspace>/.claude/commands` を開く。
+- `Commands` View 直下は root 自体ではなく、その配下の項目を表示する。
+- plugin commands は取得元として表示するが、編集対象としては readonly 扱いを前提にする。
+
+### 5.6 Skills Explorer と Skill Manager
+
+- Skills Explorer の root 候補は次の順序で収集する。
+  1. `<workspace>/.github/skills`
+  2. `<workspace>/.agents/skills`
+  3. `<workspace>/.claude/skills`
+  4. `~/.copilot/skills`
+  5. `~/.agents/skills`
+  6. `~/.claude/skills`
+  7. installed plugin 配下の skill roots
+- 表示優先は `project` → `user` → `plugin` とする。
+- `SKILL.md` の frontmatter から `name` と `description` を読む。
+- skill の enabled 状態は `~/.copilot/settings.json` の `disabledSkills` 配列で表現する。
+- Skill Manager の表示項目は次のとおり。
+  - skill 名
+  - 説明
+  - 絶対パス
+  - location label
+  - enabled / disabled switch
+  - open action
+- Skill Manager の toggle は `disabledSkills` を更新し、Tree View を再読込する。
+
+### 5.7 Agents Explorer と Agent Manager
+
+- Agents Explorer の root 候補は次の順序で収集する。
+  1. `<workspace>/.github/agents`
+  2. `<workspace>/.claude/agents`
+  3. `~/.copilot/agents`
+  4. installed plugin 配下の agent roots
+- plugin agents は readonly とする。
+- Agents Explorer では `.agent.md` と `.md` の両方を表示対象にし、一覧は `ThemeIcon('hubot')` を用いる。
+- Agent Manager の表示項目は次のとおり。
+  - 名前
+  - 説明
+  - model
+  - tools
+  - mcp-servers
+  - `user-invocable`
+  - `disable-model-invocation`
+  - preview 本文
+  - 絶対パス
+  - location label
+  - readonly 状態
+- `user-invocable` と `disable-model-invocation` の toggle は frontmatter を直接更新する。
+- Explorer の enable / disable コマンドは現実装で残っているが、実際には frontmatter 管理メッセージを表示するのみで、状態保存は行わない。
+
+### 5.8 MCP Explorer と MCP Manager
+
+- MCP Explorer のデータ取得元は次の 3 系統とする。
+  - `~/.copilot/mcp-config.json` の enabled 定義
+  - `~/.copilot/.copilot-workspace-manager/mcp-config.disabled.json` の disabled 定義
+  - installed plugin manifest 由来の plugin MCP 定義
+- 一覧表示順は通常 MCP を ID 昇順、その後に plugin MCP とする。
+- plugin MCP は readonly とする。
+- disabled な通常 MCP は `circle-slash` + `disabledForeground` で表示する。
+- MCP Manager の編集対象項目は次のとおり。
+  - `id`
+  - `type`
+  - `command`
+  - `args`
+  - `cwd`
+  - `url`
+  - `env`
+  - `headers`
+  - `tools`
+  - `timeout`
+  - `oauthClientId`
+  - `oauthPublicClient`
+  - `oidc`
+  - `filterMapping`
+- `type` は `local` / `stdio` / `http` / `sse` を扱う。
+- toggle は enabled/disabled でファイル間移送を行う。
+- add / save / delete を提供する。
+- plugin MCP は詳細フォームを表示するが編集不可とする。
+
+### 5.9 Templates Explorer
+
+- データ取得元は `~/.copilot/.copilot-workspace-manager/templates/` とする。
+- Templates Explorer は user 管理領域のみを表示する。
+- `openTemplatesFolder` はこの templates ルートを開く。
+- Templates の同期対象も同ルートとする。
+
+### 5.10 ファイル操作
+
+- Commands / Skills / Templates では add file、add folder、rename、delete を提供する。
+- ファイル作成・フォルダ作成は選択中フォルダまたは root 配下に行う。
+- Skills は複数 root を持つため、作成先は location に依存する。
+- Agents は専用コマンドで add / edit / delete を提供する。
+- MCP は Tree では編集せず、MCP Manager で add / save / delete / toggle を行う。
+
+### 5.11 同期
+
+- 同期コマンドを提供するのは次の 4 種別のみとする。
+  - `syncCore`
+  - `syncSkills`
+  - `syncTemplates`
+  - `syncAgents`
+- `syncPrompts` と `syncMcp` は現実装では存在しない。
+- 設定キーは次のとおり。
+  - `copilot-workspace-manager.copilotFolder`
+  - `copilot-workspace-manager.skillsFolder`
+  - `copilot-workspace-manager.templatesFolder`
+  - `copilot-workspace-manager.agentFolder`
+- Core 同期対象は次のファイルとする。
+  - `config.json`
+  - `settings.json`
+  - `mcp-config.json`
+  - `copilot-instructions.md`
+  - `.copilot-workspace-manager/mcp-config.disabled.json`
+- Skills 同期対象は `~/.copilot/skills`
+- Templates 同期対象は `~/.copilot/.copilot-workspace-manager/templates`
+- Agents 同期対象は `~/.copilot/agents`
+- 削除同期判定には `.copilot-workspace-manager/copilot-workspace-sync.json` を使用する。
+- hidden path と `.copilot-workspace-manager` 管理領域は通常同期の除外対象とする。
+
+### 5.12 Refresh と多言語対応
+
+- `refreshAll` は `Core / Commands / Skills / Templates / MCP / Agents` の各 Tree View を再読込する。
+- ラベルとメッセージは `package.nls.json` / `package.nls.ja.json` と runtime i18n を通じて日本語・英語を提供する。
+
+### 5.13 変動しやすい仕様の明文化
+
+- 次の箇所は GitHub Copilot CLI 側の変更影響を受けやすいため、仕様書側で取得元と探索順を必ず明記する。
+  - `config.json.installedPlugins`
+  - `settings.json.enabledPlugins`
+  - plugin manifest の探索順
+  - plugin manifest 内の `agents` / `skills` / `commands` / `hooks` / `mcpServers` / `lspServers`
+  - `session-state/<session>/events.jsonl` の履歴イベント形式
+  - trusted folders の `settings.json` 表現

@@ -1,478 +1,376 @@
-# 📘Copilot Workspace Manager 計書書
+# 📘 Copilot Workspace Manager 設計書
 
-## 1. 🏷️システム概要
+## 1. 🏷️ システム概要
 
-- **アプリ名**：`Copilot Workspace Manager`
-- **目的**：Codex の `~/.codex` 配下にある設定・プロンプト・スキル・テンプレート・エージェント・MCP 設定を VS Code 内で一元的に閲覧・編集できるようにする
-- **対象ユーザー**：`~/.codex` の設定や各種ファイルを日常的に編集する Codex 利用者
+- **アプリ名**: `Copilot Workspace Manager`
+- **目的**: GitHub Copilot CLI / IDE の設定ファイル、instructions、commands、skills、agents、MCP、plugin 情報を VS Code 内で一元的に確認・編集する
+- **対象ユーザー**: `~/.copilot` と workspace 配下の Copilot 関連ファイルを日常的に扱う開発者
+- **設計方針**:
+  - コードベースを唯一の真実とし、Workspace / User / Plugin の実体パスをそのまま見せる
+  - Tree View は「一覧と導線」、Manager View は「詳細閲覧または編集」に責務を分ける
+  - plugin 由来要素は readonly を既定とし、競合は diagnostics として表示する
 
-## 2. 🧰技術スタック
+## 2. 🧰 技術スタック
 
 | 階層 | 技術・ライブラリ |
 | --- | --- |
 | 言語 | TypeScript |
 | 実行基盤 | Node.js |
-| 拡張API | VS Code Extension API |
-| 履歴ビューUI | WebviewPanel（エディタ領域） |
-| 設定パース | TOML パーサ（例：`toml`） |
-| 多言語対応 | `vscode-nls` |
-| アイコン | `@vscode/codicons` |
-| テスト | Mocha + VS Code Test（`@vscode/test-*`） |
+| 拡張 API | VS Code Extension API |
+| Webview | `WebviewPanel` |
+| 設定形式 | JSON / Markdown frontmatter |
+| 多言語対応 | `vscode-nls` ベースの i18n |
+| アイコン | `ThemeIcon` + bundled codicons / images |
+| テスト | Mocha + VS Code Test |
+| バンドル | `esbuild` |
 
-## 3. 🗂️プロジェクト構造
+## 3. 🗂️ プロジェクト構造
 
 ```txt
 copilot-workspace-manager/
 ├── src/
-│   ├── extension.ts           # エントリポイント
-│   ├── views/                 # 各 Explorer の TreeDataProvider
-│   ├── services/              # ファイル操作・MCP/Agent 切替・利用可否判定
-│   │   ├── historyService.ts  # 会話履歴の走査・抽出・インデックス化
-│   │   ├── historyPanel.ts    # 履歴 WebView UI とメッセージング
-│   │   ├── coreDiagnosticsService.ts # AGENTS Loading Chain / trusted directory 診断
-│   │   ├── coreManagerConfigService.ts # feature flags / hooks 診断と設定更新
-│   │   ├── configTomlOrganizerService.ts # config.toml 整理とバックアップ
-│   │   ├── settings.ts        # 設定値読み取り（同期先/履歴設定）
-│   │   ├── agentService.ts    # Agent 追加/編集/削除と有効化/無効化
-│   │   └── syncStateService.ts # 同期メタの読取/移行（.copilot-workspace-manager）
-│   ├── models/                # データモデル（TreeItem/MCP 等）
-│   └── i18n/                  # 日本語/英語メッセージ定義
-├── images/                    # アイコン類
+│   ├── extension.ts
+│   ├── commands/
+│   │   ├── agentCommands.ts
+│   │   └── fileCommands.ts
+│   ├── models/
+│   ├── services/
+│   │   ├── workspaceStatus.ts
+│   │   ├── historyService.ts
+│   │   ├── historyPanel.ts
+│   │   ├── historyPanelState.ts
+│   │   ├── coreDiagnosticsService.ts
+│   │   ├── coreManagerConfigService.ts
+│   │   ├── pluginConfigService.ts
+│   │   ├── pluginDiagnosticsService.ts
+│   │   ├── skillLocations.ts
+│   │   ├── skillConfigService.ts
+│   │   ├── skillManagerPanel.ts
+│   │   ├── agentLocations.ts
+│   │   ├── agentManagerService.ts
+│   │   ├── agentManagerPanel.ts
+│   │   ├── mcpService.ts
+│   │   ├── mcpManagerService.ts
+│   │   ├── mcpManagerPanel.ts
+│   │   ├── syncService.ts
+│   │   ├── templateService.ts
+│   │   └── settings.ts
+│   ├── views/
+│   │   ├── coreExplorerProvider.ts
+│   │   ├── fileExplorerProvider.ts
+│   │   ├── agentExplorerProvider.ts
+│   │   └── mcpExplorerProvider.ts
+│   └── test/
+├── images/
 ├── docs/
 └── package.json
 ```
 
-## 4.🧩機能設計
+## 4. 🧩 機能設計
 
-- **共通（利用可否判定）**
-  - 入力：`~/.codex` と `config.toml` の存在、`config.toml` の読み取り結果
-  - 処理：存在チェックと TOML パース
-  - 出力：利用可否ステータス、不可時は理由表示（`⚠ Copilot Workspace Manager を開けません: <理由>`）
-  - 補足：`config.toml` の parse 失敗時は全面停止ではなく、Core ファイルの Open、会話履歴、AGENTS Loading Chain、Hooks source 導線を残し、設定更新系のみ無効化する
-  - 検索条件：なし
-  - ソート：なし
-  - バリデーション：設定更新系を有効化するには `config.toml` が TOML として parse 可能であること
+### 4.1 エントリポイントとビュー登録
 
-- **共通（対象選択必須）**
-  - 入力：Tree 上の選択状態
-  - 処理：対象未選択なら処理を中断
-  - 出力：`showInformationMessage("操作する対象を選択してください。")`（英語環境では英語）
-  - 検索条件：なし
-  - ソート：なし
-  - バリデーション：対象選択の有無
+- `extension.ts` が次の Tree View を生成する。
+  - `copilot-workspace-manager.core`
+  - `copilot-workspace-manager.prompts`
+  - `copilot-workspace-manager.skills`
+  - `copilot-workspace-manager.templates`
+  - `copilot-workspace-manager.mcp`
+  - `copilot-workspace-manager.agents`
+- `extension.ts` が次の WebviewPanel 管理クラスを初期化する。
+- `HistoryPanelManager` (`Core View`)
+  - `SkillManagerPanelManager`
+  - `AgentManagerPanelManager`
+  - `McpManagerPanelManager`
+- 各 View / Panel は `refresh` や selection tracking、expansion tracking と接続される。
 
-- **Prompts / Skills / Templates Explorer（閲覧・追加・編集・削除・リネーム）**
-  - 入力：対象選択、入力名、（テンプレート適用時は）テンプレート選択
-  - 処理：ルートフォルダ自動作成、ファイル/フォルダ作成、編集はファイルのみ、削除時は確認、リネーム規則適用
-  - 出力：Tree 更新、ファイルはエディタで開く
-  - 検索条件：なし
-  - ソート：フォルダ → ファイル、名称昇順（大文字小文字無視・数値考慮）
-  - バリデーション：
-    - ルートフォルダ（`prompts/skills/codex-templates`）はリネーム不可
-    - 禁止文字は `_` に置換
-    - 拡張子なしは `.md` を付与
-    - 命名重複時（ファイル）は連番候補を提示し、OK で連番名を採用・キャンセルで中止
-    - 命名重複時（フォルダ）はエラー表示で中止
-    - 大文字小文字のみの変更は許可
+### 4.2 パス解決と availability
 
-- **テンプレート機能**
-  - 入力：テンプレート選択（`.codex/codex-templates` 配下のファイルのみ）
-  - 処理：テンプレート内容を新規作成ファイルへ適用
-  - 出力：テンプレ内容の反映済みファイル
-  - 検索条件：隠しファイル（`.` 始まり）は除外
-  - ソート：VS Code 標準の表示順
-  - バリデーション：テンプレートフォルダは固定（`.codex/codex-templates`）、自動移動/自動削除/マイグレーションは行わない
+- `resolveCopilotPaths()` は `COPILOT_HOME` があればそれを優先し、なければ `~/.copilot` を使う。
+- 返却する主要パスは次のとおり。
+  - `configPath = ~/.copilot/config.json`
+  - `mcpConfigPath = ~/.copilot/mcp-config.json`
+  - `managerDir = ~/.copilot/.copilot-workspace-manager`
+  - `mcpDisabledConfigPath = ~/.copilot/.copilot-workspace-manager/mcp-config.disabled.json`
+- `getWorkspaceStatus()` と `getCoreWorkspaceStatus()` は現実装では常に `isAvailable: true` を返す。
+- 実際の `config.json` 存在・読み取り・JSON 妥当性は `getCopilotConfigStatus()` が別途判定し、Core Explorer 上の warning 表示に使う。
 
-- **Agent Explorer（一覧・追加・編集・削除・有効/無効）**
-  - 入力：対象選択、エージェント名、説明、テンプレート選択、コンテキストメニュー操作
-  - 処理：
-    - `.codex/agents` 配下の `*.toml` を一覧表示し、選択時にエディタで開く
-    - 追加時は名前/説明/テンプレート選択のウィザードを実行し、`.codex/agents/<agent>.toml` を作成
-    - 追加成功後に `config.toml` へ `[agents.<agent>]` を自動追記（重複時は上書きしない）
-    - 無効化時は `[agents.<agent>]` を削除し、削除ブロックを `.codex/.copilot-workspace-manager/agents-disabled.json` に退避
-    - 有効化時は退避ブロックを復元し、退避がなければ最小構成ブロックを追加
-    - 有効化/無効化操作はインラインアイコン（`agent_on.png` / `agent_off.png`）で提供する
-  - 出力：Tree 更新、`config.toml` 更新、再起動案内通知
-  - 検索条件：`*.toml` のみ
-  - ソート：フォルダ → ファイル、名称昇順
-  - バリデーション：`.codex/agents/<agent>.toml` 重複時は作成中断、固定ルート `agents` はリネーム不可
+### 4.3 Core Explorer
 
-- **MCP Explorer（一覧・トグル）**
-  - 入力：`config.toml` の `[mcp_servers.<id>]` 定義、クリック操作
-  - 処理：出現順で一覧化、`enabled` の反転、必要時は `enabled = false` をヘッダ直下へ挿入
-  - 出力：スイッチ風表示の更新、完了通知
-  - 検索条件：なし
-  - ソート：`config.toml` の出現順
-  - バリデーション：`enabled` 行はスペース有無を許容、末尾コメントは保持
+- `CoreExplorerProvider` は存在する項目だけを列挙する。
+- 表示候補は次の順序で定義される。
+  1. `config.json`
+  2. user `settings.json`
+  3. workspace `settings.json`
+  4. workspace `settings.local.json`
+  5. `mcp-config.json`
+  6. instruction files (`copilot-instructions.md`、`*.instructions.md`、`AGENTS.md`、custom AGENTS)
+- workspace instructions 群は内部的には `buildAgentsLoadingChain()` の結果から構成するが、UI 上の名称は `Instructions Chain` である。
+- Core Explorer は「存在するファイルへの導線」であり、設定更新は Core View や各 Manager 側へ分離されている。
 
-- **フォルダを開く**
-  - 入力：ビューごとの「フォルダを開く」コマンド実行
-  - 処理：Prompts/Skills/Templates/Agents は各ルートフォルダ、Core は `.codex` を OS の Explorer/Finder で開く
-  - 出力：OS 側のフォルダ表示
-  - 検索条件：なし
-  - ソート：なし
-  - バリデーション：対象パスの存在
+### 4.4 Commands View
 
-- **同期（Sync）**
-  - 入力：同期先フォルダ設定、同期ボタン押下
-  - 処理：確認メッセージ表示後、OK の場合に相互同期を実行
-    - Core：`.codex/AGENTS.md` と `.codex/config.toml`
-    - Prompts：`.codex/prompts` 配下のファイル
-    - Skills：`.codex/skills` 配下のファイル
-    - Templates：`.codex/codex-templates` 配下のファイル
-    - Agents：`.codex/agents` 配下のファイル
-    - 同名ファイルは最終更新日時が新しい方を正として古い方を上書きする
-    - いずれかで削除されたファイルは両方から削除する
-    - 削除同期の判定に必要なメタ情報は `.codex/.copilot-workspace-manager/codex-sync.json` に保存し、削除が両方に反映された時点で対象エントリを削除する
-    - 読取優先順は `.codex/.copilot-workspace-manager/codex-sync.json` → `.codex/.codex-sync/state.json`
-    - 新メタが存在せず旧メタが存在する場合、テンポラリファイル経由で新メタへ原子的に移行し、成功時のみ旧メタを削除する
-    - `.codex/.copilot-workspace-manager` 配下は隠しフォルダとして同期対象外
-    - 隠しフォルダ/隠しファイルは対象外
-    - 上書き中にエラーが発生した場合は該当ファイルのみスキップし、スキップした旨を簡易ダイアログで通知
-    - Agent 同期では、削除された `*.toml` に対応する `[agents.<agent>]` を `config.toml` から削除する
-    - Agent 同期では、削除された `*.toml` に対応する `.codex/.copilot-workspace-manager/agents-disabled.json` の退避エントリも削除する
-    - Agent 同期では、新規追加された `*.toml` に対応する最小構成 `[agents.<agent>]` を `config.toml` に自動追記する
-  - 出力：相互同期結果
-  - 検索条件：なし
-  - ソート：なし
-  - バリデーション：同期先フォルダ設定が空の場合はボタン非表示
+- 内部 ID は `copilot-workspace-manager.prompts` のままだが、ユーザー向け表示名は `Commands` である。
+- `FileExplorerProvider('prompts')` を使う。
+- root 候補は次のとおり。
+  - workspace commands: `<workspace>/.claude/commands`
+  - plugin commands: installed plugin が提供する command roots
+- `Commands` View は `.github/prompts` や user prompts を持たない。
+- 表示順は root 単位で組み立て、配下はファイルツリーとして列挙する。
+- ファイル操作は `fileCommands.ts` 経由で行う。
 
-- **Refresh**
-  - 入力：Refresh 操作
-  - 処理：Prompts / Skills / Templates / Agent / MCP / Core の全ビュー更新
-  - 出力：最新状態の Tree
-  - 検索条件：なし
-  - ソート：なし
-  - バリデーション：利用可否判定に従う
+### 4.5 Skills Explorer と Skill Manager
 
-- **多言語対応（日本語・英語）**
-  - 入力：VS Code 表示言語
-  - 処理：`ja` の場合は日本語、それ以外は英語でラベル/メッセージを表示
-  - 出力：ローカライズ済み UI
-  - 検索条件：なし
-  - ソート：なし
-  - バリデーション：言語判定
+- Skills root は `getSkillLocations()` で決定する。
+- project roots:
+  - `<workspace>/.github/skills`
+  - `<workspace>/.agents/skills`
+  - `<workspace>/.claude/skills`
+- user roots:
+  - `~/.copilot/skills`
+  - `~/.agents/skills`
+  - `~/.claude/skills`
+- plugin roots:
+  - installed plugin manifest から解決した skill roots
+- `listSkillRecords()` は各 root 配下の `SKILL.md` を列挙し、frontmatter の `name` / `description` を読む。
+- enabled 状態は `settings.json.disabledSkills` による否定リスト方式で保持する。
+- `SkillManagerPanelManager` は `resolveCopilotPaths().configPath` を起点に skill records を読み、一覧・検索・toggle・open を提供する。
+- Skill Manager は path と location label を常に表示し、どのスコープから来た skill かを明確化する。
 
-- **会話履歴ビュー（History）**
-  - 入力：Codex Core のボタン押下、またはコマンドパレット実行
-  - 処理：
-    - 単一インスタンスの WebviewPanel を作成/再利用し、エディタ領域に表示
-    - `$CODEX_HOME/sessions/年/月/日/rollout-*.jsonl` を再帰走査し、新形式イベントのみを解析
-    - `event_msg.task_started` でタスク開始、`event_msg.task_complete` で同一 `turn_id` タスクを確定
-    - タスク内で `event_msg.user_message`（最初の 1 件）、`event_msg.agent_message`（複数）、`response_item.reasoning`（複数）を抽出
-    - `turn_id` 欠落イベントは `turn_context.turn_id` または単一アクティブタスクへフォールバックして関連付ける
-    - `task_complete` 欠落時は、ファイル末尾時点のアクティブタスクを確定して取りこぼしを防ぐ
-    - 一覧表示用タイトルはユーザーメッセージ全文を検索対象とし、表示のみ最大 100 文字で省略（`HISTORY_MESSAGE_PREVIEW_MAX_CHARS`）
-    - 検索は入力時または Enter で実行し、クリアボタンで解除
-    - 右ペインはユーザー本文 + AIタイムラインを表示。AIタイムラインは assistant/reasoning を時系列で統合表示
-    - reasoning は `details/summary` で折りたたみ表示し、設定 `incrudeReasoningMessage` が false の場合は非表示
-    - 表示件数は全体新着順の先頭から `maxHistoryCount` 件に制限（明示設定時のみ、未設定時は全件）
-  - 出力：
-    - 左 30%：日付フォルダ（`yyyy/mm/dd`） + タスクカード（新しい順）
-    - 右 70%：選択タスクの会話プレビュー（Markdown レンダリング）
-  - 検索条件：ユーザーメッセージ全文への部分一致（大文字小文字を区別しない）
-  - ソート：全体新着順、同日内新着順
-  - バリデーション：
-    - `user_message` がないタスクは除外
-    - 時刻は各メッセージごとにローカル時刻 `[H:mm:ss]` で表示
-    - 同一ビューが既にある場合は新規作成しない
+### 4.6 Agents Explorer と Agent Manager
 
-- **Codex Manager（Core 管理タブ）**
-  - 入力：Codex Core Explorer の起動操作、タブ切替、各タブ内の Webview 操作
-  - 処理：
-    - 単一インスタンスの WebviewPanel を作成/再利用し、エディタ領域に表示
-    - タブ構成は `会話履歴` / `AGENTS Loading Chain` / `Trusted Directory` / `Feature Flags` / `Hooks`
-    - 各タブの Refresh は現在タブのみ再読み込みする
-  - 出力：タブごとの管理 UI
-  - 検索条件：タブごとの仕様に従う
-  - ソート：タブごとの仕様に従う
-  - バリデーション：`config.toml` 解析失敗時は設定更新系操作を無効化する
+- Agents root は `getAgentLocations()` で決定する。
+- project roots:
+  - `<workspace>/.github/agents`
+  - `<workspace>/.claude/agents`
+- user root:
+  - `~/.copilot/agents`
+- plugin roots:
+  - installed plugin manifest から解決した agent roots
+- `listAgentManagerRecords()` は `*.agent.md` と plugin 側 markdown agents を読み、frontmatter の次項目を抽出する。
+  - `name`
+  - `description`
+  - `model`
+  - `tools`
+  - `mcp-servers`
+  - `user-invocable`
+  - `disable-model-invocation`
+- plugin agents は `readonly: true` となり、Agent Manager では lock 表示を行う。
+- `setAgentFrontmatterToggle()` は `user-invocable` / `disable-model-invocation` の frontmatter を直接更新する。
+- Explorer の enable / disable コマンドは UI 上残るが、実体は `frontmatterManaged` メッセージ表示のみで、エージェントの有効状態を永続化しない。
 
-- **Organize config.toml**
-  - 入力：コマンドパレットからの明示実行、`~/.codex/config.toml`
-  - 処理：
-    - 書き換え前に `.codex/.copilot-workspace-manager/config.toml.bk` を 1 世代だけ更新する
-    - 管理対象セクションを抽出する
-    - ファイル全体の大まかな順序は維持しつつ、同種セクションをその種類の最初の出現位置へ集約する
-    - `[mcp_servers.<id>.env]` は親 `[mcp_servers.<id>]` の直後へ再配置する
-  - 出力：整理済み `config.toml`、更新済みバックアップ
-  - 検索条件：なし
-  - ソート：
-    - クラスタ位置は各セクション種別の最初の出現位置
-    - クラスタ内順は元の出現順
-  - バリデーション：
-    - バックアップ作成に失敗した場合は整理を中止する
-    - 管理対象外のセクションは並び替えない
+### 4.7 MCP Explorer と MCP Manager
 
-- **AGENTS Loading Chain**
-  - 入力：ワークスペースルート、`config.toml` の `project_doc_fallback_filenames`、グローバル / project 配下の AGENTS 系ファイル
-  - 処理：
-    - `Active` / `Skipped` / `Missing` / `Error` を内部判定として生成
-    - UI では `使用中` / `未使用` / `候補なし` / `問題あり` へ変換
-    - 左ペインは `現在有効` / `無視された候補` / `要確認` / `詳細候補` に分類して表示
-    - `詳細候補` はトグル ON 時のみ表示
-  - 出力：診断一覧、選択項目の詳細、本文プレビュー
-  - 検索条件：なし
-  - ソート：有効項目優先、同セクション内は候補順
-  - バリデーション：ワークスペース未オープン時は一覧ではなく説明文を表示
+- `readMcpServers()` は次の 3 系統を統合する。
+  - `mcp-config.json` の enabled 定義
+  - `mcp-config.disabled.json` の disabled 定義
+  - plugin manifest 由来の readonly MCP 定義
+- 通常 MCP は enabled/disabled を別ファイルに分けて保持する。
+- plugin MCP は `sourceLabel = "Plugin MCP"` を持つ readonly 定義として末尾に付加する。
+- `McpExplorerProvider` は一覧側のみを担当し、enabled 状態と source label を description/icon に反映する。
+- `McpManagerPanelManager` は `listMcpFormModels()` を用いて詳細フォーム用モデルを構築する。
+- フォームは `type` に応じて local / remote セクションを切り替え、次項目を編集する。
+  - 基本: `id`, `type`
+  - local / stdio: `command`, `args`, `cwd`
+  - http / sse: `url`
+  - 共通補助: `env`, `headers`, `tools`, `timeout`, `oauthClientId`, `oauthPublicClient`, `oidc`, `filterMapping`
+- toggle は `toggleMcpServer()` で enabled / disabled ファイル間を移送する。
 
-- **Trusted Directory**
-  - 入力：`config.toml` の `[projects."<path>"]`
-  - 処理：
-    - `trust_level = "trusted"` のみ抽出
-    - 追加はフォルダ選択ダイアログから `config.toml` へ追記
-    - 削除は確認後に trust 設定のみを削除
-  - 出力：trusted directory 一覧、追加 / 削除結果
-  - 検索条件：なし
-  - ソート：一覧順
-  - バリデーション：`config.toml` 解析失敗時は追加 / 削除不可
+### 4.8 Templates Explorer
 
-- **Feature Flags**
-  - 入力：`config.toml` の `[features]`、既知 feature 定義
-  - 処理：
-    - 主要 feature flag の既定値、説明、成熟度、現在値、設定有無を表示用モデルへ変換
-    - トグル変更時は `[features]` を更新
-    - `codex_hooks` 更新時は Hooks タブも再読み込み
-  - 出力：feature flag 一覧とトグル状態
-  - 検索条件：なし
-  - ソート：既知 feature 定義順
-  - バリデーション：対象は既知の主要 feature flag に限定
+- `templateService.ts` と `FileExplorerProvider('templates')` が `~/.copilot/.copilot-workspace-manager/templates` を扱う。
+- Templates は plugin や workspace の複数 root を持たない。
+- Templates 同期もこの 1 root のみを対象にする。
 
-- **Hooks**
-  - 入力：`~/.codex/hooks.json`、`~/.codex/config.toml` 内 inline hooks、`project/.codex/hooks.json`、`project/.codex/config.toml` 内 inline hooks、trusted directory 状態
-  - 処理：
-    - source 一覧を user / project、json / inline 単位で作成
-    - 各 source ごとに active/inactive、entry 件数、warning を算出
-    - 左ペインで選択した source 配下の hook entry のみ右ペインに表示
-    - source ファイルが存在しない場合は `hooks.json` の最小作成または空 `config.toml` 作成導線を表示
-  - 出力：Hooks summary、source 一覧、source 別 entry 一覧、warning
-  - 検索条件：なし
-  - ソート：user json → user inline → project json → project inline
-  - バリデーション：
-    - project layer は trusted workspace の場合のみ active
-    - command handler 以外は warning 付きの診断対象として表示
+### 4.9 Core View
 
-## 5. 🗃️データモデル
+#### 4.9.1 History
 
-| エンティティ | 属性 | 型 | 説明 | 制約 |
-| --- | --- | --- | --- | --- |
-| WorkspaceStatus | isAvailable | boolean | 利用可否 | false の場合は理由を必須 |
-| WorkspaceStatus | reason | string | 利用不可理由 | 利用不可時のみ |
-| TreeNode | id | string | TreeItem の識別子 | 一意 |
-| TreeNode | path | string | 対象ファイル/フォルダの絶対パス | 実在パス |
-| TreeNode | kind | string | `prompts/skills/templates/agents/core/mcp` | 固定値 |
-| TreeNode | nodeType | string | `file` / `folder` / `command` / `mcpServer` / `agent` | 固定値 |
-| McpServer | id | string | `[mcp_servers.<id>]` の `<id>` | 必須 |
-| McpServer | enabled | boolean | MCP の有効/無効 | 省略時は true |
-| McpServer | enabledLineIndex | number | `enabled` 行の位置（未定義時は `null`） | optional |
-| TemplateCandidate | path | string | テンプレートファイルのパス | 隠しファイル除外 |
-| AgentDescriptor | name | string | エージェント名 | 必須／`*.toml` ファイル名に対応 |
-| AgentDescriptor | description | string | エージェント説明 | 空文字許可 |
-| AgentDescriptor | configFile | string | `agents/<agent>.toml` | 必須 |
-| DisabledAgentEntry | disabledAt | string | 無効化日時（ISO8601） | 必須 |
-| DisabledAgentEntry | source | string | 退避元ファイル | `config.toml` 固定 |
-| DisabledAgentEntry | block | string | `[agents.<agent>]` の生テキスト | コメント含めて保持 |
-| DisabledAgentsStore | version | number | ストアバージョン | `1` |
-| DisabledAgentsStore | disabledAgents | object | 無効化エージェント辞書 | キーは agent 名 |
-| SyncSettings | codexFolder | string | Codex Core の同期先フォルダ | 空の場合は無効 |
-| SyncSettings | promptsFolder | string | Prompts の同期先フォルダ | 空の場合は無効 |
-| SyncSettings | skillsFolder | string | Skills の同期先フォルダ | 空の場合は無効 |
-| SyncSettings | templatesFolder | string | Templates の同期先フォルダ | 空の場合は無効 |
-| SyncSettings | agentFolder | string | Agents の同期先フォルダ | 空の場合は無効 |
-| SyncStateStore | path | string | 同期メタ保存先 | `.codex/.copilot-workspace-manager/codex-sync.json` |
-| ConfigTomlOrganizeResult | backupPath | string | 整理前バックアップの保存先 | `.codex/.copilot-workspace-manager/config.toml.bk` |
-| ConfigTomlOrganizeResult | changed | boolean | `config.toml` に実変更があったか | 必須 |
-| HistoryAiTimelineItem | kind | `'assistant' \| 'reasoning'` | AIタイムライン項目種別 | 固定値 |
-| HistoryAiTimelineItem | message | string | 表示メッセージ | 空文字不可 |
-| HistoryAiTimelineItem | localTime | string | ローカル時刻（`[H:mm:ss]`） | 必須 |
-| HistoryAiTimelineItem | sortTimestampMs | number | 時系列ソート用タイムスタンプ | 必須 |
-| HistoryAiTimelineItem | sequence | number | 同時刻時の安定ソート用連番 | 0 以上 |
-| HistoryTurnRecord | turnId | string | 表示用タスク識別子（`sessionId:taskTurnId`） | 必須 |
-| HistoryTurnRecord | taskTurnId | string | タスク境界 `turn_id` | optional |
-| HistoryTurnRecord | sessionId | string | `rollout-*.jsonl` 由来の識別子 | 必須 |
-| HistoryTurnRecord | dateKey | string | `yyyy/mm/dd` | 必須 |
-| HistoryTurnRecord | userMessage | string | ユーザー本文（全文） | 必須 |
-| HistoryTurnRecord | userMessageLocalTime | string | ユーザー本文のローカル時刻 | optional |
-| HistoryTurnRecord | agentMessages | string[] | AI回答本文一覧 | 0 件以上 |
-| HistoryTurnRecord | agentMessageLocalTimes | string[] | AI回答時刻一覧 | 件数一致 |
-| HistoryTurnRecord | reasoningMessages | string[] | 思考過程本文一覧 | 0 件以上 |
-| HistoryTurnRecord | reasoningMessageLocalTimes | string[] | 思考過程時刻一覧 | 件数一致 |
-| HistoryTurnRecord | aiTimeline | HistoryAiTimelineItem[] | AI回答/思考過程の統合タイムライン | 時刻昇順 |
-| HistoryIndex | turns | HistoryTurnRecord[] | 全タスク一覧（新しい順） | 必須 |
-| HistoryIndex | days | HistoryDayNode[] | `dateKey` 単位の表示ノード | 必須 |
-| FeatureFlagRecord | key | string | feature flag 名 | 既知の主要 flag |
-| FeatureFlagRecord | description | string | ローカライズ済み説明 | 必須 |
-| FeatureFlagRecord | maturity | string | `stable` / `experimental` / `deprecated` | 必須 |
-| FeatureFlagRecord | defaultValue | boolean | 既定値 | 必須 |
-| FeatureFlagRecord | effectiveValue | boolean | 現在有効値 | 必須 |
-| FeatureFlagRecord | configuredValue | boolean \| null | `config.toml` に明示設定された値 | optional |
-| HookSourceRecord | id | string | hook source 識別子 | 一意 |
-| HookSourceRecord | layer | string | `user` / `project` | 必須 |
-| HookSourceRecord | format | string | `json` / `inline` | 必須 |
-| HookSourceRecord | path | string | source ファイルの絶対パス | 必須 |
-| HookSourceRecord | isActive | boolean | source が有効レイヤーか | 必須 |
-| HookSourceRecord | entryCount | number | source 配下の entry 件数 | 0 以上 |
-| HookSourceRecord | warnings | string[] | source 単位の warning 一覧 | 0 件以上 |
-| HookEntryRecord | event | string | hook event 名 | 必須 |
-| HookEntryRecord | matcher | string | matcher 文字列 | optional |
-| HookEntryRecord | handlerType | string | `command` などの handler 種別 | 必須 |
-| HookEntryRecord | command | string | 実行コマンド | optional |
-| HookEntryRecord | timeout | number \| null | timeout 秒 | optional |
-| HookEntryRecord | statusMessage | string | status message | optional |
-| HookEntryRecord | warning | string \| null | entry 単位 warning | optional |
+- `historyService.ts` が `resolveSessionsRoot()` で `~/.copilot/session-state` を解決する。
+- 各 session ディレクトリ配下の `events.jsonl` を読み、turns を抽出する。
+- `HistoryPanelManager` は一覧検索、turn selection、copy、tab refresh を担当する。
+- `historyPanelState.ts` の `deriveHistoryPanelViewModel()` が一覧・選択状態の派生を行う。
 
-## 6. 🖥️画面設計
+#### 4.9.2 Instructions Chain
 
-- **View Container（Copilot Workspace Manager）**
-  - Prompts Explorer
-  - Skills Explorer
-  - Template Explorer
-  - Agent Explorer
-  - MCP Explorer
-  - Codex Core
-  - Codex Manager
-  - UI 最上部のボタンで追加/削除/リネーム/Refresh/フォルダを開く
-- **Prompts/Skills/Templates**
-  - 固定ルートフォルダ（`prompts` / `skills` / `codex-templates`）を持ち、UI はルート直下を表示
-  - ファイルはエディタで開く
-  - 操作：UI 最上部のボタンで追加/削除/リネーム/Refresh/各ルートフォルダを開く/同期（削除/リネームは未選択時メッセージ、追加はルートに作成）
-  - 同期ボタンは同期先フォルダ設定が空の場合は非表示
-- **Agent Explorer**
-  - 固定ルートフォルダ `agents`（`.codex/agents`）を持ち、`*.toml` を表示
-  - 操作：UI 最上部のボタンで追加/削除/リネーム/Refresh/フォルダを開く/同期、コンテキストメニューで有効化/無効化
-  - 追加時は名前/説明/テンプレート選択のウィザードを順に表示
-  - 有効時アイコンは `agent_on.png`、無効時アイコンは `agent_off.png`
-  - 同期ボタンは同期先フォルダ設定 `agentFolder` が空の場合は非表示
+- `buildAgentsLoadingChain()` が instruction files を集約する。
+- 対象ソースは user instructions、workspace instructions、path instructions、workspace `AGENTS.md`、custom instruction dirs の `AGENTS.md` である。
+- path instructions は `applyTo` と現在アクティブなファイルパスを突き合わせる。
+
+#### 4.9.3 Trusted
+
+- `listTrustedDirectories()` は user / workspace の `settings.json` を読む。
+- Trusted 一覧は source label と path を持つ。
+- add / remove は `coreDiagnosticsService.ts` が settings JSON を更新する。
+
+#### 4.9.4 Hooks
+
+- `listHookDiagnostics()` は workspace hooks と plugin hooks を読む。
+- workspace hooks は `<workspace>/.github/hooks/*.json`
+- plugin hooks は installed plugin 配下 `hooks.json`
+- source と entry を分離し、左 list / 右 details の構成で表示する。
+
+#### 4.9.5 Plugins
+
+- `listPluginDiagnostics()` は plugin metadata と component diagnostics を返す。
+- installed plugin の一次情報は `config.json.installedPlugins`
+- enabled override は `settings.json.enabledPlugins`
+- manifest 探索順は `.plugin/plugin.json` → `plugin.json` → `.github/plugin/plugin.json` → `.claude-plugin/plugin.json`
+- diagnostics では少なくとも次の観点を扱う。
+  - manifest 欠落
+  - name 欠落
+  - direct install
+  - readonly components
+  - agent / skill / MCP の conflict / overridden
+  - secret-like object を持つ定義
+
+### 4.10 コマンドと同期
+
+- `openCoreManager`、`openSkillManager`、`openAgentManager`、`openMcpManager` が各 WebviewPanel を開く。
+- sync commands は `syncCore`、`syncSkills`、`syncTemplates`、`syncAgents` の 4 つのみ。
+- `syncCoreFilesBidirectional()` は次の固定ファイル集合を同期する。
+  - `config.json`
+  - `settings.json`
+  - `mcp-config.json`
+  - `copilot-instructions.md`
+  - `.copilot-workspace-manager/mcp-config.disabled.json`
+- 汎用同期は `syncDirectoryBidirectional()` を用い、削除判定状態は `copilot-workspace-sync.json` に保持する。
+
+## 5. 🗃️ データモデル
+
+| エンティティ | 主属性 | 説明 |
+| --- | --- | --- |
+| `WorkspacePaths` | `copilotDir`, `configPath`, `managerDir`, `mcpConfigPath`, `mcpDisabledConfigPath` | Copilot 関連の基準パス |
+| `SkillLocation` | `kind`, `label`, `rootPath`, `createPath`, `priority` | skill roots の一覧 |
+| `SkillRecord` | `id`, `name`, `description`, `skillPath`, `location`, `enabled` | Skill Manager の表示モデル |
+| `AgentLocation` | `kind`, `label`, `rootPath`, `createPath`, `priority` | agent roots の一覧 |
+| `AgentManagerRecord` | `name`, `description`, `model`, `tools`, `mcpServers`, `userInvocable`, `disableModelInvocation`, `agentPath`, `readonly` | Agent Manager の表示モデル |
+| `McpServer` | `id`, `entryId`, `enabled`, `readOnly`, `sourceLabel` | Explorer 用 MCP モデル |
+| `McpFormModel` | `id`, `type`, `command`, `args`, `cwd`, `url`, `env`, `headers`, `tools`, `timeout`, `oauthClientId`, `oauthPublicClient`, `oidc`, `filterMapping`, `enabled`, `readOnly`, `sourceLabel` | MCP Manager の編集モデル |
+| `PluginRecord` | `pluginSpec`, `name`, `state`, `installKind`, `pluginRoot`, `manifestPath`, `agents`, `skills`, `commands`, `hooks`, `mcpServers`, `lspServers`, `diagnostics` | Plugins タブの統合モデル |
+| `HistoryTurnRecord` | `turnId`, `sessionId`, `userMessage`, `assistantMessages`, `toolUsages`, `issues`, `rawEvents` | History タブの表示単位 |
+| `AgentsChainNode` | `kind`, `status`, `fileName`, `absolutePath`, `contentPreview`, `applyTo` | Instructions Chain の表示単位 |
+| `HookSourceRecord` | `id`, `kind`, `label`, `path`, `entryCount` | Hooks タブの左リスト |
+| `HookEntryRecord` | `sourceId`, `event`, `matcher`, `command`, `schema`, `timeout`, `statusMessage` | Hooks タブの詳細レコード |
+
+## 6. 🖥️ 画面設計
+
+- **View Container**
+  - `Core`
+  - `Agents`
+  - `Skills`
+  - `Commands`
+  - `MCP`
+  - `Templates`
+- **Core Explorer**
+  - 設定ファイルと instruction files を単一 list で表示
+  - `config.json` 不正時は warning icon / description を付加
+- **Commands View**
+  - Workspace Commands と Plugin Commands を root 単位で表示
+- **Skills Explorer**
+  - root folder と `SKILL.md` を中心に表示
+  - location label で Workspace / User / Plugin の違いを見せる
+- **Agents Explorer**
+  - flat list で agent files を表示
+  - plugin items は readonly context として扱う
 - **MCP Explorer**
-  - サーバー一覧をスイッチ風 UI で表示
-  - クリックで ON/OFF を切替
-  - 成功時に再起動が必要な旨を通知
-- **Codex Core**
-  - `config.toml` / `AGENTS.md` / `AGENTS.override.md` のショートカット
-  - 操作：UI 最上部のボタンで `.codex` を開く/同期/`Codex Manager` 起動
-  - 同期ボタンは同期先フォルダ設定が空の場合は非表示
-- **Codex Manager（WebView in Editor）**
-  - タブ：会話履歴 / AGENTS Loading Chain / Trusted Directory / Feature Flags / Hooks
-  - 各タブに個別 Refresh を表示
-  - コマンドパレットから `Copilot Workspace Manager: Organize config.toml` を実行できる
-  - Hooks タブ
-    - 上部 summary：Hooks 機能、Project Hooks 機能、基準ワークスペース
-    - 左ペイン：hook source 一覧
-    - 右ペイン：選択 source 配下の hook entry 一覧
-  - Feature Flags タブ
-    - feature 名、説明、成熟度、既定値、現在値、設定有無、トグル
-  - AGENTS Loading Chain タブ
-    - 左ペイン：現在有効 / 無視された候補 / 要確認 / 詳細候補
-    - 右ペイン：状態、分類、パス、説明、本文プレビュー
-- **会話履歴タブ**
-  - 上部ペイン：検索テキストボックス + クリアボタン（codicon `clear-all`）
-  - 下部左ペイン：日付フォルダ（`yyyy/mm/dd`） + タスクカード（`💬 [H:mm:ss]` + 最大 100 文字のユーザーメッセージ）
-  - 下部右ペイン：選択タスクの会話プレビュー
-    - ユーザーメッセージ枠（codicon `account` + 時刻 + コピー）
-    - AIメッセージ枠（codicon `hubot` + 時刻 + コピー）
-    - 思考過程枠（codicon `hubot` + 時刻、折りたたみ）
-  - 検索：ユーザーメッセージ全文を対象に部分一致絞り込み、一致語ハイライト、クリアで解除
-- **利用不可時**
-  - 各ビューに `⚠ Copilot Workspace Manager を開けません: <理由>` を 1 件表示
+  - enabled / disabled / plugin MCP を単一 list に並べる
+  - disabled は `circle-slash`、enabled は `mcp`
+- **Skill Manager**
+  - 上部検索 + refresh
+  - 一覧カードに name、description、path、location、enabled switch、open
+- **Agent Manager**
+  - 左 list / 右 detail
+  - detail には model、tools、mcpServers、frontmatter toggles、preview を表示
+- **MCP Manager**
+  - 左 list / 右 form
+  - list に source label、enabled 状態、readonly 状態を表示
+  - form に type 別フィールドを表示
+- **Core View**
+  - タブ: `History` / `Instructions Chain` / `Trusted` / `Hooks` / `Plugins`
+  - `Plugins` は component block 単位の折りたたみ表示
+  - `Hooks` は左 source / 右 entry details
 
-## 7. 🗺️システム構成図
+## 7. 🗺️ システム構成図
 
 ```mermaid
 flowchart TB
   subgraph VSCode[VS Code]
-    UI[Copilot Workspace Manager View Container]
-    Ext[Extension Host\nCopilot Workspace Manager]
-    HUI[History WebviewPanel\nEditor Area]
+    Views[Tree Views]
+    Panels[Webview Panels]
+    Ext[Extension Host]
   end
 
-  FS[~/.codex\nconfig.toml / AGENTS.md /\nprompts / skills / codex-templates / agents /\n.copilot-workspace-manager]
-  SESS[$CODEX_HOME/sessions\nYYYY/MM/DD/rollout-*.jsonl]
-  OS[OS Explorer / Finder]
+  subgraph UserScope[User Scope]
+    Copilot["~/.copilot\nconfig.json\nsettings.json\nmcp-config.json\ncopilot-instructions.md"]
+    ManagerMeta["~/.copilot/.copilot-workspace-manager\nmcp-config.disabled.json\ntemplates/\ncopilot-workspace-sync.json"]
+    Sessions["~/.copilot/session-state/<session>/events.jsonl"]
+  end
 
-  UI -->|コマンド/Tree 操作| Ext
-  UI -->|history ボタン / コマンド| HUI
-  HUI -->|postMessage| Ext
-  Ext -->|Read/Write| FS
-  Ext -->|Read| SESS
-  Ext -->|フォルダを開く| OS
+  subgraph Workspace[Workspace Scope]
+    GH[".github/\nskills/\nagents/\ncopilot/\ninstructions/\nhooks/"]
+    Claude[".claude/\ncommands/\nagents/\nskills/"]
+    AgentsCompat[".agents/skills/"]
+    RootAgents["AGENTS.md"]
+  end
+
+  subgraph Plugins[Installed Plugins]
+    PluginRoots["installed plugin roots\nplugin manifest\ncommands / skills / agents /\nhooks / MCP / LSP"]
+  end
+
+  Views --> Ext
+  Panels --> Ext
+  Ext --> Copilot
+  Ext --> ManagerMeta
+  Ext --> Sessions
+  Ext --> GH
+  Ext --> Claude
+  Ext --> AgentsCompat
+  Ext --> RootAgents
+  Ext --> PluginRoots
 ```
 
-## 8.🔌外部インターフェース
+## 8. 🔌 外部インターフェース
 
-- **ローカルファイルシステム**：`~/.codex` 配下の読み書き
-- **project-local ファイルシステム**：`workspace/.codex` および一部 `workspace/.agents` の読み取り
-- **拡張機能メタ領域**：`.codex/.copilot-workspace-manager/`（`codex-sync.json` / `agents-disabled.json`）
-- **セッション履歴ファイル**：`$CODEX_HOME/sessions/.../rollout-*.jsonl` の読み取り
-- **OS Explorer/Finder**：対象ルートフォルダの表示
-- **VS Code Extension API**：TreeDataProvider、コマンド、UI メッセージ、WebviewPanel
-- **VS Code Settings**：
-  - 同期先フォルダ（`codexFolder` / `promptsFolder` / `skillsFolder` / `templatesFolder` / `agentFolder`）
-  - 履歴表示設定（`maxHistoryCount` / `incrudeReasoningMessage`）
+- **ローカルファイルシステム**
+  - `~/.copilot`
+  - `~/.copilot/.copilot-workspace-manager`
+  - workspace 配下 `.github` / `.claude` / `.agents`
+- **VS Code Extension API**
+  - `TreeView`
+  - `commands`
+  - `window.showInformationMessage`
+  - `window.showWarningMessage`
+  - `WebviewPanel`
+- **環境変数**
+  - `COPILOT_HOME`
+  - `COPILOT_CUSTOM_INSTRUCTIONS_DIRS`
+- **JSON frontmatter / plugin manifest**
+  - installed plugin manifest の探索順と component keys に依存する
 
-## 9. 🧪テスト戦略
+## 9. 🧪 テスト戦略
 
-- **ユニットテスト**
-  - `config.toml` の利用可否判定（存在/読取/パース）
-  - `enabled` 行の検出・反転・コメント保持・未定義時の挿入
-  - 禁止文字置換、拡張子付与、重複名回避
-  - ルートフォルダのリネーム禁止
-  - Agent 追加時のウィザードフロー（名前/説明/テンプレート選択）
-  - Agent 追加時の `config.toml` 自動追記（重複時は非上書き）
-  - Agent 有効化/無効化時の `[agents.<agent>]` 追加・削除
-  - `agents-disabled.json` 退避/復元（コメント保持）
-  - 同期対象ファイルの抽出と相互同期実行
-  - Agent ファイル（`.codex/agents`）の同期実行
-  - Agent 同期削除時の `config.toml` エントリ削除
-  - Agent 同期削除時の `agents-disabled.json` エントリ削除
-  - Agent 同期追加時の `config.toml` エントリ自動追記
-  - 隠しフォルダ/隠しファイルの除外
-  - 上書き失敗時のスキップ処理
-  - 削除同期の実行
-  - 削除同期メタ情報の保存と削除（`.codex/.copilot-workspace-manager/codex-sync.json`）
-  - 旧同期メタ（`.codex/.codex-sync/state.json`）から新同期メタへの原子的移行
-  - `rollout-*.jsonl` から task 境界（`task_started/task_complete`）で 1 タスク単位に抽出
-  - `turn_id` 欠落時のフォールバック解決
-  - `task_complete` 欠落時の末尾確定
-  - AI回答/思考過程の時系列統合（`aiTimeline`）とメッセージ別時刻
-  - `maxHistoryCount` と `incrudeReasoningMessage` の設定反映
-  - 履歴ビューの単一インスタンス制御
-  - AGENTS Loading Chain の表示変換、詳細候補トグル、ワークスペース未オープン時表示
-  - Trusted Directory の一覧、追加、削除
-  - Feature Flags の一覧生成、ローカライズ、トグル更新
-  - Hooks source 一覧、source 切替、warning、missing source 作成導線
-  - `config.toml` 整理時のクラスタ集約、`mcp_servers.<id>.env` 親直後配置、バックアップ作成
-- **統合テスト**
-  - 各 Explorer の Tree 表示（ルート直下表示、利用不可表示）
-  - 追加/削除/リネーム操作の UI フロー（未選択時のメッセージ含む）
-  - Agent Explorer の追加/編集/削除/有効化/無効化フロー
-  - Agent Explorer の同期ボタン表示/非表示と同期実行フロー
-  - Agent Explorer の「フォルダを開く」導線
-  - 同期ボタンの表示/非表示と確認ダイアログ
-  - MCP トグル後の通知表示
-  - Core ボタン/コマンドからエディタ領域に `Codex Manager` が表示される
-  - カード選択で会話プレビューが更新される
-  - 検索実行とクリアで一覧絞り込み状態が切り替わる
-  - Feature Flags と Hooks タブの表示更新が `Codex Manager` 上で反映される
-  - `Copilot Workspace Manager: Organize config.toml` 実行で、管理対象セクションが先頭出現位置ごとに集約され、`.codex/.copilot-workspace-manager/config.toml.bk` が更新される
-- **ローカライズ確認**
-  - `ja` と `en` のラベル/メッセージの切替
-
-## 10. 🛡️非機能要件
-
-- **ユーザビリティ**
-  - UI 最上部の共通ボタン操作で InputBox を順に入力して各操作を実行できる
-  - ボタンは codicon を使用し、`new-folder` / `new-file` / `trash` / `edit` / `refresh` / `folder-opened` / `sync` を表示する
-  - 削除/リネームなど未選択時にメッセージを表示し選択を促す
-  - MCP の ON/OFF をスイッチ風 UI で直感的に切り替えられる
-  - アイコンによりプロンプトファイル/フォルダ、Agent 状態、MCP の視認性を高める
-  - ファイルを選択した場合は通常の Explorer と同様に開いて編集できる
-  - 履歴ビューは上部検索 + 下部 2 ペイン（左 30% / 右 70%）で表示される
-  - 検索ハイライトは VS Code テーマ色に追従する
-  - 時刻表示はローカル時刻で表示する
-- **ブランド要件**
-  - 拡張名：Copilot Workspace Manager
-  - タグライン：Explore and edit your .Copilot Workspace Manager (config.toml, AGENTS.md, prompts, skill, mcp) in VS Code.
-  - Keywords：`codex`, `.codex`, `codex-cli`, `workspace`, `config`, `config.toml`, `toml`, `agent`, `AGENTS.md`, `prompts`, `prompt`, `skills`, `mcp`, `mcp server`, `explorer`, `tree view`, `editor`
-- **保守性**
-  - ビューごとに責務を分離し拡張しやすい構造とする
-  - UI とファイル操作ロジックを分離しテスト容易性を確保する
+- `workspaceStatus`:
+  - `config.json` の存在 / 読み取り / JSON 妥当性
+- `fileExplorerProvider`:
+  - prompts / skills / templates roots の解決
+  - plugin commands / plugin skills の表示
+- `agentLocations` / `skillLocations`:
+  - Workspace / User / Plugin roots の優先順
+- `skillConfigService`:
+  - `disabledSkills` による enabled 状態
+- `agentManagerService`:
+  - frontmatter 読み取り
+  - `user-invocable` / `disable-model-invocation` 更新
+- `mcpService` / `mcpManagerService`:
+  - enabled / disabled ファイル分離
+  - plugin MCP の readonly 追加
+  - MCP form model 構築
+- `pluginDiagnosticsService`:
+  - manifest 探索
+  - component diagnostics
+  - `enabledPlugins` override
+- `historyService` / `historyPanel`:
+  - `session-state` 読み取り
+  - ターン抽出
+  - 検索と最大件数
