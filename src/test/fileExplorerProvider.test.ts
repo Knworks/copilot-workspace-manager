@@ -124,7 +124,11 @@ suite('File explorer provider', () => {
 				assert.strictEqual(children[0].label, 'release-note.md');
 				assert.strictEqual(children[0].description, 'Plugin Commands');
 			} finally {
-				process.env.COPILOT_HOME = previousCopilotHome;
+				if (previousCopilotHome === undefined) {
+					delete process.env.COPILOT_HOME;
+				} else {
+					process.env.COPILOT_HOME = previousCopilotHome;
+				}
 			}
 		});
 	});
@@ -236,6 +240,48 @@ suite('File explorer provider', () => {
 		const skillChildren = provider.getChildren(root) as vscode.TreeItem[];
 		assert.ok(skillChildren[0].iconPath instanceof vscode.ThemeIcon);
 		assert.strictEqual((skillChildren[0].iconPath as vscode.ThemeIcon).id, 'agent');
+	});
+
+	test('skills explorer uses disabled icon for disabled skill root folders', () => {
+		withTempDir((root) => {
+			const previousCopilotHome = process.env.COPILOT_HOME;
+			process.env.COPILOT_HOME = path.join(root, '.copilot');
+			try {
+				const copilotHome = process.env.COPILOT_HOME;
+				const skillsRoot = path.join(copilotHome, 'skills');
+				const disabledSkillRoot = path.join(skillsRoot, 'reviewer');
+				fs.mkdirSync(disabledSkillRoot, { recursive: true });
+				fs.writeFileSync(
+					path.join(disabledSkillRoot, 'SKILL.md'),
+					'---\nname: reviewer\ndescription: Reviews code\n---\n',
+					'utf8',
+				);
+				fs.writeFileSync(
+					path.join(copilotHome, 'settings.json'),
+					JSON.stringify({ disabledSkills: ['reviewer'] }, null, 2),
+					'utf8',
+				);
+				const provider = new FileExplorerProvider(
+					'skills',
+					contextStub,
+					() => ({ isAvailable: true }),
+				);
+
+				const children = provider.getChildren() as vscode.TreeItem[];
+				const disabledSkill = children.find((item) => item.label === 'reviewer');
+
+				assert.ok(disabledSkill?.iconPath instanceof vscode.ThemeIcon);
+				assert.strictEqual((disabledSkill.iconPath as vscode.ThemeIcon).id, 'circle-slash');
+				assert.ok((disabledSkill.iconPath as vscode.ThemeIcon).color instanceof vscode.ThemeColor);
+				assert.strictEqual((disabledSkill.iconPath as vscode.ThemeIcon).color?.id, 'disabledForeground');
+			} finally {
+				if (previousCopilotHome === undefined) {
+					delete process.env.COPILOT_HOME;
+				} else {
+					process.env.COPILOT_HOME = previousCopilotHome;
+				}
+			}
+		});
 	});
 
 	test('skills explorer shows plugin skill root folder when manifest points directly to a skill', () => {

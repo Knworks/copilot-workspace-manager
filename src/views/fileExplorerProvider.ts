@@ -13,6 +13,7 @@ import {
 	getSkillLocations,
 	SkillLocation,
 } from '../services/skillLocations';
+import { isSkillEnabled } from '../services/skillConfigService';
 import { listInstalledPluginsFromConfig, resolvePluginManifestPath } from '../services/pluginConfigService';
 import { messages } from '../i18n';
 
@@ -290,6 +291,9 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 		folderPath?: string,
 	): vscode.ThemeIcon | { light: vscode.Uri; dark: vscode.Uri } | undefined {
 		if (this.kind === 'skills' && folderPath && this.isSkillRootFolder(folderPath)) {
+			if (!this.isEnabledSkillRootFolder(folderPath)) {
+				return new vscode.ThemeIcon('circle-slash', new vscode.ThemeColor('disabledForeground'));
+			}
 			return new vscode.ThemeIcon('folder-library');
 		}
 
@@ -325,6 +329,13 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 		return this.listEntries(folderPath).some(
 			(entry) => entry.isFile && entry.name === 'SKILL.md',
 		);
+	}
+
+	private isEnabledSkillRootFolder(folderPath: string): boolean {
+		const skillPath = path.join(folderPath, 'SKILL.md');
+		return fs.existsSync(skillPath)
+			? isSkillEnabled(resolveCopilotPaths().configPath, skillPath)
+			: true;
 	}
 
 	private toEmptyItem(): WorkspaceTreeItem {

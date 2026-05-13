@@ -75,6 +75,12 @@ export function readSkillEnabledByPath(configPath: string): Map<string, boolean>
 	return new Map([...disabledSkills].map((skillId) => [skillId, false]));
 }
 
+export function isSkillEnabled(configPath: string, skillPath: string): boolean {
+	const metadata = readSkillMetadata(skillPath);
+	const skillId = resolveSkillIdentifier(skillPath, metadata);
+	return !readDisabledSkills(configPath).has(skillId);
+}
+
 function readFrontmatterString(frontmatter: string, key: string): string {
 	const pattern = new RegExp(`^${key}:\\s*(?:"([^"]*)"|'([^']*)'|(.+))\\s*$`, 'm');
 	const match = frontmatter.match(pattern);

@@ -63,6 +63,16 @@ export function setAgentFrontmatterToggle(
 	fs.writeFileSync(agentPath, nextContents, 'utf8');
 }
 
+export function isAgentDisabled(agentPath: string): boolean {
+	const frontmatter = readAgentFrontmatter(agentPath);
+	const userInvocable = readBooleanFrontmatter(frontmatter['user-invocable'], true);
+	const disableModelInvocation = readBooleanFrontmatter(
+		frontmatter['disable-model-invocation'],
+		false,
+	);
+	return !userInvocable && disableModelInvocation;
+}
+
 export function disableAgentByName(copilotDir: string, configPath: string, agentName: string): void {
 	void copilotDir;
 	void configPath;

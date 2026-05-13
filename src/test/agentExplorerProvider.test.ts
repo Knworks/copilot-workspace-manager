@@ -1,4 +1,6 @@
 import * as assert from 'assert';
+import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { getUnavailableLabel } from '../services/workspaceStatus';
@@ -100,5 +102,54 @@ suite('Agent explorer provider', () => {
 		const items = provider.getChildren() as vscode.TreeItem[];
 		assert.strictEqual(items.length, 1);
 		assert.strictEqual(items[0].label, 'No Sub Agents to display.');
+	});
+
+	test('uses disabled icon when agent disables user and model invocation', () => {
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'disabled-agent-icon-'));
+		try {
+			const agentsDir = path.join(tempDir, 'agents');
+			const agentPath = path.join(agentsDir, 'disabled.agent.md');
+			fs.mkdirSync(agentsDir, { recursive: true });
+			fs.writeFileSync(
+				agentPath,
+				[
+					'---',
+					'name: disabled',
+					'user-invocable: false',
+					'disable-model-invocation: true',
+					'---',
+					'Instructions.',
+				].join('\n'),
+				'utf8',
+			);
+			const provider = new AgentExplorerProvider(
+				contextStub,
+				() => ({ isAvailable: true }),
+				() => [
+					{
+						name: 'disabled.agent.md',
+						fullPath: agentPath,
+						isFile: true,
+					},
+				],
+				() => [
+					{
+						kind: 'project',
+						label: 'Workspace Agents',
+						rootPath: agentsDir,
+						priority: 1,
+					},
+				],
+			);
+
+			const items = provider.getChildren() as vscode.TreeItem[];
+
+			assert.ok(items[0].iconPath instanceof vscode.ThemeIcon);
+			assert.strictEqual((items[0].iconPath as vscode.ThemeIcon).id, 'circle-slash');
+			assert.ok((items[0].iconPath as vscode.ThemeIcon).color instanceof vscode.ThemeColor);
+			assert.strictEqual((items[0].iconPath as vscode.ThemeIcon).color?.id, 'disabledForeground');
+		} finally {
+			fs.rmSync(tempDir, { recursive: true, force: true });
+		}
 	});
 });

@@ -8,6 +8,7 @@ import {
 	findAgentLocationForPath,
 	getAgentLocations,
 } from '../services/agentLocations';
+import { isAgentDisabled } from '../services/agentManagerService';
 import { messages } from '../i18n';
 
 type AgentEntry = {
@@ -98,7 +99,11 @@ export class AgentExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTr
 			title: messages.explorerOpenAgentFile,
 			arguments: [item],
 		};
-		item.iconPath = new vscode.ThemeIcon('hubot');
+		item.iconPath = isAgentDisabled(entry.fullPath)
+			? new vscode.ThemeIcon('circle-slash', new vscode.ThemeColor('disabledForeground'))
+			: location.kind === 'plugin'
+			? new vscode.ThemeIcon('lock', new vscode.ThemeColor('disabledForeground'))
+			: new vscode.ThemeIcon('hubot');
 		return item;
 	}
 
