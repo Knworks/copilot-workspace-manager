@@ -32,6 +32,7 @@ Copilot Workspace Manager は、GitHub Copilot CLI / IDE の設定やカスタ�
 - Workspace / User / Plugin をまたいだ Skills 一覧
 - Workspace / User / Plugin をまたいだ Sub Agents 一覧
 - Skills、Sub Agents、MCP Server 用の専用 Manager View
+- `AGENTS Manager` 内の視覚的な `Orchestration Editor` で workflow / agent / loop グラフを設計し、バリデーションと prompt 生成を行える
 - Session history、Instructions diagnostics、Trusted directories、Hooks、Plugin diagnostics をまとめた `Copilot Manager` Webview
 - plugin が提供する `Agents`、`Skills`、`Commands`、`Hooks`、`MCP Servers`、`LSP Servers` の readonly diagnostics
 - Core files、Skills、Templates、Sub Agents の双方向同期
@@ -91,6 +92,19 @@ Core Explore からは、次へアクセスできます。
 `Sub Agents Manager` では、`model`、`tools`、`mcp-servers`、`user-invocable`、`disable-model-invocation` などの frontmatter 項目を確認できます。plugin agents は readonly として表示されます。
 
 ![alt text](images/view_subagents.png)
+
+### Orchestration Editor
+
+`Orchestration Editor` は `AGENTS Manager` の `Orchestration` タブから利用できます。
+
+- canvas 上で `workflow` / `agent` / `loop` card を使った workflow グラフを作成・編集できます
+- Inspector から agent の順序、使用する subagent、委譲目的、入力、期待する出力、完了条件を設定できます
+- `maxAttempts` と `acceptanceCriteria` を持つ review / retry loop を設定できます
+- workflow JSON を `~/.codex/.codex-workspace/orchestrations` 配下へ保存できます
+- 編集中に必須項目不足、不正な接続、未到達 node、重複 ID、循環をバリデーションできます
+- 保存前でも現在のグラフから prompt preview を生成し、そのままコピーできます
+
+![alt text](images/view_orchestration.png)
 
 ### 🧠 Skills
 

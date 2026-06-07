@@ -4,6 +4,8 @@ All notable changes to the "copilot-workspace-manager" extension will be documen
 
 ## 1.0.2
 
+- Updated Commands Explore to load workspace command files from both `.claude/commands/*.md` and `.github/prompts/*.prompt.md`.
+
 Preview
 
 - Added `Orchestration Editor` in `AGENTS Manager` for editing workflow graphs and generating prompts.

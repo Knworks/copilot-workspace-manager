@@ -32,6 +32,7 @@ Copilot Workspace Manager is a VS Code extension that helps you see and manage y
 - Skills list across Workspace / User / Plugin scopes
 - Sub Agents list across Workspace / User / Plugin scopes
 - Dedicated Manager views for Skills, Sub Agents, and MCP Servers
+- Visual `Orchestration Editor` in `AGENTS Manager` for designing workflow / agent / loop graphs, validating them, and generating reusable prompts
 - A `Copilot Manager` webview that consolidates session history, instruction diagnostics, trusted directories, hooks, and plugin diagnostics
 - Read-only diagnostics for plugin-provided `Agents`, `Skills`, `Commands`, `Hooks`, `MCP Servers`, and `LSP Servers`
 - Bidirectional sync for core files, Skills, Templates, and Sub Agents
@@ -91,6 +92,19 @@ Manages Sub Agents from the following locations:
 In `Sub Agents Manager`, you can inspect frontmatter fields such as `model`, `tools`, `mcp-servers`, `user-invocable`, and `disable-model-invocation`. Plugin agents are shown as read-only.
 
 ![alt text](images/view_subagents.png)
+
+### Orchestration Editor
+
+`Orchestration Editor` is available from the `Orchestration` tab inside `AGENTS Manager`.
+
+- Create and edit workflow graphs using `workflow`, `agent`, and `loop` cards on a canvas
+- Configure agent order, selected subagent, delegation purpose, input, expected output, and done criteria from the Inspector
+- Configure review / retry loops with `maxAttempts` and `acceptanceCriteria`
+- Save workflow JSON files under `~/.codex/.codex-workspace/orchestrations`
+- Validate missing required fields, invalid connections, unreachable nodes, duplicate IDs, and cycles while editing
+- Generate a prompt preview from the current graph and copy it without requiring the workflow to be saved first
+
+![Orchestration Editor](images/view_orchestration.png)
 
 ### 🧠 Skills
 
