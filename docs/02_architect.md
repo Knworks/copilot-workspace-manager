@@ -9,6 +9,7 @@
   - コードベースを唯一の真実とし、Workspace / User / Plugin の実体パスをそのまま見せる
   - Tree View は「一覧と導線」、Manager View は「詳細閲覧または編集」に責務を分ける
   - plugin 由来要素は readonly を既定とし、競合は diagnostics として表示する
+  - Agent Manager 内の Orchestration Editor で、workflow 定義 JSON と prompt 生成を完結させる
 
 ## 2. 🧰 技術スタック
 
@@ -83,6 +84,7 @@ copilot-workspace-manager/
   - `AgentManagerPanelManager`
   - `McpManagerPanelManager`
 - 各 View / Panel は `refresh` や selection tracking、expansion tracking と接続される。
+- `AgentManagerPanelManager` は agent detail に加えて orchestration tab の状態配信も担う。
 
 ### 4.2 パス解決と availability
 
@@ -111,13 +113,16 @@ copilot-workspace-manager/
 ### 4.4 Commands View
 
 - 内部 ID は `copilot-workspace-manager.prompts` のままだが、ユーザー向け表示名は `Commands` である。
-- `FileExplorerProvider('prompts')` を使う。
+- `FileExplorerProvider('commands')` を使う。
 - root 候補は次のとおり。
   - workspace commands: `<workspace>/.claude/commands`
+  - workspace prompts: `<workspace>/.github/prompts`
   - plugin commands: installed plugin が提供する command roots
-- `Commands` View は `.github/prompts` や user prompts を持たない。
+- `Commands` View は user prompts を持たないが、workspace prompt files として `.github/prompts` を含む。
 - 表示順は root 単位で組み立て、配下はファイルツリーとして列挙する。
 - ファイル操作は `fileCommands.ts` 経由で行う。
+- `addPromptsFile` は commands root 選択時に保存先 QuickPick を開き、`.github/prompts` 側へ作成する場合は `applyPromptFileExtension()` で `*.prompt.md` を強制する。
+- 一覧の description は path ではなく種別ラベルのみを表示し、workspace 配下は `Workspace Command`、plugin 配下は `Plugin Commands` を使う。
 
 ### 4.5 Skills Explorer と Skill Manager
 
@@ -158,6 +163,19 @@ copilot-workspace-manager/
 - plugin agents は `readonly: true` となり、Agent Manager では lock 表示を行う。
 - `setAgentFrontmatterToggle()` は `user-invocable` / `disable-model-invocation` の frontmatter を直接更新する。
 - Explorer の enable / disable コマンドは UI 上残るが、実体は `frontmatterManaged` メッセージ表示のみで、エージェントの有効状態を永続化しない。
+- `AgentManagerPanelManager` の Webview は `Agents` タブと `Orchestration Editor` タブを持つ。
+
+#### 4.6.1 Orchestration Editor
+
+- orchestration の永続化は `orchestrationService.ts` が担う。
+- 保存先ディレクトリは `getOrchestrationDirectory()` で解決し、実体は `~/.copilot/.copilot-workspace-manager/orchestrations` である。
+- workflow モデルは `OrchestrationWorkflow` で、`version`、`workflowId`、`name`、`description`、`finalOutputFormat`、`nodes`、`edges`、`createdAt`、`updatedAt` を持つ。
+- node 種別は `workflow`、`agent`、`loop` の 3 つである。
+- `saveWorkflowDefinition()`、`loadWorkflowDefinition()`、`deleteWorkflowDefinition()`、`listSavedWorkflowSummaries()` が JSON ファイル入出力を提供する。
+- `validateWorkflowDefinition()` は workflow 名、card 構成、agent order、loop 接続、到達可能性、cycle などを検証し、`errors` と `warnings` を返す。
+- `generateWorkflowPrompt()` は validation 結果を前提に、workflow 定義から日本語または英語の prompt Markdown を生成する。
+- Agent Manager Webview は `createWorkflow`、`saveWorkflow`、`loadWorkflow`、`deleteWorkflow`、`validateWorkflow`、`generatePrompt`、`copyPrompt`、`openWorkflowFolder` の message を送信し、拡張側が処理結果を `workflowCatalog`、`workflowLoaded`、`workflowSaved`、`workflowDeleted`、`workflowValidation`、`workflowPrompt` で返す。
+- 旧形式 output node を含む workflow JSON は `loadWorkflowDefinition()` の正規化時に `finalOutputFormat` へ移行される。
 
 ### 4.7 MCP Explorer と MCP Manager
 
@@ -245,6 +263,9 @@ copilot-workspace-manager/
 | `SkillRecord` | `id`, `name`, `description`, `skillPath`, `location`, `enabled` | Skill Manager の表示モデル |
 | `AgentLocation` | `kind`, `label`, `rootPath`, `createPath`, `priority` | agent roots の一覧 |
 | `AgentManagerRecord` | `name`, `description`, `model`, `tools`, `mcpServers`, `userInvocable`, `disableModelInvocation`, `agentPath`, `readonly` | Agent Manager の表示モデル |
+| `OrchestrationWorkflow` | `version`, `workflowId`, `name`, `description`, `finalOutputFormat`, `nodes`, `edges`, `createdAt`, `updatedAt` | Orchestration Editor の保存モデル |
+| `OrchestrationWorkflowSummary` | `workflowId`, `name`, `description`, `updatedAt` | Orchestration 一覧表示用の軽量モデル |
+| `WorkflowValidationResult` | `errors`, `warnings` | workflow validation 結果 |
 | `McpServer` | `id`, `entryId`, `enabled`, `readOnly`, `sourceLabel` | Explorer 用 MCP モデル |
 | `McpFormModel` | `id`, `type`, `command`, `args`, `cwd`, `url`, `env`, `headers`, `tools`, `timeout`, `oauthClientId`, `oauthPublicClient`, `oidc`, `filterMapping`, `enabled`, `readOnly`, `sourceLabel` | MCP Manager の編集モデル |
 | `PluginRecord` | `pluginSpec`, `name`, `state`, `installKind`, `pluginRoot`, `manifestPath`, `agents`, `skills`, `commands`, `hooks`, `mcpServers`, `lspServers`, `diagnostics` | Plugins タブの統合モデル |
@@ -266,7 +287,8 @@ copilot-workspace-manager/
   - 設定ファイルと instruction files を単一 list で表示
   - `config.json` 不正時は warning icon / description を付加
 - **Commands View**
-  - Workspace Commands と Plugin Commands を root 単位で表示
+  - `.claude/commands`、`.github/prompts`、Plugin Commands を単一ビューで表示
+  - 一覧には `Workspace Command` / `Plugin Commands` の種別ラベルを表示
 - **Skills Explorer**
   - root folder と `SKILL.md` を中心に表示
   - location label で Workspace / User / Plugin の違いを見せる
@@ -282,6 +304,7 @@ copilot-workspace-manager/
 - **Agent Manager**
   - 左 list / 右 detail
   - detail には model、tools、mcpServers、frontmatter toggles、preview を表示
+  - 追加で `Orchestration Editor` タブを持ち、canvas、inspector、saved workflow selector、prompt preview を表示
 - **MCP Manager**
   - 左 list / 右 form
   - list に source label、enabled 状態、readonly 状態を表示
@@ -303,7 +326,7 @@ flowchart TB
 
   subgraph UserScope[User Scope]
     Copilot["~/.copilot\nconfig.json\nsettings.json\nmcp-config.json\ncopilot-instructions.md"]
-    ManagerMeta["~/.copilot/.copilot-workspace-manager\nmcp-config.disabled.json\ntemplates/\ncopilot-workspace-sync.json"]
+    ManagerMeta["~/.copilot/.copilot-workspace-manager\nmcp-config.disabled.json\ntemplates/\norchestrations/\ncopilot-workspace-sync.json"]
     Sessions["~/.copilot/session-state/<session>/events.jsonl"]
   end
 

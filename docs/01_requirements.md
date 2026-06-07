@@ -29,8 +29,10 @@
 | `mcp-config.json` | 有効な MCP 定義を保持する JSON | `mcpServers` または `servers` を読む |
 | `.copilot-workspace-manager/mcp-config.disabled.json` | 無効な MCP 定義を保持する JSON | ON/OFF 切替時に `mcp-config.json` と相互移送する |
 | `.copilot-workspace-manager/templates/` | Templates Explorer の保存先 | `~/.copilot/.copilot-workspace-manager/templates/` |
+| `.copilot-workspace-manager/orchestrations/` | Orchestration Editor の保存先 | workflow 定義 JSON を保持する |
 | `.copilot-workspace-manager/copilot-workspace-sync.json` | 相互同期用の状態ファイル | Core / Skills / Templates / Agents 同期の削除判定に使用する |
-| `.claude/commands/` | `Commands` View が扱う workspace commands ルート | 現実装では user prompts や IDE prompts は扱わない |
+| `.claude/commands/` | `Commands` View が扱う workspace command ルートの 1 つ | `*.md` を command file として扱う |
+| `.github/prompts/` | `Commands` View が扱う workspace prompt ルートの 1 つ | `*.prompt.md` を prompt file として扱う |
 | `.github/skills/` | workspace skills の代表ルート | `.agents/skills/`、`.claude/skills/` も併読する |
 | `.github/agents/` | workspace agents の代表ルート | `.claude/agents/` も併読する |
 | installed plugin | `config.json.installedPlugins` に列挙された plugin | `settings.json.enabledPlugins` による有効状態上書きを受ける |
@@ -38,7 +40,7 @@
 | Core Explorer | Core 設定ファイル群を開く Tree View | `config.json`、`settings.json`、workspace settings、`mcp-config.json`、instruction files を表示する |
 | Core View | エディタ領域に開く WebviewPanel | タブは `History` / `Instructions Chain` / `Trusted` / `Hooks` / `Plugins` |
 | Skill Manager | skills 一覧と有効状態を確認する WebviewPanel | `settings.json.disabledSkills` を編集する |
-| Agent Manager | agents 一覧と frontmatter を確認する WebviewPanel | `user-invocable` / `disable-model-invocation` を編集する |
+| Agent Manager | agents 一覧と Orchestration Editor を持つ WebviewPanel | agents タブと orchestration タブを持つ |
 | MCP Manager | MCP 一覧と詳細編集フォームを提供する WebviewPanel | local / stdio / http / sse を扱う |
 | `session-state/<session>/events.jsonl` | History タブが読む会話履歴ファイル | `~/.copilot/session-state/` 配下を新しい順に走査する |
 
@@ -47,9 +49,10 @@
 ## 4. 🎭 ユースケース / ユーザーストーリー
 
 - ユーザーは Core Explorer から `config.json`、`settings.json`、workspace settings、`mcp-config.json`、instructions を開ける。
-- ユーザーは `Commands` View から workspace commands と plugin commands を一覧し、workspace commands を編集できる。
+- ユーザーは `Commands` View から workspace command files、workspace prompt files、plugin commands を一覧し、workspace 配下の command / prompt files を編集できる。
 - ユーザーは Skills Explorer から Workspace / User / Plugin の skills を一覧し、Skill Manager で有効状態を確認・切替できる。
 - ユーザーは Agents Explorer から Workspace / User / Plugin の agents を一覧し、Agent Manager で frontmatter の主要項目を確認できる。
+- ユーザーは Agent Manager の Orchestration Editor で workflow を作成・保存・読込・削除し、サブエージェント委譲用 prompt を生成できる。
 - ユーザーは MCP Explorer から enabled / disabled / plugin MCP を一覧し、MCP Manager で追加・更新・削除・有効化切替を行える。
 - ユーザーは Core View で会話履歴、instruction chain、trusted folders、hooks、plugins を横断確認できる。
 - ユーザーは plugin が提供する commands / skills / agents / hooks / MCP / LSP の取得元と readonly 状態、既存定義との競合診断を確認できる。
@@ -74,6 +77,7 @@
   - `Agent Manager`
   - `MCP Manager`
 - `Commands Manager` と `Template Manager` は現実装では提供しない。
+- `Orchestration Editor` は独立 Panel ではなく `Agent Manager` 内タブとして提供する。
 
 ### 5.2 利用可否判定と設定破損時の扱い
 
@@ -181,13 +185,16 @@
 
 | 種別 | 取得元 | 表示ラベル |
 | --- | --- | --- |
-| Workspace Commands | `<workspace>/.claude/commands` | `Workspace Commands` |
+| Workspace Commands | `<workspace>/.claude/commands` | `Workspace Command` |
+| Workspace Prompts | `<workspace>/.github/prompts` | `Workspace Command` |
 | Plugin Commands | installed plugin 配下の commands roots | `Plugin Commands` |
 
-- user scope prompts、IDE prompts、`.github/prompts` は現実装では扱わない。
-- 未選択時の `openPromptsFolder` は `<workspace>/.claude/commands` を開く。
+- user scope prompts と IDE prompts は現実装では扱わない。
+- `openPromptsFolder` は選択中項目の親フォルダを開き、未選択時はエラーを表示する。
 - `Commands` View 直下は root 自体ではなく、その配下の項目を表示する。
 - plugin commands は取得元として表示するが、編集対象としては readonly 扱いを前提にする。
+- `addPromptsFile` は `Commands` View の root から追加する場合、QuickPick で `.claude/commands` と `.github/prompts` の保存先を選ばせる。
+- `.claude/commands` に追加するファイル名は `*.md`、`.github/prompts` に追加するファイル名は `*.prompt.md` に正規化する。
 
 ### 5.6 Skills Explorer と Skill Manager
 
@@ -220,6 +227,7 @@
   4. installed plugin 配下の agent roots
 - plugin agents は readonly とする。
 - Agents Explorer では `.agent.md` と `.md` の両方を表示対象にし、一覧は `ThemeIcon('hubot')` を用いる。
+- Agent Manager は `Agents` タブと `Orchestration Editor` タブを持つ。
 - Agent Manager の表示項目は次のとおり。
   - 名前
   - 説明
@@ -234,6 +242,47 @@
   - readonly 状態
 - `user-invocable` と `disable-model-invocation` の toggle は frontmatter を直接更新する。
 - Explorer の enable / disable コマンドは現実装で残っているが、実際には frontmatter 管理メッセージを表示するのみで、状態保存は行わない。
+
+#### 5.7.1 Orchestration Editor
+
+- workflow 定義の保存先は `~/.copilot/.copilot-workspace-manager/orchestrations/*.json` とする。
+- workflow の構成要素は次の 3 種類とする。
+  - `Workflow` card
+  - `Agent` card
+  - `Loop` card
+- workflow 定義には少なくとも次を保持する。
+  - `version`
+  - `workflowId`
+  - `name`
+  - `description`
+  - `finalOutputFormat`
+  - `nodes`
+  - `edges`
+  - `createdAt`
+  - `updatedAt`
+- Editor では次の操作を提供する。
+  - 新規 workflow 作成
+  - 保存済み workflow 一覧の読込
+  - workflow の保存
+  - workflow の読込
+  - workflow の削除
+  - 保存フォルダを開く
+  - validation 実行
+  - prompt 生成
+  - 生成 prompt の clipboard コピー
+- validation は少なくとも次の条件を確認する。
+  - workflow 名が空でないこと
+  - `Workflow` card が 1 つだけ存在すること
+  - `Agent` card の `order` が正で重複しないこと
+  - `Agent` card の `agentName` が空でないこと
+  - `Loop` card の `maxAttempts` が正であること
+  - `Loop` card の `acceptanceCriteria` が空でないこと
+  - `Workflow` card に入力 edge がないこと
+  - `Workflow` card の接続先が `Agent` card のみであること
+  - `Loop` card に入力元 `Agent` と出力先 `Agent` が存在すること
+  - 到達不能 node と cycle を検出すること
+- prompt 生成は validation error がある場合はブロックし、warning のみの場合は生成を許可する。
+- 旧形式の output node を含む workflow JSON は、読込時に `finalOutputFormat` へ移行する。
 
 ### 5.8 MCP Explorer と MCP Manager
 
