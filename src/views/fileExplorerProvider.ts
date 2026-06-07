@@ -91,7 +91,7 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 				return [
 						{
 							kind: 'project',
-							label: messages.explorerWorkspaceCommands,
+							label: messages.explorerWorkspaceClaudeCommands,
 							rootPath: this.rootPathOverride,
 							createPath: this.rootPathOverride,
 							priority: 1,
@@ -100,13 +100,7 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 			}
 			const roots: SkillLocation[] = [];
 			if (workspaceRoot) {
-				roots.push({
-					kind: 'project',
-					label: messages.explorerWorkspaceCommands,
-					rootPath: path.join(workspaceRoot, '.claude', 'commands'),
-					createPath: path.join(workspaceRoot, '.claude', 'commands'),
-					priority: 1,
-				});
+				roots.push(...getWorkspaceCommandLocations(workspaceRoot));
 			}
 			roots.push(...getPluginCommandLocations());
 			return roots;
@@ -136,7 +130,7 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 	}
 
 	getLocationForPath(targetPath: string): SkillLocation | undefined {
-		if (this.kind !== 'skills') {
+		if (this.kind !== 'skills' && this.kind !== 'commands') {
 			return undefined;
 		}
 		return findSkillLocationForPath(targetPath, this.getRootOptions());
@@ -280,7 +274,14 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 			return;
 		}
 		item.tooltip = `${location.label}: ${targetPath}`;
-		item.description = location.label;
+		if (this.kind === 'skills') {
+			item.description = location.label;
+			return;
+		}
+		item.description =
+			location.kind === 'plugin'
+				? messages.explorerPluginCommands
+				: messages.explorerWorkspaceCommands;
 	}
 
 	private isHiddenName(name: string): boolean {
@@ -360,6 +361,25 @@ export class FileExplorerProvider extends WorkspaceTreeDataProvider<WorkspaceTre
 				return messages.templatesExplorerEmpty;
 		}
 	}
+}
+
+function getWorkspaceCommandLocations(workspaceRoot: string): SkillLocation[] {
+	return [
+		{
+			kind: 'project',
+			label: messages.explorerWorkspaceClaudeCommands,
+			rootPath: path.join(workspaceRoot, '.claude', 'commands'),
+			createPath: path.join(workspaceRoot, '.claude', 'commands'),
+			priority: 1,
+		},
+		{
+			kind: 'project',
+			label: messages.explorerWorkspaceGithubPrompts,
+			rootPath: path.join(workspaceRoot, '.github', 'prompts'),
+			createPath: path.join(workspaceRoot, '.github', 'prompts'),
+			priority: 1,
+		},
+	];
 }
 
 function getPluginCommandLocations(): SkillLocation[] {

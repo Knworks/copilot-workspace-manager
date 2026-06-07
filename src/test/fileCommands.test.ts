@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import path from 'path';
 import {
+	applyPromptFileExtension,
 	buildSkillMarkdownTemplate,
 	getCreatableLocationsForAdd,
 	isCaseOnlyRename,
@@ -8,6 +9,7 @@ import {
 	requiresFolderSelectionForFileAdd,
 	resolveAddViewSelection,
 	resolveFolderAddViewSelection,
+	shouldPickCommandLocationForAdd,
 	shouldPickSkillLocationForAdd,
 	shouldDeleteRenameTarget,
 } from '../commands/fileCommands';
@@ -211,6 +213,26 @@ test('resolveAddViewSelection prefers item over selection', () => {
 		assert.strictEqual(shouldPickSkillLocationForAdd(promptRoot), false);
 	});
 
+	test('shouldPickCommandLocationForAdd only triggers at command roots', () => {
+		const root = new WorkspaceTreeItem(
+			'root',
+			'commands',
+			'commands',
+			0,
+			path.join('root', 'commands'),
+		);
+		const file = new WorkspaceTreeItem(
+			'file',
+			'commands',
+			'note.md',
+			0,
+			path.join('root', 'commands', 'note.md'),
+		);
+
+		assert.strictEqual(shouldPickCommandLocationForAdd(root), true);
+		assert.strictEqual(shouldPickCommandLocationForAdd(file), false);
+	});
+
 	test('getCreatableLocationsForAdd keeps all workspace and user skill roots but excludes plugin roots', () => {
 		const locations = [
 			{ kind: 'project', label: 'Workspace Skills', rootPath: path.join('repo', '.github', 'skills'), createPath: path.join('repo', '.github', 'skills') },
@@ -268,5 +290,12 @@ description: "say \\"hello\\""
 ---
 `,
 		);
+	});
+
+	test('applyPromptFileExtension enforces .prompt.md suffix', () => {
+		assert.strictEqual(applyPromptFileExtension('sample'), 'sample.prompt.md');
+		assert.strictEqual(applyPromptFileExtension('sample.md'), 'sample.prompt.md');
+		assert.strictEqual(applyPromptFileExtension('sample.prompt'), 'sample.prompt.md');
+		assert.strictEqual(applyPromptFileExtension('sample.prompt.md'), 'sample.prompt.md');
 	});
 });

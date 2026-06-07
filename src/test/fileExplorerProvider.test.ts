@@ -123,12 +123,76 @@ suite('File explorer provider', () => {
 				assert.strictEqual(children.length, 1);
 				assert.strictEqual(children[0].label, 'release-note.md');
 				assert.strictEqual(children[0].description, 'Plugin Commands');
+				assert.strictEqual(
+					children[0].tooltip,
+					`Plugin Commands: ${path.join(commandsRoot, 'release-note.md')}`,
+				);
 			} finally {
 				if (previousCopilotHome === undefined) {
 					delete process.env.COPILOT_HOME;
 				} else {
 					process.env.COPILOT_HOME = previousCopilotHome;
 				}
+			}
+		});
+	});
+
+	test('commands explorer exposes both workspace command roots', () => {
+		withTempDir((root) => {
+			const workspaceRoot = path.join(root, 'workspace');
+			const commandsRoot = path.join(workspaceRoot, '.claude', 'commands');
+			const promptsRoot = path.join(workspaceRoot, '.github', 'prompts');
+			fs.mkdirSync(commandsRoot, { recursive: true });
+			fs.mkdirSync(promptsRoot, { recursive: true });
+
+			const originalWorkspaceFolders = vscode.workspace.workspaceFolders;
+			Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+				configurable: true,
+				value: [
+					{ uri: vscode.Uri.file(workspaceRoot), name: 'workspace', index: 0 },
+				],
+			});
+
+			try {
+				const provider = new FileExplorerProvider(
+					'commands',
+					contextStub,
+					() => ({ isAvailable: true }),
+					undefined,
+					(targetPath) => {
+						if (targetPath === commandsRoot) {
+							return [{
+								name: 'command.md',
+								fullPath: path.join(commandsRoot, 'command.md'),
+								isDirectory: false,
+								isFile: true,
+							}];
+						}
+						if (targetPath === promptsRoot) {
+							return [{
+								name: 'review.prompt.md',
+								fullPath: path.join(promptsRoot, 'review.prompt.md'),
+								isDirectory: false,
+								isFile: true,
+							}];
+						}
+						return [];
+					},
+				);
+
+				const children = provider.getChildren() as vscode.TreeItem[];
+				assert.deepStrictEqual(
+					children.map((item) => [item.label, item.description]),
+					[
+						['command.md', 'Workspace Command'],
+						['review.prompt.md', 'Workspace Command'],
+					],
+				);
+			} finally {
+				Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+					configurable: true,
+					value: originalWorkspaceFolders,
+				});
 			}
 		});
 	});

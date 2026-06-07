@@ -337,6 +337,7 @@ export function isRootNode(item: WorkspaceTreeItem): boolean {
 const FILE_VIEW_KINDS: FileViewKind[] = ['commands', 'skills', 'templates'];
 const SKILL_SUBFOLDER_OPTIONS = ['references', 'scripts', 'assets'] as const;
 const SKILL_MARKDOWN_FILE_NAME = 'SKILL.md';
+const GITHUB_PROMPTS_SUFFIX = '.prompt.md';
 
 function resolveSelection(
 	item: WorkspaceTreeItem | undefined,
@@ -393,6 +394,10 @@ export function requiresFolderSelectionForFileAdd(item: WorkspaceTreeItem): bool
 
 export function shouldPickSkillLocationForAdd(item: WorkspaceTreeItem): boolean {
 	return item.kind === 'skills' && item.nodeType === 'root';
+}
+
+export function shouldPickCommandLocationForAdd(item: WorkspaceTreeItem): boolean {
+	return item.kind === 'commands' && item.nodeType === 'root';
 }
 
 function isFileViewKind(kind: string): kind is FileViewKind {
@@ -518,7 +523,7 @@ async function addFileWithSelection(
 		return;
 	}
 
-	const targetDir = resolveTargetDirectory(selection, provider);
+	const targetDir = await resolveTargetDirectoryForFileAdd(selection, provider);
 	if (!targetDir) {
 		return;
 	}
@@ -546,7 +551,9 @@ async function addFileWithSelection(
 					? SKILL_MARKDOWN_FILE_NAME
 					: value,
 			);
-			return normalized ? applyDefaultExtension(normalized) : '';
+			return normalized
+				? resolveDefaultFileName(normalized, selection, targetDir, provider)
+				: '';
 		},
 		formatLabel: (value) => messages.file.createFilePreview(value),
 	});
@@ -564,7 +571,12 @@ async function addFileWithSelection(
 		return;
 	}
 
-	const fileName = applyDefaultExtension(normalizedName);
+	const fileName = resolveDefaultFileName(
+		normalizedName,
+		selection,
+		targetDir,
+		provider,
+	);
 	const targetPath = path.join(targetDir, fileName);
 	let resolvedName = fileName;
 	if (pathExists(targetPath)) {
@@ -591,6 +603,36 @@ async function addFileWithSelection(
 	createFile(targetDir, resolvedName, templateContent);
 	await expandParentFolder(selection, views);
 	provider.refresh();
+}
+
+async function resolveTargetDirectoryForFileAdd(
+	item: WorkspaceTreeItem,
+	provider: FileExplorerProvider,
+): Promise<string | null> {
+	const targetDir = resolveTargetDirectory(item, provider);
+	if (!targetDir) {
+		return null;
+	}
+	if (!shouldPickCommandLocationForAdd(item)) {
+		return targetDir;
+	}
+
+	const locations = getCreatableLocationsForAdd(item.kind, provider.getRootOptions());
+	if (locations.length <= 1) {
+		return targetDir;
+	}
+
+	const selected = await vscode.window.showQuickPick(
+		locations.map((location) => ({
+			label: location.label,
+			description: location.createPath ?? location.rootPath,
+			location,
+		})),
+		{ placeHolder: messages.file.commandLocationPickPlaceholder },
+	);
+	return selected
+		? (selected.location.createPath ?? selected.location.rootPath)
+		: null;
 }
 
 async function addFolderWithSelection(
@@ -692,6 +734,40 @@ async function pickSkillSubfolderName(
 		{ placeHolder: messages.file.skillSubfolderPickPlaceholder },
 	);
 	return selected?.name ?? null;
+}
+
+function resolveDefaultFileName(
+	fileName: string,
+	selection: WorkspaceTreeItem,
+	targetDir: string,
+	provider: FileExplorerProvider,
+): string {
+	if (selection.kind !== 'commands') {
+		return applyDefaultExtension(fileName);
+	}
+
+	const location = provider.getLocationForPath(targetDir);
+	return isGithubPromptsLocation(location?.rootPath ?? targetDir)
+		? applyPromptFileExtension(fileName)
+		: applyDefaultExtension(fileName);
+}
+
+export function applyPromptFileExtension(fileName: string): string {
+	if (fileName.toLowerCase().endsWith(GITHUB_PROMPTS_SUFFIX)) {
+		return fileName;
+	}
+	if (fileName.toLowerCase().endsWith('.prompt')) {
+		return `${fileName}.md`;
+	}
+	if (fileName.toLowerCase().endsWith('.md')) {
+		return `${fileName.slice(0, -3)}${GITHUB_PROMPTS_SUFFIX}`;
+	}
+	return `${fileName}${GITHUB_PROMPTS_SUFFIX}`;
+}
+
+function isGithubPromptsLocation(targetPath: string): boolean {
+	const normalized = targetPath.replace(/\\/g, '/').toLowerCase();
+	return normalized.endsWith('/.github/prompts');
 }
 
 async function pickTemplateContents(): Promise<string | null> {

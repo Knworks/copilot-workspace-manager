@@ -215,9 +215,17 @@ export const messages = {
 		),
 	explorerOpenFile: localize('message.explorerOpenFile', 'Open file'),
 	explorerOpenAgentFile: localize('message.explorerOpenAgentFile', 'Open agent file'),
+	explorerWorkspaceClaudeCommands: localize(
+		'message.explorerWorkspaceClaudeCommands',
+		'Workspace Command .claude/commands',
+	),
+	explorerWorkspaceGithubPrompts: localize(
+		'message.explorerWorkspaceGithubPrompts',
+		'Workspace Command .github/prompts',
+	),
 	explorerWorkspaceCommands: localize(
 		'message.explorerWorkspaceCommands',
-		'Workspace Commands',
+		'Workspace Command',
 	),
 	explorerPluginCommands: localize(
 		'message.explorerPluginCommands',
@@ -1157,6 +1165,10 @@ export const messages = {
 		inputCommandFileName: localize(
 			'message.inputCommandFileName',
 			'Enter a Command name.',
+		),
+		commandLocationPickPlaceholder: localize(
+			'message.commandLocationPickPlaceholder',
+			'Select where to save the prompt file.',
 		),
 		inputSkillFileName: localize(
 			'message.inputSkillFileName',
