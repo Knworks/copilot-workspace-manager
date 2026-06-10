@@ -9,7 +9,7 @@
   - コードベースを唯一の真実とし、Workspace / User / Plugin の実体パスをそのまま見せる
   - Tree View は「一覧と導線」、Manager View は「詳細閲覧または編集」に責務を分ける
   - plugin 由来要素は readonly を既定とし、競合は diagnostics として表示する
-  - Agent Manager 内の Orchestration Editor で、workflow 定義 JSON と prompt 生成を完結させる
+  - Agent Manager 内の Orchestration Editor で、orchestration 定義 JSON と prompt 生成を完結させる
 
 ## 2. 🧰 技術スタック
 
@@ -169,13 +169,13 @@ copilot-workspace-manager/
 
 - orchestration の永続化は `orchestrationService.ts` が担う。
 - 保存先ディレクトリは `getOrchestrationDirectory()` で解決し、実体は `~/.copilot/.copilot-workspace-manager/orchestrations` である。
-- workflow モデルは `OrchestrationWorkflow` で、`version`、`workflowId`、`name`、`description`、`finalOutputFormat`、`nodes`、`edges`、`createdAt`、`updatedAt` を持つ。
+- orchestration モデルは `OrchestrationWorkflow` で、`version`、`workflowId`、`name`、`description`、`finalOutputFormat`、`nodes`、`edges`、`createdAt`、`updatedAt` を持つ。
 - node 種別は `workflow`、`agent`、`loop` の 3 つである。
 - `saveWorkflowDefinition()`、`loadWorkflowDefinition()`、`deleteWorkflowDefinition()`、`listSavedWorkflowSummaries()` が JSON ファイル入出力を提供する。
-- `validateWorkflowDefinition()` は workflow 名、card 構成、agent order、loop 接続、到達可能性、cycle などを検証し、`errors` と `warnings` を返す。
-- `generateWorkflowPrompt()` は validation 結果を前提に、workflow 定義から日本語または英語の prompt Markdown を生成する。
+- `validateWorkflowDefinition()` は orchestration 名、card 構成、agent order、loop 接続、到達可能性、cycle などを検証し、`errors` と `warnings` を返す。
+- `generateWorkflowPrompt()` は validation 結果を前提に、orchestration 定義から日本語または英語の prompt Markdown を生成する。
 - Agent Manager Webview は `createWorkflow`、`saveWorkflow`、`loadWorkflow`、`deleteWorkflow`、`validateWorkflow`、`generatePrompt`、`copyPrompt`、`openWorkflowFolder` の message を送信し、拡張側が処理結果を `workflowCatalog`、`workflowLoaded`、`workflowSaved`、`workflowDeleted`、`workflowValidation`、`workflowPrompt` で返す。
-- 旧形式 output node を含む workflow JSON は `loadWorkflowDefinition()` の正規化時に `finalOutputFormat` へ移行される。
+- 旧形式 output node を含む orchestration JSON は `loadWorkflowDefinition()` の正規化時に `finalOutputFormat` へ移行される。
 
 ### 4.7 MCP Explorer と MCP Manager
 
@@ -304,7 +304,7 @@ copilot-workspace-manager/
 - **Agent Manager**
   - 左 list / 右 detail
   - detail には model、tools、mcpServers、frontmatter toggles、preview を表示
-  - 追加で `Orchestration Editor` タブを持ち、canvas、inspector、saved workflow selector、prompt preview を表示
+  - 追加で `Orchestration Editor` タブを持ち、canvas、inspector、saved orchestration selector、prompt preview を表示
 - **MCP Manager**
   - 左 list / 右 form
   - list に source label、enabled 状態、readonly 状態を表示

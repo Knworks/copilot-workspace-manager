@@ -97,12 +97,12 @@ In `Sub Agents Manager`, you can inspect frontmatter fields such as `model`, `to
 
 `Orchestration Editor` is available from the `Orchestration` tab inside `AGENTS Manager`.
 
-- Create and edit workflow graphs using `workflow`, `agent`, and `loop` cards on a canvas
+- Create and edit orchestration graphs using `orchestration`, `agent`, and `loop` cards on a canvas
 - Configure agent order, selected subagent, delegation purpose, input, expected output, and done criteria from the Inspector
 - Configure review / retry loops with `maxAttempts` and `acceptanceCriteria`
-- Save workflow JSON files under `~/.codex/.codex-workspace/orchestrations`
+- Save orchestration JSON files under `~/.codex/.codex-workspace/orchestrations`
 - Validate missing required fields, invalid connections, unreachable nodes, duplicate IDs, and cycles while editing
-- Generate a prompt preview from the current graph and copy it without requiring the workflow to be saved first
+- Generate a prompt preview from the current graph and copy it without requiring the orchestration to be saved first
 
 ![Orchestration Editor](images/view_orchestration.png)
 

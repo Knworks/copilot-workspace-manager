@@ -2043,7 +2043,7 @@ function buildHtml(
 				appState.selection = { kind: 'workflow' };
 				appState.prompt = '';
 				appState.validation = message.validation || { errors: [], warnings: [] };
-				setStatus(message.status || 'Workflow loaded.');
+				setStatus(message.status || 'Orchestration loaded.');
 				renderAll();
 				return;
 			}
@@ -2052,7 +2052,7 @@ function buildHtml(
 				appState.savedWorkflows = message.savedWorkflows;
 				appState.selectedWorkflowId = message.workflow.workflowId;
 				appState.validation = message.validation || appState.validation;
-				setStatus(message.status || 'Workflow saved.');
+				setStatus(message.status || 'Orchestration saved.');
 				renderAll();
 				return;
 			}
@@ -2063,7 +2063,7 @@ function buildHtml(
 				appState.selection = { kind: 'workflow' };
 				appState.prompt = '';
 				appState.validation = message.validation || { errors: [], warnings: [] };
-				setStatus(message.status || 'Workflow deleted.');
+				setStatus(message.status || 'Orchestration deleted.');
 				renderAll();
 				return;
 			}
@@ -2432,7 +2432,7 @@ export class AgentManagerPanelManager implements vscode.Disposable {
 				workflow,
 				savedWorkflows: listSavedWorkflowSummaries(),
 				validation: validateWorkflowDefinition(workflow, vscode.env.language),
-				status: 'New workflow created.',
+				status: 'New orchestration created.',
 			});
 			return;
 		}
@@ -2450,7 +2450,7 @@ export class AgentManagerPanelManager implements vscode.Disposable {
 					workflow,
 					savedWorkflows: listSavedWorkflowSummaries(),
 					validation: validateWorkflowDefinition(workflow, vscode.env.language),
-					status: 'Workflow saved to ~/.copilot/.copilot-workspace-manager/orchestrations.',
+					status: 'Orchestration saved to ~/.copilot/.copilot-workspace-manager/orchestrations.',
 				});
 			} catch (error) {
 				this.postToWebview({
@@ -2468,7 +2468,7 @@ export class AgentManagerPanelManager implements vscode.Disposable {
 					workflow,
 					savedWorkflows: listSavedWorkflowSummaries(),
 					validation: validateWorkflowDefinition(workflow, vscode.env.language),
-					status: 'Workflow loaded.',
+					status: 'Orchestration loaded.',
 				});
 			} catch (error) {
 				this.postToWebview({
@@ -2487,7 +2487,7 @@ export class AgentManagerPanelManager implements vscode.Disposable {
 					workflow,
 					savedWorkflows: listSavedWorkflowSummaries(),
 					validation: validateWorkflowDefinition(workflow, vscode.env.language),
-					status: 'Workflow deleted.',
+					status: 'Orchestration deleted.',
 				});
 			} catch (error) {
 				this.postToWebview({

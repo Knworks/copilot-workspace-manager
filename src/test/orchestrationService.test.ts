@@ -252,7 +252,7 @@ suite('Orchestration service', () => {
 
 		const validation = validateWorkflowDefinition(workflow, 'en');
 
-		assert.ok(validation.errors.some((issue) => issue.message === 'The workflow name is required.'));
+		assert.ok(validation.errors.some((issue) => issue.message === 'The orchestration name is required.'));
 		assert.ok(validation.errors.some((issue) => issue.message === 'Each Agent card must select a subagent.'));
 	});
 

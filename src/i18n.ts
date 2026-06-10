@@ -269,7 +269,7 @@ export const messages = {
 	),
 	agentManagerNoSavedWorkflow: localize(
 		'message.agentManagerNoSavedWorkflow',
-		'No saved workflows',
+		'No saved orchestrations',
 	),
 	agentManagerSelectWorkflow: localize(
 		'message.agentManagerSelectWorkflow',
@@ -391,7 +391,7 @@ export const messages = {
 	),
 	agentManagerNoSavedWorkflowSelected: localize(
 		'message.agentManagerNoSavedWorkflowSelected',
-		'No saved workflow is selected.',
+		'No saved orchestration is selected.',
 	),
 	agentManagerCardDeleted: localize(
 		'message.agentManagerCardDeleted',
@@ -411,7 +411,7 @@ export const messages = {
 	),
 	agentManagerConfirmDeleteWorkflow: localize(
 		'message.agentManagerConfirmDeleteWorkflow',
-		'Delete the selected workflow?',
+		'Delete the selected orchestration?',
 	),
 	agentManagerConfirmDeleteCard: localize(
 		'message.agentManagerConfirmDeleteCard',
@@ -423,7 +423,7 @@ export const messages = {
 	),
 	agentManagerWorkflowDescriptionPlaceholder: localize(
 		'message.agentManagerWorkflowDescriptionPlaceholder',
-		'Describe what this workflow is meant to accomplish.',
+		'Describe what this orchestration is meant to accomplish.',
 	),
 	agentManagerWorkflowOutputFormatPlaceholder: localize(
 		'message.agentManagerWorkflowOutputFormatPlaceholder',

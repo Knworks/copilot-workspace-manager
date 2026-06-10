@@ -97,10 +97,10 @@ Core Explore からは、次へアクセスできます。
 
 `Orchestration Editor` は `AGENTS Manager` の `Orchestration` タブから利用できます。
 
-- canvas 上で `workflow` / `agent` / `loop` card を使った workflow グラフを作成・編集できます
+- canvas 上で `orchestration` / `agent` / `loop` card を使った orchestration グラフを作成・編集できます
 - Inspector から agent の順序、使用する subagent、委譲目的、入力、期待する出力、完了条件を設定できます
 - `maxAttempts` と `acceptanceCriteria` を持つ review / retry loop を設定できます
-- workflow JSON を `~/.codex/.codex-workspace/orchestrations` 配下へ保存できます
+- orchestration JSON を `~/.codex/.codex-workspace/orchestrations` 配下へ保存できます
 - 編集中に必須項目不足、不正な接続、未到達 node、重複 ID、循環をバリデーションできます
 - 保存前でも現在のグラフから prompt preview を生成し、そのままコピーできます
 
