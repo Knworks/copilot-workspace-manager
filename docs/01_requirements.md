@@ -29,7 +29,7 @@
 | `mcp-config.json` | 有効な MCP 定義を保持する JSON | `mcpServers` または `servers` を読む |
 | `.copilot-workspace-manager/mcp-config.disabled.json` | 無効な MCP 定義を保持する JSON | ON/OFF 切替時に `mcp-config.json` と相互移送する |
 | `.copilot-workspace-manager/templates/` | Templates Explorer の保存先 | `~/.copilot/.copilot-workspace-manager/templates/` |
-| `.copilot-workspace-manager/orchestrations/` | Orchestration Editor の保存先 | workflow 定義 JSON を保持する |
+| `.copilot-workspace-manager/orchestrations/` | Orchestration Editor の保存先 | orchestration 定義 JSON を保持する |
 | `.copilot-workspace-manager/copilot-workspace-sync.json` | 相互同期用の状態ファイル | Core / Skills / Templates / Agents 同期の削除判定に使用する |
 | `.claude/commands/` | `Commands` View が扱う workspace command ルートの 1 つ | `*.md` を command file として扱う |
 | `.github/prompts/` | `Commands` View が扱う workspace prompt ルートの 1 つ | `*.prompt.md` を prompt file として扱う |
@@ -52,7 +52,7 @@
 - ユーザーは `Commands` View から workspace command files、workspace prompt files、plugin commands を一覧し、workspace 配下の command / prompt files を編集できる。
 - ユーザーは Skills Explorer から Workspace / User / Plugin の skills を一覧し、Skill Manager で有効状態を確認・切替できる。
 - ユーザーは Agents Explorer から Workspace / User / Plugin の agents を一覧し、Agent Manager で frontmatter の主要項目を確認できる。
-- ユーザーは Agent Manager の Orchestration Editor で workflow を作成・保存・読込・削除し、サブエージェント委譲用 prompt を生成できる。
+- ユーザーは Agent Manager の Orchestration Editor で orchestration を作成・保存・読込・削除し、サブエージェント委譲用 prompt を生成できる。
 - ユーザーは MCP Explorer から enabled / disabled / plugin MCP を一覧し、MCP Manager で追加・更新・削除・有効化切替を行える。
 - ユーザーは Core View で会話履歴、instruction chain、trusted folders、hooks、plugins を横断確認できる。
 - ユーザーは plugin が提供する commands / skills / agents / hooks / MCP / LSP の取得元と readonly 状態、既存定義との競合診断を確認できる。
@@ -245,44 +245,52 @@
 
 #### 5.7.1 Orchestration Editor
 
-- workflow 定義の保存先は `~/.copilot/.copilot-workspace-manager/orchestrations/*.json` とする。
-- workflow の構成要素は次の 3 種類とする。
-  - `Workflow` card
+- orchestration 定義の保存先は `~/.copilot/.copilot-workspace-manager/orchestrations/*.json` とする。
+- orchestration の構成要素は次の 3 種類とする。
+  - `Orchestration` card
   - `Agent` card
   - `Loop` card
-- workflow 定義には少なくとも次を保持する。
+- orchestration 定義には少なくとも次を保持する。
   - `version`
   - `workflowId`
   - `name`
   - `description`
+  - `constraints`
   - `finalOutputFormat`
   - `nodes`
   - `edges`
   - `createdAt`
   - `updatedAt`
 - Editor では次の操作を提供する。
-  - 新規 workflow 作成
-  - 保存済み workflow 一覧の読込
-  - workflow の保存
-  - workflow の読込
-  - workflow の削除
+  - 新規 orchestration 作成
+  - 保存済み orchestration 一覧の読込
+  - orchestration の保存
+  - orchestration の読込
+  - orchestration の削除
   - 保存フォルダを開く
   - validation 実行
   - prompt 生成
   - 生成 prompt の clipboard コピー
+  - Agents Manager を離れて戻ったあとも未保存 draft を復元する
+- Orchestration インスペクタでは次の入力項目を編集できる。
+  - `name`
+  - `description`
+  - `constraints`
+  - `finalOutputFormat`
 - validation は少なくとも次の条件を確認する。
-  - workflow 名が空でないこと
-  - `Workflow` card が 1 つだけ存在すること
+  - orchestration 名が空でないこと
+  - `Orchestration` card が 1 つだけ存在すること
   - `Agent` card の `order` が正で重複しないこと
   - `Agent` card の `agentName` が空でないこと
   - `Loop` card の `maxAttempts` が正であること
   - `Loop` card の `acceptanceCriteria` が空でないこと
-  - `Workflow` card に入力 edge がないこと
-  - `Workflow` card の接続先が `Agent` card のみであること
+  - `Orchestration` card に入力 edge がないこと
+  - `Orchestration` card の接続先が `Agent` card のみであること
   - `Loop` card に入力元 `Agent` と出力先 `Agent` が存在すること
   - 到達不能 node と cycle を検出すること
 - prompt 生成は validation error がある場合はブロックし、warning のみの場合は生成を許可する。
-- 旧形式の output node を含む workflow JSON は、読込時に `finalOutputFormat` へ移行する。
+- `constraints` に入力がある場合のみ、生成 prompt の `🧑‍✈️ 基本方針` と `🤖 起動するサブエージェント` の間へ、その内容を生テキストで出力する。
+- 旧形式の output node を含む orchestration JSON は、読込時に `finalOutputFormat` へ移行する。
 
 ### 5.8 MCP Explorer と MCP Manager
 

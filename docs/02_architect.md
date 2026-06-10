@@ -169,13 +169,14 @@ copilot-workspace-manager/
 
 - orchestration の永続化は `orchestrationService.ts` が担う。
 - 保存先ディレクトリは `getOrchestrationDirectory()` で解決し、実体は `~/.copilot/.copilot-workspace-manager/orchestrations` である。
-- orchestration モデルは `OrchestrationWorkflow` で、`version`、`workflowId`、`name`、`description`、`finalOutputFormat`、`nodes`、`edges`、`createdAt`、`updatedAt` を持つ。
-- node 種別は `workflow`、`agent`、`loop` の 3 つである。
+- orchestration モデルは `OrchestrationWorkflow` で、`version`、`workflowId`、`name`、`description`、`constraints`、`finalOutputFormat`、`nodes`、`edges`、`createdAt`、`updatedAt` を持つ。
+- node 種別は `workflow`、`agent`、`loop` の 3 つで、UI 上はそれぞれ `Orchestration` / `Agent` / `Loop` card として表示する。
 - `saveWorkflowDefinition()`、`loadWorkflowDefinition()`、`deleteWorkflowDefinition()`、`listSavedWorkflowSummaries()` が JSON ファイル入出力を提供する。
 - `validateWorkflowDefinition()` は orchestration 名、card 構成、agent order、loop 接続、到達可能性、cycle などを検証し、`errors` と `warnings` を返す。
-- `generateWorkflowPrompt()` は validation 結果を前提に、orchestration 定義から日本語または英語の prompt Markdown を生成する。
+- `generateWorkflowPrompt()` は validation 結果を前提に、orchestration 定義から日本語または英語の prompt Markdown を生成する。`constraints` が空でない場合は、`基本方針` と `起動するサブエージェント` の間に制約セクションを差し込む。
 - Agent Manager Webview は `createWorkflow`、`saveWorkflow`、`loadWorkflow`、`deleteWorkflow`、`validateWorkflow`、`generatePrompt`、`copyPrompt`、`openWorkflowFolder` の message を送信し、拡張側が処理結果を `workflowCatalog`、`workflowLoaded`、`workflowSaved`、`workflowDeleted`、`workflowValidation`、`workflowPrompt` で返す。
 - 旧形式 output node を含む orchestration JSON は `loadWorkflowDefinition()` の正規化時に `finalOutputFormat` へ移行される。
+- Webview state は `vscode.setState()` / `getState()` を使って保持し、Agents Manager から離れて戻った際も未保存 orchestration draft を復元する。
 
 ### 4.7 MCP Explorer と MCP Manager
 
@@ -263,7 +264,7 @@ copilot-workspace-manager/
 | `SkillRecord` | `id`, `name`, `description`, `skillPath`, `location`, `enabled` | Skill Manager の表示モデル |
 | `AgentLocation` | `kind`, `label`, `rootPath`, `createPath`, `priority` | agent roots の一覧 |
 | `AgentManagerRecord` | `name`, `description`, `model`, `tools`, `mcpServers`, `userInvocable`, `disableModelInvocation`, `agentPath`, `readonly` | Agent Manager の表示モデル |
-| `OrchestrationWorkflow` | `version`, `workflowId`, `name`, `description`, `finalOutputFormat`, `nodes`, `edges`, `createdAt`, `updatedAt` | Orchestration Editor の保存モデル |
+| `OrchestrationWorkflow` | `version`, `workflowId`, `name`, `description`, `constraints`, `finalOutputFormat`, `nodes`, `edges`, `createdAt`, `updatedAt` | Orchestration Editor の保存モデル |
 | `OrchestrationWorkflowSummary` | `workflowId`, `name`, `description`, `updatedAt` | Orchestration 一覧表示用の軽量モデル |
 | `WorkflowValidationResult` | `errors`, `warnings` | workflow validation 結果 |
 | `McpServer` | `id`, `entryId`, `enabled`, `readOnly`, `sourceLabel` | Explorer 用 MCP モデル |
