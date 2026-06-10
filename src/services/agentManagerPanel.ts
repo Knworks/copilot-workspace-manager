@@ -1045,23 +1045,24 @@ function buildHtml(
 	<script nonce="${nonce}">
 		const vscode = acquireVsCodeApi();
 		const initialPayload = ${payload};
+		const restoredState = vscode.getState ? vscode.getState() : undefined;
 		const cardWidth = 220;
 		const cardHeight = 124;
 		const appState = {
-			activeTab: 'agents',
-			agentSearch: '',
-			selectedAgentId: '',
-			workflow: initialPayload.workflow,
-			selectedWorkflowId: '',
-			selection: { kind: 'workflow' },
-			validation: { errors: [], warnings: [] },
-			prompt: '',
-			statusMessage: '',
+			activeTab: restoredState && typeof restoredState.activeTab === 'string' ? restoredState.activeTab : 'agents',
+			agentSearch: restoredState && typeof restoredState.agentSearch === 'string' ? restoredState.agentSearch : '',
+			selectedAgentId: restoredState && typeof restoredState.selectedAgentId === 'string' ? restoredState.selectedAgentId : '',
+			workflow: restoredState && restoredState.workflow ? restoredState.workflow : initialPayload.workflow,
+			selectedWorkflowId: restoredState && typeof restoredState.selectedWorkflowId === 'string' ? restoredState.selectedWorkflowId : '',
+			selection: restoredState && restoredState.selection ? restoredState.selection : { kind: 'workflow' },
+			validation: restoredState && restoredState.validation ? restoredState.validation : { errors: [], warnings: [] },
+			prompt: restoredState && typeof restoredState.prompt === 'string' ? restoredState.prompt : '',
+			statusMessage: restoredState && typeof restoredState.statusMessage === 'string' ? restoredState.statusMessage : '',
 			agents: initialPayload.agents,
 			savedWorkflows: initialPayload.savedWorkflows,
 			orchestrationDirectory: initialPayload.orchestrationDirectory,
-			inspectorCollapsed: false,
-			previewCollapsed: true,
+			inspectorCollapsed: restoredState ? restoredState.inspectorCollapsed === true : false,
+			previewCollapsed: restoredState ? restoredState.previewCollapsed !== false : true,
 			isComposing: false,
 			connectDraft: null,
 			dragState: null,
@@ -1113,7 +1114,24 @@ function buildHtml(
 			confirmOverlay.hidden = true;
 		}
 
-		function persistState() {}
+		function persistState() {
+			if (!vscode.setState) {
+				return;
+			}
+			vscode.setState({
+				activeTab: appState.activeTab,
+				agentSearch: appState.agentSearch,
+				selectedAgentId: appState.selectedAgentId,
+				workflow: appState.workflow,
+				selectedWorkflowId: appState.selectedWorkflowId,
+				selection: appState.selection,
+				validation: appState.validation,
+				prompt: appState.prompt,
+				statusMessage: appState.statusMessage,
+				inspectorCollapsed: appState.inspectorCollapsed,
+				previewCollapsed: appState.previewCollapsed,
+			});
+		}
 
 		function makeId(prefix) {
 			return prefix + '-' + Math.random().toString(16).slice(2, 10);

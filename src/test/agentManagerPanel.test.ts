@@ -120,4 +120,39 @@ suite('Agent manager panel', () => {
 			}
 		});
 	});
+
+	test('webview script persists orchestration draft state across reloads', async () => {
+		await withTempHome(async (homeDir) => {
+			const copilotDir = path.join(homeDir, '.copilot');
+			const agentsDir = path.join(copilotDir, 'agents');
+			fs.mkdirSync(agentsDir, { recursive: true });
+
+			const originalCreateWebviewPanel = vscode.window.createWebviewPanel;
+			const fakePanel = createFakePanel();
+			(
+				vscode.window as unknown as {
+					createWebviewPanel: typeof originalCreateWebviewPanel;
+				}
+			).createWebviewPanel = () => fakePanel.panel;
+
+			try {
+				const manager = new AgentManagerPanelManager(() => undefined);
+				manager.show();
+				const html = fakePanel.panel.webview.html;
+				assert.ok(html.includes('const restoredState = vscode.getState ? vscode.getState() : undefined;'));
+				assert.ok(html.includes("workflow: restoredState && restoredState.workflow ? restoredState.workflow : initialPayload.workflow,"));
+				assert.ok(html.includes('function persistState() {'));
+				assert.ok(html.includes('vscode.setState({'));
+				assert.ok(html.includes('workflow: appState.workflow,'));
+				assert.ok(html.includes('selection: appState.selection,'));
+				manager.dispose();
+			} finally {
+				(
+					vscode.window as unknown as {
+						createWebviewPanel: typeof originalCreateWebviewPanel;
+					}
+				).createWebviewPanel = originalCreateWebviewPanel;
+			}
+		});
+	});
 });

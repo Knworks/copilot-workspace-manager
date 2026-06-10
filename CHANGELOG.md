@@ -2,6 +2,12 @@
 
 All notable changes to the "copilot-workspace-manager" extension will be documented in this file.
 
+## 1.0.3
+
+Fixed
+
+- Fixed Restore orchestration editor draft when reopening Agents Manager
+
 ## 1.0.2
 
 - Updated Commands Explore to load workspace command files from both `.claude/commands/*.md` and `.github/prompts/*.prompt.md`.
