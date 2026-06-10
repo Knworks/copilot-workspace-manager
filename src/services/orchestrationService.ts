@@ -54,6 +54,7 @@ export type OrchestrationWorkflow = {
 	workflowId: string;
 	name: string;
 	description: string;
+	constraints: string;
 	finalOutputFormat: string;
 	nodes: OrchestrationNode[];
 	edges: OrchestrationEdge[];
@@ -91,6 +92,7 @@ type PromptStrings = {
 	mainRoleBody: string[];
 	policyTitle: string;
 	policyBody: string[];
+	constraintsTitle: string;
 	agentListTitle: string;
 	loopTitle: string;
 	outputFormatTitle: string;
@@ -212,6 +214,7 @@ export function createEmptyWorkflow(
 		workflowId: createId('workflow'),
 		name,
 		description: '',
+		constraints: '',
 		finalOutputFormat: '',
 		nodes: [createWorkflowNode(createId('workflow-node'), 80, 180)],
 		edges: [],
@@ -542,6 +545,7 @@ export function generateWorkflowPrompt(
 	const strings = getPromptStrings(locale);
 	const workflowName = workflow.name.trim() || strings.fallbackName;
 	const workflowDescription = workflow.description.trim();
+	const constraints = workflow.constraints.trim();
 	const finalOutputFormat = workflow.finalOutputFormat.trim();
 	const agentNodes = getAgentNodes(workflow).sort((left, right) => left.order - right.order);
 	const resolvedLoops = resolveLoops(workflow)
@@ -562,6 +566,18 @@ export function generateWorkflowPrompt(
 		`## ${strings.policyTitle}`,
 		'',
 		...strings.policyBody.map((line) => `- ${line}`),
+	];
+
+	if (constraints) {
+		lines.push(
+			'',
+			`## ${strings.constraintsTitle}`,
+			'',
+			constraints,
+		);
+	}
+
+	lines.push(
 		'',
 		`## ${strings.agentListTitle}`,
 		'',
@@ -604,7 +620,7 @@ export function generateWorkflowPrompt(
 		`## ${strings.stepsTitle}`,
 		'',
 		...strings.stepLines.map((line, index) => `${index + 1}. ${line}`),
-	];
+	);
 
 	if (finalOutputFormat) {
 		lines.push(
@@ -749,6 +765,7 @@ function getPromptStrings(locale: PromptLocale): PromptStrings {
 				'現在のサブエージェントに対応する差し戻し設定がある場合のみ、対応付けられた `確認 No` のサブエージェントを優先して起動すること。',
 				'特別な出力指定がない場合でも、最後に必要な確認または担当作業が完了したらタスクを完了し、ユーザーへ報告すること。',
 			],
+			constraintsTitle: '🚧 制約',
 			agentListTitle: '🤖 起動するサブエージェント',
 			loopTitle: '🔄 差し戻し設定',
 			outputFormatTitle: '📐 出力形式',
@@ -832,6 +849,7 @@ function getPromptStrings(locale: PromptLocale): PromptStrings {
 			'Only when the current subagent has a review and retry setting should the mapped subagent in `Reviewer No` be launched with priority.',
 			'Even when there is no special output format, complete the task and report to the user once the last required review or assigned task is complete.',
 		],
+		constraintsTitle: 'Constraints',
 		agentListTitle: 'Subagents to launch',
 		loopTitle: 'Review and retry settings',
 		outputFormatTitle: 'Output format',
@@ -949,6 +967,7 @@ function normalizeWorkflowDefinition(
 		workflowId: workflow.workflowId || createId('workflow'),
 		name: workflow.name.trim() || 'New orchestration',
 		description: workflow.description ?? '',
+		constraints: workflow.constraints ?? '',
 		finalOutputFormat: workflow.finalOutputFormat ?? '',
 		createdAt: workflow.createdAt || nowIso,
 		updatedAt: nowIso,
@@ -983,6 +1002,8 @@ function assertWorkflowDefinition(value: unknown): OrchestrationWorkflow {
 		name: record.name,
 		description:
 			typeof record.description === 'string' ? record.description : '',
+		constraints:
+			typeof record.constraints === 'string' ? record.constraints : '',
 		finalOutputFormat:
 			typeof record.finalOutputFormat === 'string'
 				? record.finalOutputFormat

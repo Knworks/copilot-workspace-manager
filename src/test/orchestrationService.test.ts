@@ -25,6 +25,7 @@ function withTempDir(run: (root: string) => void): void {
 function createWorkflowFixture(): OrchestrationWorkflow {
 	const workflow = createEmptyWorkflow('Review loop');
 	workflow.description = 'Implement and review the task.';
+	workflow.constraints = 'Do not modify production data.\nAsk the user before changing public APIs.';
 	workflow.finalOutputFormat = 'Markdown summary / Include risks and remaining work.';
 	const workflowNode = workflow.nodes.find((node) => node.cardType === 'workflow');
 	assert.ok(workflowNode);
@@ -108,6 +109,10 @@ suite('Orchestration service', () => {
 
 			assert.strictEqual(reloaded.workflowId, saved.workflowId);
 			assert.strictEqual(reloaded.name, saved.name);
+			assert.strictEqual(
+				reloaded.constraints,
+				'Do not modify production data.\nAsk the user before changing public APIs.',
+			);
 			assert.strictEqual(
 				reloaded.finalOutputFormat,
 				'Markdown summary / Include risks and remaining work.',
@@ -264,6 +269,10 @@ suite('Orchestration service', () => {
 		assert.strictEqual(result.validation.errors.length, 0);
 		assert.ok(result.prompt.includes('name: "Review loop"'));
 		assert.ok(result.prompt.includes('## 🎯 目的'));
+		assert.ok(result.prompt.includes('## 🚧 制約'));
+		assert.ok(result.prompt.includes('Do not modify production data.\nAsk the user before changing public APIs.'));
+		assert.ok(result.prompt.indexOf('## 🧑‍✈️ 基本方針') < result.prompt.indexOf('## 🚧 制約'));
+		assert.ok(result.prompt.indexOf('## 🚧 制約') < result.prompt.indexOf('## 🤖 起動するサブエージェント'));
 		assert.ok(result.prompt.includes('implementer'));
 		assert.ok(result.prompt.includes('reviewer'));
 		assert.ok(result.prompt.includes('各列が `-` の場合、その項目はエージェント定義または関連スキルに従います。'));
@@ -293,6 +302,7 @@ suite('Orchestration service', () => {
 
 		assert.strictEqual(result.validation.errors.length, 0);
 		assert.ok(result.prompt.includes('## Goal'));
+		assert.ok(result.prompt.includes('## Constraints'));
 		assert.ok(result.prompt.includes('## Review and retry settings'));
 		assert.ok(result.prompt.includes('When a column is `-`, follow the subagent definition or related skills for that field.'));
 		assert.ok(result.prompt.includes('## Output format'));
@@ -332,6 +342,16 @@ suite('Orchestration service', () => {
 		assert.strictEqual(result.validation.errors.length, 0);
 		assert.ok(result.prompt.includes('各列が `-` の場合、その項目はエージェント定義または関連スキルに従います。'));
 		assert.ok(result.prompt.includes('| 1 | implementer | - | - | - | - |'));
+	});
+
+	test('generateWorkflowPrompt omits constraints section when empty', () => {
+		const workflow = createWorkflowFixture();
+		workflow.constraints = '';
+
+		const result = generateWorkflowPrompt(workflow, 'ja');
+
+		assert.strictEqual(result.validation.errors.length, 0);
+		assert.ok(!result.prompt.includes('## 🚧 制約'));
 	});
 
 	test('generateWorkflowPrompt refuses invalid workflows', () => {

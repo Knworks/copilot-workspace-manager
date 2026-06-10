@@ -107,6 +107,8 @@ suite('Agent manager panel', () => {
 				assert.ok(html.includes('id="orchestrationPanel"'));
 				assert.ok(html.includes('toggleAgentSetting'));
 				assert.ok(html.includes('workflowCatalog'));
+				assert.ok(html.includes('data-workflow-field="constraints"'));
+				assert.ok(html.includes('If there is a constraint, enter it here.'));
 				const scriptMatch = html.match(/<script nonce="[^"]+">([\s\S]+)<\/script>/);
 				assert.ok(scriptMatch, 'webview script should be present');
 				assert.doesNotThrow(() => new Function(scriptMatch?.[1] ?? ''));

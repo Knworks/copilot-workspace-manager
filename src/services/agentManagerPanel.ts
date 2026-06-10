@@ -146,6 +146,7 @@ function buildHtml(
 			doneCriteria: messages.agentManagerDoneCriteria,
 			maxAttempts: messages.agentManagerMaxAttempts,
 			outputFormat: messages.agentManagerOutputFormat,
+			constraints: messages.agentManagerConstraints,
 			savedIn: messages.agentManagerSavedIn,
 			cards: messages.agentManagerCards,
 			connectors: messages.agentManagerConnectors,
@@ -169,6 +170,8 @@ function buildHtml(
 				messages.agentManagerWorkflowDescriptionPlaceholder,
 			workflowOutputFormatPlaceholder:
 				messages.agentManagerWorkflowOutputFormatPlaceholder,
+			workflowConstraintsPlaceholder:
+				messages.agentManagerWorkflowConstraintsPlaceholder,
 			acceptanceCriteriaPlaceholder:
 				messages.agentManagerAcceptanceCriteriaPlaceholder,
 			purposePlaceholder: messages.agentManagerPurposePlaceholder,
@@ -1767,6 +1770,10 @@ function buildHtml(
 				'<div class="field-group">' +
 					'<label class="field-label" for="workflowDescription">' + escapeHtmlClient(uiText.description) + '</label>' +
 					'<textarea id="workflowDescription" data-workflow-field="description" placeholder="' + escapeHtmlClient(uiText.workflowDescriptionPlaceholder) + '">' + escapeHtmlClient(appState.workflow.description || '') + '</textarea>' +
+				'</div>' +
+				'<div class="field-group">' +
+					'<label class="field-label" for="workflowConstraints">' + escapeHtmlClient(uiText.constraints) + '</label>' +
+					'<textarea id="workflowConstraints" data-workflow-field="constraints" placeholder="' + escapeHtmlClient(uiText.workflowConstraintsPlaceholder) + '">' + escapeHtmlClient(appState.workflow.constraints || '') + '</textarea>' +
 				'</div>' +
 				'<div class="field-group">' +
 					'<label class="field-label" for="workflowFinalOutputFormat">' + escapeHtmlClient(uiText.outputFormat) + '</label>' +

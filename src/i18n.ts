@@ -361,6 +361,10 @@ export const messages = {
 		'message.agentManagerOutputFormat',
 		'Output format',
 	),
+	agentManagerConstraints: localize(
+		'message.agentManagerConstraints',
+		'Constraint',
+	),
 	agentManagerSavedIn: localize('message.agentManagerSavedIn', 'Saved in'),
 	agentManagerCards: localize('message.agentManagerCards', 'Cards'),
 	agentManagerConnectors: localize(
@@ -428,6 +432,10 @@ export const messages = {
 	agentManagerWorkflowOutputFormatPlaceholder: localize(
 		'message.agentManagerWorkflowOutputFormatPlaceholder',
 		'If there is a special output format instruction, enter it here.',
+	),
+	agentManagerWorkflowConstraintsPlaceholder: localize(
+		'message.agentManagerWorkflowConstraintsPlaceholder',
+		'If there is a constraint, enter it here.',
 	),
 	agentManagerAcceptanceCriteriaPlaceholder: localize(
 		'message.agentManagerAcceptanceCriteriaPlaceholder',

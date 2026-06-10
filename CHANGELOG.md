@@ -4,6 +4,7 @@ All notable changes to the "copilot-workspace-manager" extension will be documen
 
 ## 1.0.3
 
+- Add constraints field and prompt output to Orchestration Editor
 - Fixed Restore orchestration editor draft when reopening Agents Manager
 - Fixed Unify Orchestration Editor terminology around orchestration
 
